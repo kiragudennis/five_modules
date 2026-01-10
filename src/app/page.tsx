@@ -1,0 +1,921 @@
+// Landing page for Blessed Two Electronics
+import Image from "next/image";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Product } from "@/types/store";
+import { formatCurrency } from "@/lib/utils";
+import { ProductCardSkeleton } from "@/components/ProductSkeleton";
+import { Suspense } from "react";
+import {
+  ChevronDown,
+  ShieldCheck,
+  ShoppingBag,
+  Truck,
+  Users,
+  Star,
+  Quote,
+  Headphones,
+  CreditCard,
+  Sun,
+  Lightbulb,
+  Zap,
+  BatteryCharging,
+  Home as HomeIcon,
+  Shield,
+  Award,
+  Clock,
+  MapPin,
+  Phone,
+  Mail,
+  Sparkles,
+  Bolt,
+  Moon,
+  ThermometerSun,
+} from "lucide-react";
+import {
+  AnimatedSection,
+  CompactSection,
+} from "@/components/ui/animated-section";
+import { testimonials } from "@/lib/constants";
+import { DealOfTheDaySection } from "@/components/deal-of-the-day";
+
+async function fetchFeatured() {
+  let featuredProducts: Product[] = [];
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/products/featured`
+    );
+
+    if (response.ok) {
+      featuredProducts = await response.json();
+    } else {
+      console.error("Failed to fetch featured products:", response.status);
+    }
+  } catch (error) {
+    console.error("Error fetching featured products:", error);
+  }
+  return featuredProducts;
+}
+
+function FeaturedProductsGrid({ products }: { products: Product[] }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6">
+      {products.map((product, index) => (
+        <AnimatedSection
+          key={product.id}
+          delay={0.05 * index}
+          animation="fadeUp"
+          className="h-full"
+          spacing="none"
+          once
+        >
+          <Link
+            href={`/products/${product.slug}`}
+            className="group relative overflow-hidden rounded-xl border bg-background shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full hover:-translate-y-1"
+          >
+            {/* Deal of the Day Badge */}
+            {product.isDealOfTheDay && (
+              <div className="absolute top-2 left-2 z-10">
+                <div className="bg-gradient-to-r from-amber-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                  🔥 DEAL OF THE DAY
+                </div>
+              </div>
+            )}
+
+            {/* Product Rating */}
+            {product.rating && (
+              <div className="absolute top-2 right-2 z-10">
+                <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                  <span>{product.rating.toFixed(1)}</span>
+                  <span className="text-muted-foreground text-xs">
+                    ({product.reviewsCount})
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="aspect-square relative flex-shrink-0">
+              {product.images?.[0] ? (
+                <>
+                  <Image
+                    src={product.images[0]}
+                    alt={product.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-110"
+                    sizes="(max-width: 480px) 50vw,
+                           (max-width: 768px) 33vw,
+                           (max-width: 1024px) 25vw,
+                           20vw"
+                    priority={false}
+                  />
+                  {/* Subtle overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-70" />
+
+                  {/* Text overlay */}
+                  <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-white">
+                    <h3 className="font-semibold text-sm sm:text-base line-clamp-2 mb-1 transition-colors group-hover:text-amber-300">
+                      {product.title}
+                    </h3>
+                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white bg-black/40 px-2 py-0.5 rounded">
+                          {formatCurrency(product.price, product.currency)}
+                        </span>
+                        {product.originalPrice && (
+                          <span className="text-xs text-muted-foreground line-through">
+                            {formatCurrency(
+                              product.originalPrice,
+                              product.currency
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {product.category === "solar" && (
+                        <span className="bg-gradient-to-r from-amber-500/20 to-yellow-500/20 backdrop-blur-sm px-2 py-0.5 rounded text-xs capitalize border border-amber-500/30">
+                          ☀️ {product.category}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-gradient-to-br from-muted to-muted/50">
+                  <Lightbulb className="w-8 h-8" />
+                </div>
+              )}
+            </div>
+          </Link>
+        </AnimatedSection>
+      ))}
+    </div>
+  );
+}
+
+function CategoriesGrid({
+  categories,
+}: {
+  categories: Array<{
+    name: string;
+    slug: string;
+    icon: any;
+    description: string;
+  }>;
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-5">
+      {categories.map((category, index) => (
+        <AnimatedSection
+          key={category.slug}
+          delay={0.05 * index}
+          animation="fadeUp"
+          className="h-full"
+          spacing="none"
+          once
+        >
+          <Link
+            href={`/products?category=${category.slug}`}
+            className="group relative overflow-hidden rounded-xl border bg-gradient-to-b from-background to-background/80 shadow-sm hover:shadow-xl transition-all duration-300 h-full block hover:-translate-y-1 p-6"
+          >
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                <category.icon className="w-8 h-8 text-amber-600" />
+              </div>
+              <h3 className="font-bold text-base group-hover:text-amber-600 transition-colors">
+                {category.name}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {category.description}
+              </p>
+              <p className="text-xs text-amber-500 mt-2 font-medium group-hover:text-amber-400 transition-colors">
+                Shop Now →
+              </p>
+            </div>
+          </Link>
+        </AnimatedSection>
+      ))}
+    </div>
+  );
+}
+
+function TestimonialsSection() {
+  const lightingTestimonials = [
+    {
+      name: "Samuel Kamau",
+      role: "Hardware Store Owner, Kitengela",
+      content:
+        "Blessed Two Electronics has the best solar lights in Nairobi. Their products are durable and customer service is exceptional. My business has grown 40% since partnering with them.",
+      rating: 5,
+    },
+    {
+      name: "Grace Wanjiku",
+      role: "Homeowner, Ruiru",
+      content:
+        "The LED bulbs I bought have cut my electricity bill by 30%. The quality is unmatched and they deliver all over Nairobi same day!",
+      rating: 5,
+    },
+    {
+      name: "David Ochieng",
+      role: "Security Company Director",
+      content:
+        "Their security camera lights are top-notch. Bright, reliable, and perfect for commercial properties. Best lighting supplier in Duruma Road!",
+      rating: 5,
+    },
+    {
+      name: "Mercy Atieno",
+      role: "Restaurant Owner, Westlands",
+      content:
+        "The decorative lights transformed my restaurant's ambiance. Customers love it! Professional installation and fair prices.",
+      rating: 5,
+    },
+  ];
+
+  return (
+    <div className="relative overflow-hidden py-12 sm:py-4 md:py-8">
+      <div className="absolute inset-0 bg-gradient-to-b from-amber-50/20 to-yellow-50/20 dark:from-amber-900/10 dark:to-yellow-900/10" />
+
+      <div className="container mx-auto px-4 sm:px-6 relative z-10">
+        <AnimatedSection animation="fadeUp" once>
+          <div className="text-center mb-8 sm:mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-4 bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30">
+              <Quote className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                What Our Customers Say
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
+              Lighting Up Nairobi with Excellence
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Trusted by homeowners and businesses across Kenya
+            </p>
+          </div>
+        </AnimatedSection>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {lightingTestimonials.map((testimonial, index) => (
+            <AnimatedSection
+              key={index}
+              animation="fadeUp"
+              delay={0.2 * index}
+              once
+              className="h-full"
+              spacing="none"
+            >
+              <div className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-3 sm:p-6 h-full border dark:border-gray-800 hover:-translate-y-1 bg-gradient-to-br from-white to-amber-50/30 dark:from-gray-900 dark:to-amber-900/10">
+                <div className="flex items-center gap-1 mb-4">
+                  {Array.from({ length: testimonial.rating }).map((_, i) => (
+                    <Star
+                      key={i}
+                      className="w-4 h-4 fill-amber-400 text-amber-400"
+                    />
+                  ))}
+                </div>
+
+                <div className="relative mb-6">
+                  <Quote className="absolute -top-2 -left-2 w-8 h-8 text-amber-100 dark:text-amber-900/30" />
+                  <p className="leading-relaxed italic pl-4 text-gray-700 dark:text-gray-300">
+                    "{testimonial.content}"
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 border-t pt-4 dark:border-amber-800/30">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-500 to-yellow-500 flex items-center justify-center font-bold text-white">
+                    {testimonial.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-gray-900 dark:text-white">
+                      {testimonial.name}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      {testimonial.role}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AnimatedSection>
+          ))}
+        </div>
+
+        {/* Stats section */}
+        <AnimatedSection animation="fade" delay={0.8} once className="mt-12">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center">
+            {[
+              { value: "2,000+", label: "Happy Customers", icon: Users },
+              { value: "5,000+", label: "Products Sold", icon: Lightbulb },
+              { value: "24/7", label: "Nairobi Delivery", icon: Truck },
+              { value: "2-Year", label: "Warranty", icon: ShieldCheck },
+            ].map((stat, index) => (
+              <div
+                key={index}
+                className="p-4 rounded-xl border dark:border-amber-800/30 bg-gradient-to-b from-white to-amber-50/30 dark:from-gray-900 dark:to-amber-900/10"
+              >
+                <div className="flex justify-center mb-2">
+                  <stat.icon className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 dark:from-amber-400 dark:to-yellow-400 bg-clip-text text-transparent">
+                  {stat.value}
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </AnimatedSection>
+      </div>
+    </div>
+  );
+}
+
+function CouponSection() {
+  return (
+    <CompactSection>
+      <div className="container mx-auto px-4 sm:px-6">
+        <AnimatedSection
+          animation="fadeUp"
+          spacing="none"
+          once
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 p-1 shadow-2xl"
+        >
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 sm:p-8">
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 animate-pulse">
+                    <Sparkles className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="inline-block px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white text-sm font-bold shadow-lg">
+                      LIMITED TIME OFFER
+                    </span>
+                    <p className="text-sm text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                      Use code at checkout
+                    </p>
+                  </div>
+                </div>
+
+                <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                  🎁 Exclusive Discounts for You!
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-bold text-lg text-gray-900 dark:text-white">
+                          FIRST ORDER
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          New customers only
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-4 py-2 rounded-lg">
+                        15% OFF
+                      </div>
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
+                      <code className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400">
+                        WELCOME15
+                      </code>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Valid on first purchase
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-bold text-lg text-gray-900 dark:text-white">
+                          SOLAR BUNDLE
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Save on solar packages
+                        </p>
+                      </div>
+                      <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-4 py-2 rounded-lg">
+                        20% OFF
+                      </div>
+                    </div>
+                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
+                      <code className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400">
+                        SUNPOWER20
+                      </code>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Minimum order: KES 5,000
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+                  <Clock className="h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    Offers expire in 7 days • One coupon per customer • Cannot
+                    be combined
+                  </p>
+                </div>
+              </div>
+
+              <div className="lg:w-1/3 flex flex-col items-center justify-center p-6 rounded-xl bg-gradient-to-b from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/20">
+                <div className="text-center mb-6">
+                  <div className="inline-block p-4 rounded-full bg-gradient-to-r from-amber-400 to-yellow-400 mb-4">
+                    <Bolt className="w-8 h-8 text-white" />
+                  </div>
+                  <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    How to Use Coupons
+                  </h4>
+                  <ol className="text-sm text-gray-600 dark:text-gray-400 text-left space-y-2">
+                    <li className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
+                        1
+                      </div>
+                      Add items to cart
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
+                        2
+                      </div>
+                      Proceed to checkout
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
+                        3
+                      </div>
+                      Enter coupon code
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
+                        4
+                      </div>
+                      Enjoy your discount!
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>
+        </AnimatedSection>
+      </div>
+    </CompactSection>
+  );
+}
+
+export default async function Home() {
+  const featuredProducts = await fetchFeatured();
+
+  const lightingCategories = [
+    {
+      name: "LED Bulbs",
+      slug: "led-bulbs",
+      icon: Lightbulb,
+      description: "Energy efficient",
+    },
+    {
+      name: "Solar Lights",
+      slug: "solar-lights",
+      icon: Sun,
+      description: "Solar powered",
+    },
+    {
+      name: "Security Lights",
+      slug: "security-lights",
+      icon: Shield,
+      description: "Motion sensor",
+    },
+    {
+      name: "Smart Lighting",
+      slug: "smart-lighting",
+      icon: Zap,
+      description: "Wi-Fi enabled",
+    },
+    {
+      name: "Camera Lights",
+      slug: "camera-lights",
+      icon: ThermometerSun,
+      description: "CCTV integrated",
+    },
+    {
+      name: "Decorative",
+      slug: "decorative-lights",
+      icon: Sparkles,
+      description: "Home & garden",
+    },
+    {
+      name: "Commercial",
+      slug: "commercial-lighting",
+      icon: HomeIcon,
+      description: "Business use",
+    },
+    {
+      name: "Batteries",
+      slug: "batteries",
+      icon: BatteryCharging,
+      description: "Power backup",
+    },
+    {
+      name: "Outdoor",
+      slug: "outdoor-lighting",
+      icon: Moon,
+      description: "Weatherproof",
+    },
+    {
+      name: "Emergency",
+      slug: "emergency-lights",
+      icon: Bolt,
+      description: "Backup lights",
+    },
+  ];
+
+  const shopFeatures = [
+    {
+      title: "Same-Day Nairobi Delivery",
+      description:
+        "Order by 2PM, get it same day. Free delivery within Nairobi CBD for orders above KES 3,000.",
+      icon: Truck,
+      color: "from-green-500 to-emerald-500",
+    },
+    {
+      title: "2-Year Warranty",
+      description:
+        "All products come with 2-year warranty. Quality guaranteed or your money back.",
+      icon: ShieldCheck,
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      title: "Expert Installation",
+      description:
+        "Professional installation services available. Our technicians ensure perfect setup.",
+      icon: Award,
+      color: "from-amber-500 to-yellow-500",
+    },
+    {
+      title: "M-Pesa & Card Payments",
+      description:
+        "Secure payments via M-Pesa, Visa, Mastercard. Lipa Pole Pole financing available.",
+      icon: CreditCard,
+      color: "from-purple-500 to-pink-500",
+    },
+    {
+      title: "24/7 Support",
+      description:
+        "Lighting experts available round the clock. Call, WhatsApp, or visit our Duruma Road store.",
+      icon: Headphones,
+      color: "from-red-500 to-orange-500",
+    },
+    {
+      title: "Bulk Order Discounts",
+      description:
+        "Special prices for contractors, businesses, and bulk purchases. Request a quote today.",
+      icon: Users,
+      color: "from-indigo-500 to-purple-500",
+    },
+  ];
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      {/* Hero Section */}
+      <section className="relative min-h-[90vh] w-full bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-gray-900 dark:via-gray-800 dark:to-amber-900/20 flex items-center justify-center overflow-hidden">
+        {/* Animated light beams */}
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute h-1 w-64 bg-gradient-to-r from-transparent via-yellow-300/30 to-transparent"
+              style={{
+                top: `${20 + i * 15}%`,
+                left: `${i * 20}%`,
+                transform: `rotate(${i * 15}deg)`,
+                animation: `beam 8s infinite ${i * 0.5}s`,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="px-4 sm:px-6 lg:px-8 relative z-20 w-full">
+          <div className="max-w-6xl mx-auto">
+            {/* Location Badge */}
+            <AnimatedSection
+              animation="fade"
+              delay={0.1}
+              className="text-center mb-6"
+              spacing="none"
+              once
+            >
+              <div className="inline-flex items-center gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 shadow-lg">
+                <MapPin className="w-4 h-4 text-amber-600" />
+                <span>Nairobi, Duruma Road • </span>
+                <Phone className="w-4 h-4 text-amber-600" />
+                <span>0727 833 691</span>
+              </div>
+            </AnimatedSection>
+
+            {/* Main Headline */}
+            <div className="mb-6 sm:mb-8">
+              <AnimatedSection
+                animation="fade"
+                delay={0.2}
+                className="text-center"
+                spacing="normal"
+                once
+              >
+                <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight tracking-tight">
+                  <span className="block text-gray-900 dark:text-white">
+                    Lighting Up
+                  </span>
+                  <span className="bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent animate-gradient">
+                    Every Corner of Kenya
+                  </span>
+                </h1>
+              </AnimatedSection>
+            </div>
+
+            {/* Deal of the Day Badge */}
+            <AnimatedSection
+              animation="fadeUp"
+              delay={0.3}
+              className="text-center mb-6"
+              spacing="none"
+              once
+            >
+              <Link
+                href="/products?deal=true"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 hover:from-red-600 hover:via-orange-600 hover:to-amber-600 text-white font-bold py-3 px-3 sm:px-6 rounded-full sm:text-xl shadow-2xl shadow-red-500/30 hover:shadow-red-500/50 transition-all duration-300 hover:scale-105 hover:-translate-y-0.5 animate-pulse"
+              >
+                <div className="flex items-center gap-2">
+                  <Bolt className="w-6 h-6" />
+                  <span className="relative">
+                    🔥 DEAL OF THE DAY: 30% OFF!
+                    <span className="absolute -top-2 -right-6 text-xs font-normal bg-white text-red-600 px-2 py-0.5 rounded-full animate-bounce">
+                      Ends Today
+                    </span>
+                  </span>
+                  <Bolt className="w-6 h-6" />
+                </div>
+              </Link>
+            </AnimatedSection>
+
+            {/* Subheading */}
+            <AnimatedSection
+              animation="fadeUp"
+              delay={0.4}
+              className="text-center"
+              spacing="none"
+              once
+            >
+              <div className="mb-8 sm:mb-12">
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 dark:text-gray-200 mb-4">
+                  Kenya's Leading Lighting Solutions Provider
+                </p>
+                <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
+                  From energy-saving LED bulbs to advanced solar systems -
+                  illuminating homes and businesses across Nairobi since 2010
+                </p>
+              </div>
+            </AnimatedSection>
+
+            {/* Feature badges */}
+            <AnimatedSection
+              animation="fadeUp"
+              delay={0.6}
+              className="mb-8 sm:mb-12"
+              spacing="none"
+              once
+            >
+              <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
+                {[
+                  { text: "Same-Day Delivery", icon: Truck },
+                  { text: "2-Year Warranty", icon: ShieldCheck },
+                  { text: "Free Installation", icon: Award },
+                  { text: "M-Pesa Accepted", icon: CreditCard },
+                  { text: "Expert Advice", icon: Headphones },
+                ].map((badge, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 shadow-lg hover:shadow-xl transition-shadow duration-300 border dark:border-gray-700"
+                  >
+                    <badge.icon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    {badge.text}
+                  </div>
+                ))}
+              </div>
+            </AnimatedSection>
+
+            {/* CTA Buttons */}
+            <AnimatedSection
+              animation="fadeUp"
+              delay={0.8}
+              className="mb-8"
+              spacing="none"
+              once
+            >
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <Button
+                  asChild
+                  size="lg"
+                  className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold py-6 px-8 rounded-xl text-lg transition-all duration-300 hover:scale-105 hover:shadow-2xl shadow-amber-500/40 w-full sm:w-auto"
+                >
+                  <Link
+                    href="/products"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <ShoppingBag className="w-5 h-5" />
+                    SHOP ALL LIGHTS
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="font-bold py-6 px-8 rounded-xl text-lg transition-all duration-300 hover:scale-105 w-full sm:w-auto border-amber-500 text-amber-600 hover:bg-amber-50"
+                >
+                  <Link
+                    href="/contact"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <Phone className="w-5 h-5" />
+                    GET EXPERT ADVICE
+                  </Link>
+                </Button>
+              </div>
+            </AnimatedSection>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <ChevronDown className="w-6 h-6 text-amber-600/70" />
+        </div>
+      </section>
+
+      {/* Categories */}
+      <CompactSection>
+        <div className="container mx-auto px-4 sm:px-6">
+          <AnimatedSection animation="fadeUp" spacing="none" once>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-4 sm:mb-12">
+              Complete Lighting Solutions
+            </h2>
+            <p className="sm:text-lg text-center text-muted-foreground max-w-3xl mx-auto mb-6 sm:mb-12">
+              Everything you need to light up your home or business - from
+              energy-saving bulbs to advanced solar systems
+            </p>
+          </AnimatedSection>
+          <CategoriesGrid categories={lightingCategories} />
+        </div>
+      </CompactSection>
+
+      {/* Coupons Section */}
+      <CouponSection />
+
+      {/* Featured Products */}
+      <CompactSection>
+        <div className="container mx-auto px-4 sm:px-6">
+          <AnimatedSection animation="fadeUp" spacing="none" once>
+            <div className="text-center mb-8 sm:mb-12">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <div className="h-px w-20 bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+                <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 text-amber-700 dark:text-amber-300 font-medium">
+                  <Bolt className="w-4 h-4" />
+                  TOP PICKS THIS WEEK
+                </span>
+                <div className="h-px w-20 bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
+                Best Selling Lighting Products
+              </h2>
+              <p className="text-muted-foreground sm:text-lg max-w-2xl mx-auto">
+                Quality lighting solutions loved by thousands of Kenyan homes
+                and businesses
+              </p>
+            </div>
+          </AnimatedSection>
+
+          <Suspense
+            fallback={
+              <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <ProductCardSkeleton key={index} />
+                ))}
+              </div>
+            }
+          >
+            <FeaturedProductsGrid products={featuredProducts} />
+          </Suspense>
+
+          {/* Deal of the day section */}
+          {featuredProducts.some((p) => p.isDealOfTheDay) && (
+            <DealOfTheDaySection products={featuredProducts} />
+          )}
+        </div>
+      </CompactSection>
+
+      {/* Why Choose Us */}
+      <CompactSection>
+        <div className="container mx-auto px-4 sm:px-6">
+          <AnimatedSection animation="fadeUp" spacing="none" once>
+            <div className="text-center mb-8 sm:mb-12">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
+                Why Choose Blessed Two Electronics
+              </h2>
+              <p className="text-muted-foreground sm:text-lg max-w-2xl mx-auto">
+                The trusted lighting partner for Nairobi homes and businesses
+                since 2010
+              </p>
+            </div>
+          </AnimatedSection>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {shopFeatures.map((feature, index) => (
+              <AnimatedSection
+                key={index}
+                animation="fadeUp"
+                delay={0.1 * index}
+                once
+                className="h-full"
+                spacing="none"
+              >
+                <div className="flex flex-col p-6 rounded-2xl bg-white dark:bg-gray-900 shadow-lg hover:shadow-xl transition-all duration-300 h-full hover:-translate-y-1 border dark:border-gray-800">
+                  <div
+                    className={`w-12 h-12 rounded-lg bg-gradient-to-r ${feature.color} flex items-center justify-center mb-4`}
+                  >
+                    <feature.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </AnimatedSection>
+            ))}
+          </div>
+        </div>
+      </CompactSection>
+
+      {/* Testimonials */}
+      <TestimonialsSection />
+
+      {/* Final CTA */}
+      <CompactSection className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white">
+        <div className="container mx-auto px-4 sm:px-6 text-center">
+          <AnimatedSection animation="fade" once>
+            <div className="max-w-3xl mx-auto">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
+                Need Lighting Solutions?
+              </h2>
+              <p className="text-lg sm:text-xl mb-6 opacity-95">
+                Visit our store on Duruma Road or chat with our lighting experts
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                  <MapPin className="w-8 h-8 mx-auto mb-2" />
+                  <h4 className="font-bold mb-1">Visit Our Store</h4>
+                  <p className="text-sm opacity-90">Duruma Road, Nairobi</p>
+                  <p className="text-sm opacity-80">Mon-Sat: 8AM-8PM</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                  <Phone className="w-8 h-8 mx-auto mb-2" />
+                  <h4 className="font-bold mb-1">Call Us</h4>
+                  <p className="text-sm opacity-90">0700 000 000</p>
+                  <p className="text-sm opacity-80">24/7 Support</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                  <Mail className="w-8 h-8 mx-auto mb-2" />
+                  <h4 className="font-bold mb-1">Email Us</h4>
+                  <p className="text-sm opacity-90">info@blessedtwo.co.ke</p>
+                  <p className="text-sm opacity-80">Quick Response</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  asChild
+                  size="lg"
+                  className="bg-white text-amber-700 hover:bg-white/90 font-bold px-10 py-6 text-lg rounded-xl hover:scale-105 transition-transform duration-300"
+                >
+                  <Link href="/products">Shop All Products →</Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="border-white text-white hover:bg-white/20 font-bold px-10 py-6 text-lg rounded-xl hover:scale-105 transition-transform duration-300"
+                >
+                  <Link href="/contact">Get Free Consultation</Link>
+                </Button>
+              </div>
+              <p className="mt-6 text-sm opacity-80">
+                Free delivery in Nairobi • 2-year warranty • Professional
+                installation • M-Pesa accepted
+              </p>
+            </div>
+          </AnimatedSection>
+        </div>
+      </CompactSection>
+    </div>
+  );
+}
