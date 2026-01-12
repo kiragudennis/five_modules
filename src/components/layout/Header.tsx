@@ -32,6 +32,8 @@ const adminNavigation = [
   { name: "Dashboard", href: "/admin" },
   { name: "Products", href: "/admin/products" },
   { name: "Orders", href: "/admin/orders" },
+  { name: "Coupons", href: "/admin/coupons" },
+  { name: "Tracking", href: "/admin/tracking" },
   { name: "Customers", href: "/admin/customers" },
   { name: "Analytics", href: "/admin/analytics" },
 ];
@@ -50,7 +52,10 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-colors duration-300 px-2">
       <div className="container mx-auto flex h-16 items-center justify-between">
         <div className="flex items-center justify-center gap-6">
-          <Link href="/" className="font-bold text-xl">
+          <Link
+            href="/"
+            className="font-bold text-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent animate-gradient-xy"
+          >
             Blessed Two
           </Link>
 

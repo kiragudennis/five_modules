@@ -4,19 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Filter,
-  ChevronDown,
-  ShoppingBag,
   Sparkles,
   X,
   ShoppingCart,
   Check,
   Sun,
   Lightbulb,
-  Zap,
-  BatteryCharging,
-  Shield,
-  ThermometerSun,
-  Moon,
   Star,
   Bolt,
   Clock,
@@ -50,56 +43,21 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/lib/context/StoreContext";
-import { Product } from "@/types/store";
+import { Coupon, Product } from "@/types/store";
 import { FloatingCartButton } from "@/components/cartButton";
 import axios from "axios";
-import { beltLevels, cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { ProductCardSkeleton } from "@/components/ProductSkeleton";
 import Image from "next/image";
-
-// Updated categories for lighting products
-const lightingCategories = [
-  { id: "led-bulbs", name: "LED Bulbs", icon: Lightbulb },
-  { id: "solar-lights", name: "Solar Lights", icon: Sun },
-  { id: "security-lights", name: "Security Lights", icon: Shield },
-  { id: "smart-lighting", name: "Smart Lighting", icon: Zap },
-  { id: "camera-lights", name: "Camera Lights", icon: ThermometerSun },
-  { id: "decorative-lights", name: "Decorative Lights", icon: Sparkles },
-  { id: "commercial-lighting", name: "Commercial", icon: ShoppingBag },
-  { id: "batteries", name: "Batteries", icon: BatteryCharging },
-  { id: "outdoor-lighting", name: "Outdoor", icon: Moon },
-  { id: "emergency-lights", name: "Emergency", icon: Bolt },
-];
-
-// Lighting-specific tags
-const lightingTags = [
-  { id: "energy-saving", name: "Energy Saving" },
-  { id: "waterproof", name: "Waterproof" },
-  { id: "motion-sensor", name: "Motion Sensor" },
-  { id: "wifi-enabled", name: "Wi-Fi Enabled" },
-  { id: "dimmable", name: "Dimmable" },
-  { id: "smart-home", name: "Smart Home" },
-  { id: "solar-powered", name: "Solar Powered" },
-  { id: "long-lasting", name: "Long Lasting" },
-  { id: "easy-install", name: "Easy Install" },
-  { id: "warranty", name: "2-Year Warranty" },
-];
-
-const sortOptions = [
-  { value: "featured", label: "Featured" },
-  { value: "newest", label: "Newest" },
-  { value: "price-asc", label: "Price: Low to High" },
-  { value: "price-desc", label: "Price: High to Low" },
-  { value: "rating-desc", label: "Top Rated" },
-  { value: "deal", label: "Deal of the Day" },
-];
+import { toast } from "sonner";
+import { lightingCategories, lightingTags, sortOptions } from "@/lib/constants";
 
 export default function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; deal?: string }>;
 }) {
-  const { category } = use(searchParams);
+  const { category, deal } = use(searchParams);
   const { state } = useStore();
   const orderData = state.pendingOrder;
   const router = useRouter();
@@ -107,7 +65,7 @@ export default function ProductsPage({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("featured");
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
-  const [showDealsOnly, setShowDealsOnly] = useState(false);
+  const [showDealsOnly, setShowDealsOnly] = useState(Boolean(deal) || false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { dispatch } = useStore();
   const [products, setProducts] = useState<Product[]>([]);
@@ -116,14 +74,15 @@ export default function ProductsPage({
   const [clickedStates, setClickedStates] = useState<Record<string, boolean>>(
     {}
   );
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
 
-  // Fetch products
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await axios.get("/api/products");
-      setProducts(res.data || []);
+      setProducts(res.data.products || []);
+      setCoupons(res.data.coupons || []); // Add state for coupons
     } catch (err: any) {
       setError(err.message || "Failed to load products");
       console.error("Error fetching products:", err);
@@ -301,7 +260,7 @@ export default function ProductsPage({
         <Separator className="my-6" />
       </div>
 
-      {/* Special Offers Banner */}
+      {/* Special Offers Banner - Updated */}
       <div className="mb-8">
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 p-1">
           <div className="bg-white dark:bg-gray-900 rounded-lg p-4 sm:p-6">
@@ -314,11 +273,29 @@ export default function ProductsPage({
                 </div>
                 <div>
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-1">
-                    🎁 Use Coupon Code:{" "}
-                    <span className="text-amber-600">WELCOME15</span>
+                    {coupons.length > 0 ? (
+                      <>
+                        🎁 Use Coupon Code:{" "}
+                        <span className="text-amber-600">
+                          {coupons[0].code}
+                        </span>
+                        <span className="ml-2 text-sm bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                          {coupons[0].discount_type === "percentage"
+                            ? `${coupons[0].discount_value}% OFF`
+                            : `${formatCurrency(
+                                coupons[0].discount_value,
+                                "KES"
+                              )} OFF`}
+                        </span>
+                      </>
+                    ) : (
+                      "🎁 Special Offers Available"
+                    )}
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Get 15% off your first order! Limited time offer.
+                    {coupons.length > 0
+                      ? coupons[0].description || "Limited time offer!"
+                      : "Check our exclusive discounts below"}
                   </p>
                 </div>
               </div>
@@ -327,7 +304,11 @@ export default function ProductsPage({
                 className="border-amber-500 text-amber-600 hover:bg-amber-50 whitespace-nowrap"
                 asChild
               >
-                <Link href="#coupons">View All Coupons</Link>
+                <Link href="#coupons">
+                  {coupons.length > 1
+                    ? `View ${coupons.length} Offers`
+                    : "View Offer"}
+                </Link>
               </Button>
             </div>
           </div>
@@ -819,7 +800,7 @@ export default function ProductsPage({
             ))}
       </div>
 
-      {/* Coupons Section */}
+      {/* Coupons Section - Updated */}
       <div id="coupons" className="mt-16 pt-8 border-t">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
@@ -831,82 +812,129 @@ export default function ProductsPage({
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Coupon Cards */}
-          {[
-            {
-              code: "WELCOME15",
-              discount: "15% OFF",
-              description: "First order discount",
-              minAmount: "KES 1,000",
-              expiry: "30 Days",
-              color: "from-amber-500 to-yellow-500",
-            },
-            {
-              code: "SUNPOWER20",
-              discount: "20% OFF",
-              description: "Solar products bundle",
-              minAmount: "KES 5,000",
-              expiry: "7 Days",
-              color: "from-orange-500 to-red-500",
-            },
-            {
-              code: "BULK25",
-              discount: "25% OFF",
-              description: "Bulk orders (10+ items)",
-              minAmount: "KES 15,000",
-              expiry: "Valid always",
-              color: "from-blue-500 to-cyan-500",
-            },
-          ].map((coupon, index) => (
-            <div
-              key={index}
-              className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 p-6"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/10 to-yellow-500/10 rounded-full -translate-y-8 translate-x-8" />
+        {coupons.length === 0 ? (
+          <div className="text-center py-12 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 rounded-xl">
+            <Tag className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+            <h4 className="text-lg font-semibold mb-2">No Active Coupons</h4>
+            <p className="text-muted-foreground mb-4">
+              Check back soon for amazing offers!
+            </p>
+            <Button variant="outline" asChild>
+              <Link href="/contact">Contact us for special deals</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {coupons.map((coupon) => {
+              const discountText =
+                coupon.discount_type === "percentage"
+                  ? `${coupon.discount_value}% OFF`
+                  : `${formatCurrency(coupon.discount_value, "KES")} OFF`;
 
-              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">
-                      {coupon.discount}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {coupon.description}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Min: {coupon.minAmount}
-                  </Badge>
-                </div>
+              const minAmount =
+                coupon.min_order_amount > 0
+                  ? `KES ${coupon.min_order_amount.toLocaleString()}`
+                  : "No minimum";
 
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center mb-4">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                    USE CODE
-                  </div>
-                  <code className="text-2xl font-mono font-bold text-amber-600 dark:text-amber-400">
-                    {coupon.code}
-                  </code>
-                </div>
+              // Calculate urgency
+              const expiryDate = new Date(coupon.valid_until);
+              const today = new Date();
+              const daysLeft = Math.ceil(
+                (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+              );
+              const usageLeft = coupon.usage_limit
+                ? coupon.usage_limit - (coupon.used_count || 0)
+                : null;
 
-                <div className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Clock className="w-4 h-4" />
-                    <span>Expires in {coupon.expiry}</span>
+              return (
+                <div
+                  key={coupon.id}
+                  className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 p-6 hover:shadow-lg transition-all duration-300 group"
+                >
+                  {/* Limited Badge */}
+                  {usageLeft && usageLeft <= 10 && (
+                    <div className="absolute top-4 right-4">
+                      <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs animate-pulse">
+                        🔥 Only {usageLeft} left!
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Urgent Badge */}
+                  {daysLeft <= 3 && (
+                    <div className="absolute top-12 right-4">
+                      <Badge variant="destructive" className="text-xs">
+                        ⏰ {daysLeft} days left!
+                      </Badge>
+                    </div>
+                  )}
+
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="font-bold text-lg text-gray-900 dark:text-white">
+                          {discountText}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          {coupon.description || "Special lighting offer"}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        Min: {minAmount}
+                      </Badge>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/30 dark:to-yellow-900/30 rounded-lg p-4 text-center mb-4 group-hover:scale-[1.02] transition-transform duration-300">
+                      <div className="text-xs text-amber-600 dark:text-amber-400 mb-1 font-medium">
+                        USE CODE AT CHECKOUT
+                      </div>
+                      <code className="text-2xl font-mono font-bold text-amber-600 dark:text-amber-400 tracking-wider">
+                        {coupon.code}
+                      </code>
+                    </div>
+
+                    <div className="flex justify-between items-center text-sm">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-gray-500" />
+                        <span
+                          className={
+                            daysLeft <= 7
+                              ? "text-red-500 font-bold"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {daysLeft <= 0 ? "Expired" : `${daysLeft} days left`}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-amber-500 text-amber-600 hover:bg-amber-50"
+                          onClick={() => {
+                            navigator.clipboard.writeText(coupon.code);
+                            toast.success(
+                              `Copied ${coupon.code} to clipboard!`
+                            );
+                          }}
+                        >
+                          Copy Code
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-amber-500 hover:bg-amber-600 text-white"
+                          asChild
+                        >
+                          <Link href="/cart">Use Now</Link>
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-amber-500 text-amber-600 hover:bg-amber-50"
-                    onClick={() => navigator.clipboard.writeText(coupon.code)}
-                  >
-                    Copy Code
-                  </Button>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bottom CTA */}

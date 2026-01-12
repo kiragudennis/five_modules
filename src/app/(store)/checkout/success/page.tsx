@@ -47,8 +47,6 @@ export default function SuccessPage({
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentComplete, setPaymentComplete] = useState(false);
-  const router = useRouter();
-  const { profile } = useAuth();
   const { dispatch } = useStore();
 
   useEffect(() => {

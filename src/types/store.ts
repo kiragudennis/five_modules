@@ -19,11 +19,58 @@ export interface Product {
   belt_level: string;
   tags: string[];
   featured: boolean;
-  metadata: {};
+  metadata: { [key: string]: string } | null;
   rating: number;
   reviewsCount: number;
   isDealOfTheDay: boolean;
   created_at: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  min_order_amount: number;
+  max_discount_amount?: number;
+  valid_from: string;
+  valid_until: string;
+  usage_limit?: number;
+  used_count?: number;
+  is_active: boolean;
+  applicable_categories: string[];
+  excluded_products: string[];
+  single_use_per_customer: boolean;
+  description?: string;
+  created_at: string;
+  coupon_redemptions?: { count: number }[];
+}
+
+export interface ApiResponse {
+  products: Product[];
+  coupons: Coupon[];
+}
+
+export interface TrackingOrder {
+  id: string;
+  order_number: string;
+  customer: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  shipping_address: {
+    city: string;
+    state: string;
+    country: string;
+  };
+  total: number;
+  status: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
+  tracking_number: string | null;
+  estimated_delivery: string | null;
+  shipping_method: string;
+  created_at: string;
+  items_count: number;
 }
 
 export interface ProductFormData {

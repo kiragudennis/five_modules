@@ -24,6 +24,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -32,19 +33,7 @@ import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Product } from "@/types/store";
-import { categoryOptions } from "@/lib/constants";
-
-const beltLevels = [
-  { id: "all", name: "All Levels" },
-  { id: "white", name: "White Belt" },
-  { id: "yellow", name: "Yellow Belt" },
-  { id: "orange", name: "Orange Belt" },
-  { id: "green", name: "Green Belt" },
-  { id: "blue", name: "Blue Belt" },
-  { id: "purple", name: "Purple Belt" },
-  { id: "brown", name: "Brown Belt" },
-  { id: "black", name: "Black Belt" },
-];
+import { lightingCategories } from "@/lib/constants";
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,7 +44,7 @@ export default function AdminProductsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { supabase } = useAuth();
 
-  const itemsPerPage = 5;
+  const itemsPerPage = 20;
 
   const fetchProducts = useCallback(async () => {
     const { data, error } = await supabase.from("products").select("*"); // Add select to explicitly get all columns
@@ -149,11 +138,7 @@ export default function AdminProductsPage() {
     const matchesCategory =
       selectedCategory === "all" || product.category === selectedCategory;
 
-    // Belt level filter
-    const matchesBeltLevel =
-      selectedBeltLevel === "all" || product.belt_level === selectedBeltLevel;
-
-    return matchesSearch && matchesCategory && matchesBeltLevel;
+    return matchesSearch && matchesCategory;
   });
 
   // Pagination
@@ -206,14 +191,15 @@ export default function AdminProductsPage() {
             <SheetContent side="right">
               <SheetHeader>
                 <SheetTitle>Filters</SheetTitle>
+                <SheetDescription>Refine your product list</SheetDescription>
               </SheetHeader>
 
-              <div className="py-6 space-y-6">
+              <div className="py-6 space-y-6 p-2 sm-4">
                 {/* Categories */}
                 <div>
                   <h3 className="font-medium mb-3">Categories</h3>
                   <div className="space-y-2">
-                    {categoryOptions.map((category) => (
+                    {lightingCategories?.map((category) => (
                       <div key={category.id} className="flex items-center">
                         <input
                           type="radio"
@@ -228,31 +214,6 @@ export default function AdminProductsPage() {
                           className="ml-2 text-sm"
                         >
                           {category.name}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Belt Levels */}
-                <div>
-                  <h3 className="font-medium mb-3">Belt Level</h3>
-                  <div className="space-y-2">
-                    {beltLevels.map((level) => (
-                      <div key={level.id} className="flex items-center">
-                        <input
-                          type="radio"
-                          id={`level-${level.id}`}
-                          name="beltLevel"
-                          checked={selectedBeltLevel === level.id}
-                          onChange={() => setSelectedBeltLevel(level.id)}
-                          className="h-4 w-4 rounded-full border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <label
-                          htmlFor={`level-${level.id}`}
-                          className="ml-2 text-sm"
-                        >
-                          {level.name}
                         </label>
                       </div>
                     ))}
@@ -298,21 +259,9 @@ export default function AdminProductsPage() {
           {selectedCategory !== "all" && (
             <div className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-sm">
               Category:{" "}
-              {categoryOptions.find((c) => c.id === selectedCategory)?.name}
+              {lightingCategories.find((c) => c.id === selectedCategory)?.name}
               <button
                 onClick={() => setSelectedCategory("all")}
-                className="ml-2 text-muted-foreground hover:text-foreground"
-              >
-                &times;
-              </button>
-            </div>
-          )}
-
-          {selectedBeltLevel !== "all" && (
-            <div className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-sm">
-              Belt: {beltLevels.find((b) => b.id === selectedBeltLevel)?.name}
-              <button
-                onClick={() => setSelectedBeltLevel("all")}
                 className="ml-2 text-muted-foreground hover:text-foreground"
               >
                 &times;
@@ -333,7 +282,6 @@ export default function AdminProductsPage() {
                 <TableHead>Price</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Belt Level</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -364,9 +312,6 @@ export default function AdminProductsPage() {
                   </TableCell>
                   <TableCell className="capitalize">
                     {product.category}
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {product.belt_level}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

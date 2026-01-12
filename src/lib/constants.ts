@@ -1,259 +1,417 @@
+// src/lib/constants.ts
+
+export const productCategories = [
+  "led-bulbs",
+  "solar-lights",
+  "security-lights",
+  "smart-lighting",
+  "camera-lights",
+  "decorative-lights",
+  "commercial-lighting",
+  "batteries",
+  "outdoor-lighting",
+  "emergency-lights",
+];
+
 import {
-  CreditCard,
-  Globe,
-  Package,
+  Lightbulb,
+  Sun,
+  Shield,
+  Sparkles,
+  Camera,
+  BatteryCharging,
+  Moon,
+  Zap,
+  Home,
+  Fan,
+  Car,
+  Factory,
+  Flashlight,
+  Plug,
+  PanelTop,
+  Truck,
   ShieldCheck,
-  Smartphone,
+  Award,
+  CreditCard,
+  Headphones,
   Users,
 } from "lucide-react";
 
-export const categoryOptions = [
-  { id: "uniforms", name: "Uniforms" },
-  { id: "gear", name: "Protective Gear" },
-  { id: "belts", name: "Belts" },
-  { id: "equipment", name: "Training Equipment" },
-  { id: "womens-fashion", name: "Women's Fashion" },
-  { id: "mens-collection", name: "Men's Collection" },
-  { id: "electronics", name: "Electronics" },
-  { id: "furniture", name: "Furniture" },
-  { id: "beauty", name: "Beauty & Cosmetics" },
-  { id: "sports-fitness", name: "Sports & Fitness" },
-  { id: "baby-kids", name: "Baby & Kids" },
-  { id: "groceries", name: "Groceries" },
-  { id: "mobile-phones", name: "Mobile Phones" },
-  { id: "automotive", name: "Automotive" },
-  { id: "books-stationery", name: "Books & Stationery" },
-  { id: "health-wellness", name: "Health & Wellness" },
-  { id: "jewelry-watches", name: "Jewelry & Watches" },
-  { id: "computing", name: "Computing" },
+// Blessed Two Electronics categories - Enhanced version
+export const lightingCategories = [
+  {
+    id: "led-bulbs",
+    slug: "led-bulbs",
+    name: "LED Bulbs",
+    description: "Energy efficient home & office bulbs",
+    image: "/categories/led-bulbs.jpg",
+    icon: Lightbulb,
+    color: "from-green-500 to-emerald-500",
+    subcategories: ["Edison Bulbs", "Corn Bulbs", "Panel Lights", "Spotlights"],
+    popular: true,
+  },
+  {
+    id: "solar-lighting",
+    slug: "solar-lighting",
+    name: "Solar Lighting",
+    description: "Complete solar lighting systems",
+    image: "/categories/solar-lighting.jpg",
+    icon: Sun,
+    color: "from-amber-500 to-orange-500",
+    subcategories: [
+      "Solar Home Kits",
+      "Street Lights",
+      "Garden Lights",
+      "Solar Flood Lights",
+    ],
+    popular: true,
+  },
+  {
+    id: "security-lights",
+    slug: "security-lights",
+    name: "Security Lights",
+    description: "Motion sensor & surveillance lighting",
+    image: "/categories/security-lights.jpg",
+    icon: Shield,
+    color: "from-blue-500 to-cyan-500",
+    subcategories: [
+      "PIR Motion Lights",
+      "Flood Lights",
+      "Wall Lights",
+      "Post Lights",
+    ],
+    popular: true,
+  },
+  {
+    id: "smart-lighting",
+    slug: "smart-lighting",
+    name: "Smart Lighting",
+    description: "App & voice controlled lighting",
+    image: "/categories/smart-lighting.jpg",
+    icon: Sparkles,
+    color: "from-purple-500 to-pink-500",
+    subcategories: [
+      "Smart Bulbs",
+      "Smart Switches",
+      "LED Strips",
+      "Smart Controllers",
+    ],
+  },
+  {
+    id: "cctv-lighting",
+    slug: "cctv-lighting",
+    name: "CCTV Lighting",
+    description: "Specialized lighting for surveillance",
+    image: "/categories/cctv-lighting.jpg",
+    icon: Camera,
+    color: "from-red-500 to-orange-500",
+    subcategories: [
+      "IR Illuminators",
+      "Camera Flood Lights",
+      "License Plate Lights",
+    ],
+  },
+  {
+    id: "home-lighting",
+    slug: "home-lighting",
+    name: "Home Lighting",
+    description: "Complete home lighting solutions",
+    image: "/categories/home-lighting.jpg",
+    icon: Home,
+    color: "from-yellow-500 to-amber-500",
+    subcategories: [
+      "Ceiling Lights",
+      "Wall Lights",
+      "Table Lamps",
+      "Chandeliers",
+    ],
+    popular: true,
+  },
+  {
+    id: "commercial-lighting",
+    slug: "commercial-lighting",
+    name: "Commercial & Industrial",
+    description: "Business & factory lighting",
+    image: "/categories/commercial-lighting.jpg",
+    icon: Factory,
+    color: "from-indigo-500 to-purple-500",
+    subcategories: [
+      "Shop Lights",
+      "Warehouse Lighting",
+      "High Bay Lights",
+      "Office Panels",
+    ],
+  },
+  {
+    id: "emergency-lighting",
+    slug: "emergency-lighting",
+    name: "Emergency Lighting",
+    description: "Backup & safety lighting systems",
+    image: "/categories/emergency-lighting.jpg",
+    icon: Zap,
+    color: "from-red-500 to-yellow-500",
+    subcategories: [
+      "Exit Signs",
+      "Emergency Bulbs",
+      "Central Inverter Systems",
+      "Portable Lights",
+    ],
+  },
+  {
+    id: "automotive-lighting",
+    slug: "automotive-lighting",
+    name: "Automotive Lights",
+    description: "Vehicle & motorcycle lighting",
+    image: "/categories/automotive-lighting.jpg",
+    icon: Car,
+    color: "from-gray-500 to-blue-500",
+    subcategories: ["Headlights", "Fog Lights", "Work Lights", "Indicators"],
+  },
+  {
+    id: "decorative-lighting",
+    slug: "decorative-lighting",
+    name: "Decorative & Festive",
+    description: "Party & event lighting",
+    image: "/categories/decorative-lighting.jpg",
+    icon: Sparkles,
+    color: "from-pink-500 to-rose-500",
+    subcategories: [
+      "Fairy Lights",
+      "Neon Signs",
+      "Garden Decor",
+      "Christmas Lights",
+    ],
+    seasonal: true,
+  },
+  {
+    id: "power-solutions",
+    slug: "power-solutions",
+    name: "Power Solutions",
+    description: "Batteries & power backup",
+    image: "/categories/power-solutions.jpg",
+    icon: BatteryCharging,
+    color: "from-blue-500 to-teal-500",
+    subcategories: [
+      "Inverter Batteries",
+      "Solar Batteries",
+      "UPS Systems",
+      "Stabilizers",
+    ],
+  },
+  {
+    id: "electrical-accessories",
+    slug: "electrical-accessories",
+    name: "Electrical Accessories",
+    description: "Installation components & tools",
+    image: "/categories/electrical-accessories.jpg",
+    icon: Plug,
+    color: "from-gray-600 to-gray-800",
+    subcategories: [
+      "Switches & Sockets",
+      "Wires & Cables",
+      "Conduits",
+      "Installation Tools",
+    ],
+  },
+  {
+    id: "ceiling-fans",
+    slug: "ceiling-fans",
+    name: "Ceiling Fans with Lights",
+    description: "Energy efficient ceiling fans",
+    image: "/categories/ceiling-fans.jpg",
+    icon: Fan,
+    color: "from-cyan-500 to-blue-500",
+    subcategories: ["Standard Fans", "Premium Fans", "Remote Control Fans"],
+    popular: true,
+  },
+  {
+    id: "outdoor-lighting",
+    slug: "outdoor-lighting",
+    name: "Outdoor & Garden",
+    description: "Weatherproof exterior lighting",
+    image: "/categories/outdoor-lighting.jpg",
+    icon: Moon,
+    color: "from-indigo-500 to-purple-500",
+    subcategories: [
+      "Path Lights",
+      "Wall Lights",
+      "Flood Lights",
+      "Step Lights",
+    ],
+  },
+  {
+    id: "specialty-lighting",
+    slug: "specialty-lighting",
+    name: "Specialty Lighting",
+    description: "Niche & specialized applications",
+    image: "/categories/specialty-lighting.jpg",
+    icon: Flashlight,
+    color: "from-orange-500 to-red-500",
+    subcategories: [
+      "Grow Lights",
+      "UV Lights",
+      "Stage Lights",
+      "Medical Lights",
+    ],
+  },
+  {
+    id: "solar-panels",
+    slug: "solar-panels",
+    name: "Solar Panels",
+    description: "Complete solar energy systems",
+    image: "/categories/solar-panels.jpg",
+    icon: PanelTop,
+    color: "from-amber-600 to-yellow-500",
+    subcategories: [
+      "Monocrystalline",
+      "Polycrystalline",
+      "Solar Kits",
+      "Mounting Systems",
+    ],
+    popular: true,
+  },
 ];
 
-export const tagOptions = [
-  { id: "premium", name: "Premium" },
-  { id: "competition", name: "Competition" },
-  { id: "training", name: "Training" },
-  { id: "protective", name: "Protective" },
-  { id: "essential", name: "Essential" },
-  { id: "beginner", name: "Beginner" },
-  { id: "intermediate", name: "Intermediate" },
-  { id: "advanced", name: "Advanced" },
-];
-
-export const categories = [
+// Special collections for featured sections
+export const featuredCollections = [
   {
-    name: "Uniforms (Gi)",
-    slug: "uniforms",
-    description:
-      "Find the perfect Gi for your training, from lightweight single weaves for everyday practice to durable double weaves for competition.",
-    image: "/categories/uniforms.jpg",
+    id: "energy-saving-kits",
+    name: "Energy Saving Kits",
+    description: "Complete kits to reduce electricity bills",
+    slug: "energy-saving-kits",
+    image: "/collections/energy-kits.jpg",
   },
   {
-    name: "Protective Gear",
-    slug: "gear",
-    description:
-      "Safety first. Browse our selection of headgear, gloves, shin guards, and mouthguards to stay protected during sparring.",
-    image: "/categories/gear.jpg",
+    id: "nairobi-essentials",
+    name: "Nairobi Essentials",
+    description: "Best sellers in Nairobi area",
+    slug: "nairobi-essentials",
+    image: "/collections/nairobi-essentials.jpg",
   },
   {
-    name: "Belts",
-    slug: "belts",
-    description:
-      "Mark your journey and rank progression with our high-quality, durable martial arts belts.",
-    image: "/categories/belts.jpg",
+    id: "budget-friendly",
+    name: "Budget Friendly",
+    description: "Quality lighting under 2000 KES",
+    slug: "budget-friendly",
+    image: "/collections/budget-lighting.jpg",
   },
   {
-    name: "Training Equipment",
-    slug: "equipment",
-    description:
-      "From focus mitts to punching bags, get the equipment you need to sharpen your skills and enhance your training.",
-    image: "/categories/equipment.jpg",
-  },
-  {
-    name: "Merch & Apparel",
-    slug: "merch",
-    description:
-      "Rep Samma Martial Arts outside the dojo with branded t-shirts, hoodies, caps, and streetwear.",
-    image: "/categories/merch.jpg",
-  },
-  {
-    name: "Accessories",
-    slug: "accessories",
-    description:
-      "Thoughtfully designed Samma Martial Arts accessories made for training days, off days, and everything in between.",
-    image: "/categories/accessories.jpg",
-  },
-  {
-    name: "Women's Fashion",
-    slug: "womens-fashion",
-    description:
-      "Trendy dresses, skirts, blouses, traditional wear (kitenge, kanga), and accessories for every occasion.",
-    image: "/categories/womens-fashion.jpg",
-  },
-  {
-    name: "Men's Collection",
-    slug: "mens-collection",
-    description:
-      "Smart casual wear, suits, traditional outfits, jeans, shirts, and footwear for the modern Kenyan man.",
-    image: "/categories/mens-fashion.jpeg",
-  },
-  {
-    name: "Electronics",
-    slug: "electronics",
-    description:
-      "Smartphones, laptops, home appliances, audio systems, and gadgets at competitive prices.",
-    image: "/categories/electronics.jpeg",
-  },
-  {
-    name: "Furniture & Home",
-    slug: "furniture",
-    description:
-      "Quality sofas, beds, tables, chairs, and home decor to transform your living space.",
-    image: "/categories/furniture.jpeg",
-  },
-  {
-    name: "Beauty & Cosmetics",
-    slug: "beauty",
-    description:
-      "Skincare, makeup, hair care products, fragrances, and beauty tools from top brands.",
-    image: "/categories/beauty.jpeg",
-  },
-  {
-    name: "Sports & Fitness",
-    slug: "sports-fitness",
-    description:
-      "Gym equipment, sportswear, running gear, football kits, and fitness accessories.",
-    image: "/categories/sports.jpeg",
-  },
-  {
-    name: "Baby & Kids",
-    slug: "baby-kids",
-    description:
-      "Clothing, toys, school supplies, nursery furniture, and essentials for children of all ages.",
-    image: "/categories/kids.jpeg",
-  },
-  {
-    name: "Groceries & Food",
-    slug: "groceries",
-    description:
-      "Fresh produce, pantry staples, beverages, snacks, and household essentials delivered to your door.",
-    image: "/categories/groceries.jpeg",
-  },
-  {
-    name: "Mobile Phones",
-    slug: "mobile-phones",
-    description:
-      "Latest smartphones, tablets, accessories, and mobile gadgets from top brands.",
-    image: "/categories/mobile-phones.jpeg",
-  },
-  {
-    name: "Automotive",
-    slug: "automotive",
-    description:
-      "Car parts, accessories, tools, lubricants, and maintenance products for your vehicle.",
-    image: "/categories/automotive.jpeg",
-  },
-  {
-    name: "Books & Stationery",
-    slug: "books-stationery",
-    description:
-      "Educational books, novels, office supplies, writing materials, and art supplies.",
-    image: "/categories/books.jpeg",
-  },
-  {
-    name: "Health & Wellness",
-    slug: "health-wellness",
-    description:
-      "Vitamins, supplements, medical equipment, personal care, and wellness products.",
-    image: "/categories/health.jpeg",
-  },
-  {
-    name: "Jewelry & Watches",
-    slug: "jewelry-watches",
-    description:
-      "Elegant jewelry pieces, traditional adornments, luxury watches, and fashion accessories.",
-    image: "/categories/jewelry.jpeg",
-  },
-  {
-    name: "Computing",
-    slug: "computing",
-    description:
-      "Laptops, desktops, computer accessories, software, and networking equipment.",
-    image: "/categories/computing.jpeg",
+    id: "premium-lighting",
+    name: "Premium Solutions",
+    description: "High-end lighting for commercial use",
+    slug: "premium-lighting",
+    image: "/collections/premium-lighting.jpg",
   },
 ];
 
-export const testimonials = [
-  {
-    name: "Grace Wangari",
-    role: "Fashion Boutique Owner",
-    content:
-      "This platform increased my online sales by 300% in just 3 months! The interface is so easy for customers to use, and I can manage everything from my phone.",
-    rating: 5,
-  },
-  {
-    name: "David Otieno",
-    role: "Electronics Store",
-    content:
-      "Best e-commerce solution I've used. The dashboard is intuitive, and the M-Pesa integration works flawlessly. My customers love the shopping experience.",
-    rating: 5,
-  },
-  {
-    name: "Sarah Kimani",
-    role: "Home Decor Business",
-    content:
-      "Moving my physical store online was seamless. The platform handles everything from inventory to delivery tracking. Highly recommended!",
-    rating: 5,
-  },
-  {
-    name: "Michael Ochieng",
-    role: "Sports Equipment Supplier",
-    content:
-      "The bulk order management features saved me hours of work. My wholesale customers can now order directly through the portal.",
-    rating: 5,
-  },
+// Enhanced lighting tags
+export const lightingTags = [
+  // Energy & Cost
+  { id: "energy-saving", name: "Energy Saving", icon: Zap },
+  { id: "low-wattage", name: "Low Wattage" },
+  { id: "bill-reduction", name: "Reduces Bills" },
+
+  // Features
+  { id: "waterproof-ip65", name: "Waterproof IP65" },
+  { id: "weatherproof", name: "Weatherproof" },
+  { id: "motion-sensor", name: "Motion Sensor" },
+  { id: "dusk-to-dawn", name: "Dusk to Dawn" },
+  { id: "auto-on-off", name: "Auto On/Off" },
+  { id: "dimmable", name: "Dimmable" },
+  { id: "color-changing", name: "Color Changing" },
+
+  // Smart Features
+  { id: "wifi-enabled", name: "Wi-Fi Enabled" },
+  { id: "bluetooth", name: "Bluetooth" },
+  { id: "voice-control", name: "Voice Control" },
+  { id: "app-controlled", name: "App Controlled" },
+  { id: "smart-home", name: "Smart Home Compatible" },
+
+  // Power
+  { id: "solar-powered", name: "Solar Powered" },
+  { id: "battery-backup", name: "Battery Backup" },
+  { id: "usb-charging", name: "USB Charging" },
+  { id: "ac-dc", name: "AC/DC Compatible" },
+
+  // Quality
+  { id: "long-lasting", name: "50,000+ Hours" },
+  { id: "dali-certified", name: "DALI Certified" },
+  { id: "ce-certified", name: "CE Certified" },
+  { id: "rohs-compliant", name: "RoHS Compliant" },
+
+  // Installation
+  { id: "easy-install", name: "Easy Installation" },
+  { id: "diy-friendly", name: "DIY Friendly" },
+  { id: "plug-play", name: "Plug & Play" },
+
+  // Warranty & Support
+  { id: "2-year-warranty", name: "2 Year Warranty" },
+  { id: "3-year-warranty", name: "3 Year Warranty" },
+  { id: "local-support", name: "Local Support" },
+  { id: "free-installation", name: "Free Installation*" },
+
+  // Use Cases
+  { id: "home-office", name: "Home & Office" },
+  { id: "shop-retail", name: "Shop & Retail" },
+  { id: "industrial-use", name: "Industrial Use" },
+  { id: "outdoor-garden", name: "Outdoor & Garden" },
+
+  // Special Offers
+  { id: "nairobi-delivery", name: "Nairobi Free Delivery" },
+  { id: "bulk-discount", name: "Bulk Discount Available" },
+  { id: "trade-pricing", name: "Trade Pricing" },
+];
+
+export const sortOptions = [
+  { value: "featured", label: "Featured" },
+  { value: "newest", label: "Newest" },
+  { value: "price-asc", label: "Price: Low to High" },
+  { value: "price-desc", label: "Price: High to Low" },
+  { value: "rating-desc", label: "Top Rated" },
+  { value: "deal", label: "Deal of the Day" },
 ];
 
 export const shopFeatures = [
   {
-    icon: CreditCard,
-    title: "M-Pesa Integration",
+    title: "Same-Day Nairobi Delivery",
     description:
-      "Seamless mobile money payments with Lipa Na M-Pesa and Buy Goods till numbers",
+      "Order by 2PM, get it same day. Free delivery within Nairobi CBD for orders above KES 3,000.",
+    icon: Truck,
     color: "from-green-500 to-emerald-500",
   },
   {
-    icon: Globe,
-    title: "Kenyan Delivery Networks",
+    title: "2-Year Warranty",
     description:
-      "Integrated with top Kenyan couriers - Sendy, G4S, and local logistics partners",
+      "All products come with 2-year warranty. Quality guaranteed or your money back.",
+    icon: ShieldCheck,
     color: "from-blue-500 to-cyan-500",
   },
   {
-    icon: Smartphone,
-    title: "Mobile-First Design",
+    title: "Expert Installation",
     description:
-      "90% of Kenyan shoppers use phones. Our platform is optimized for mobile shopping",
-    color: "from-purple-500 to-pink-500",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Local Support",
-    description:
-      "24/7 Kenyan-based support in English and Swahili. We understand your market",
+      "Professional installation services available. Our technicians ensure perfect setup.",
+    icon: Award,
     color: "from-amber-500 to-yellow-500",
   },
   {
-    icon: Users,
-    title: "Bulk Order Management",
+    title: "M-Pesa & Card Payments",
     description:
-      "Perfect for wholesalers, schools, and businesses with regular bulk purchases",
+      "Secure payments via M-Pesa, Visa, Mastercard. Lipa Pole Pole financing available.",
+    icon: CreditCard,
+    color: "from-purple-500 to-pink-500",
+  },
+  {
+    title: "24/7 Support",
+    description:
+      "Lighting experts available round the clock. Call, WhatsApp, or visit our Duruma Road store.",
+    icon: Headphones,
     color: "from-red-500 to-orange-500",
   },
   {
-    icon: Package,
-    title: "Inventory Management",
+    title: "Bulk Order Discounts",
     description:
-      "Track stock across multiple locations, get low stock alerts, and manage suppliers",
-    color: "from-indigo-500 to-blue-500",
+      "Special prices for contractors, businesses, and bulk purchases. Request a quote today.",
+    icon: Users,
+    color: "from-indigo-500 to-purple-500",
   },
 ];

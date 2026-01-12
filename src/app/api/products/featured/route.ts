@@ -12,30 +12,53 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Fetch featured products
-    const { data: products, error } = await supabaseAdmin
-      .from("products")
-      .select(
-        "id, title, price, originalPrice, currency, images, category, belt_level, slug"
-      )
-      .eq("featured", true)
-      .order("created_at", { ascending: false })
-      .limit(10); // Limit to 8 featured products
+    const now = new Date().toISOString();
 
-    if (error) {
-      console.error("Error fetching featured products:", error);
+    // Fetch featured products and top coupons in parallel
+    const [productsResponse, couponsResponse] = await Promise.all([
+      supabaseAdmin
+        .from("products")
+        .select(
+          "id, title, price, originalPrice, currency, images, category, slug, featured, isDealOfTheDay, rating, reviewsCount, stock, description"
+        )
+        .or("featured.eq.true,isDealOfTheDay.eq.true")
+        .order("isDealOfTheDay", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(12),
+      supabaseAdmin
+        .from("coupons")
+        .select(
+          `
+          *,
+          coupon_redemptions(count)
+        `
+        )
+        .eq("is_active", true)
+        .lte("valid_from", now)
+        .gte("valid_until", now)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+
+    if (productsResponse.error) {
+      console.error(
+        "Error fetching featured products:",
+        productsResponse.error
+      );
       return NextResponse.json(
         { error: "Failed to fetch featured products" },
         { status: 500 }
       );
     }
 
-    const response = NextResponse.json(products || []);
+    const response = NextResponse.json({
+      products: productsResponse.data || [],
+      coupons: couponsResponse.data || [],
+    });
 
-    // Cache featured products aggressively
     response.headers.set(
       "Cache-Control",
-      "public, s-maxage=3600, stale-while-revalidate=1800"
+      "public, s-maxage=1800, stale-while-revalidate=900"
     );
 
     return response;

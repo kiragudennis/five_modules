@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Product } from "@/types/store";
+import { Product, Coupon } from "@/types/store";
 import { formatCurrency } from "@/lib/utils";
 import { ProductCardSkeleton } from "@/components/ProductSkeleton";
 import { Suspense } from "react";
@@ -31,31 +31,41 @@ import {
   Bolt,
   Moon,
   ThermometerSun,
+  CheckCircle,
+  Badge,
 } from "lucide-react";
 import {
   AnimatedSection,
   CompactSection,
 } from "@/components/ui/animated-section";
-import { testimonials } from "@/lib/constants";
 import { DealOfTheDaySection } from "@/components/deal-of-the-day";
+import { Badge as ShadBadge } from "@/components/ui/badge";
+import CopyCouponBar from "@/components/copy-coupon";
+import { lightingCategories, shopFeatures } from "@/lib/constants";
 
 async function fetchFeatured() {
   let featuredProducts: Product[] = [];
+  let coupons: Coupon[] = [];
 
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL}/api/products/featured`
+      `${process.env.NEXT_PUBLIC_SITE_URL}/api/products/featured`,
+      {
+        next: { revalidate: 1800 },
+      }
     );
 
     if (response.ok) {
-      featuredProducts = await response.json();
+      const data = await response.json();
+      featuredProducts = data.products || [];
+      coupons = data.coupons || [];
     } else {
       console.error("Failed to fetch featured products:", response.status);
     }
   } catch (error) {
     console.error("Error fetching featured products:", error);
   }
-  return featuredProducts;
+  return { featuredProducts, coupons };
 }
 
 function FeaturedProductsGrid({ products }: { products: Product[] }) {
@@ -329,7 +339,42 @@ function TestimonialsSection() {
   );
 }
 
-function CouponSection() {
+function CouponSection({ coupons }: { coupons: Coupon[] }) {
+  if (coupons.length === 0) return null;
+
+  // Format coupon for display
+  const formatCoupon = (coupon: Coupon) => {
+    const discountText =
+      coupon.discount_type === "percentage"
+        ? `${coupon.discount_value}% OFF`
+        : `${formatCurrency(coupon.discount_value, "KES")} OFF`;
+
+    const minAmount =
+      coupon.min_order_amount > 0
+        ? `KES ${coupon.min_order_amount.toLocaleString()}`
+        : "No minimum";
+
+    // Calculate days until expiry
+    const expiryDate = new Date(coupon.valid_until);
+    const today = new Date();
+    const daysLeft = Math.ceil(
+      (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    return {
+      ...coupon,
+      displayDiscount: discountText,
+      displayMinAmount: minAmount,
+      daysLeft,
+      isExpiringSoon: daysLeft <= 7,
+      usageLeft: coupon.usage_limit
+        ? coupon.usage_limit - (coupon.used_count || 0)
+        : null,
+    };
+  };
+
+  const formattedCoupons = coupons.map(formatCoupon);
+
   return (
     <CompactSection>
       <div className="container mx-auto px-4 sm:px-6">
@@ -348,73 +393,80 @@ function CouponSection() {
                   </div>
                   <div>
                     <span className="inline-block px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-600 to-yellow-600 text-white text-sm font-bold shadow-lg">
-                      LIMITED TIME OFFER
+                      EXCLUSIVE OFFERS
                     </span>
                     <p className="text-sm text-amber-600 dark:text-amber-400 mt-1 font-medium">
-                      Use code at checkout
+                      Limited coupons available • First come, first served
                     </p>
                   </div>
                 </div>
 
-                <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-                  🎁 Exclusive Discounts for You!
+                <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+                  🎁 Grab These Exclusive Discounts!
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-bold text-lg text-gray-900 dark:text-white">
-                          FIRST ORDER
-                        </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          New customers only
-                        </p>
-                      </div>
-                      <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-4 py-2 rounded-lg">
-                        15% OFF
-                      </div>
-                    </div>
-                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
-                      <code className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400">
-                        WELCOME15
-                      </code>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Valid on first purchase
-                      </p>
-                    </div>
-                  </div>
+                  {formattedCoupons.slice(0, 2).map((coupon, index) => (
+                    <div
+                      key={coupon.id}
+                      className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30 hover:shadow-lg transition-shadow duration-300"
+                    >
+                      {/* Limited Stock Badge */}
+                      {coupon.usageLeft && coupon.usageLeft <= 10 && (
+                        <div className="absolute -top-2 -right-2">
+                          <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs animate-pulse">
+                            {coupon.usageLeft} left!
+                          </Badge>
+                        </div>
+                      )}
 
-                  <div className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-bold text-lg text-gray-900 dark:text-white">
-                          SOLAR BUNDLE
-                        </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Save on solar packages
-                        </p>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-bold text-lg text-gray-900 dark:text-white">
+                            {coupon.code}
+                          </h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {coupon.description || coupon.displayDiscount}
+                          </p>
+                        </div>
+                        <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-4 py-2 rounded-lg">
+                          {coupon.displayDiscount}
+                        </div>
                       </div>
-                      <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-4 py-2 rounded-lg">
-                        20% OFF
+                      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                          USE CODE AT CHECKOUT
+                        </div>
+                        <code className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400">
+                          {coupon.code}
+                        </code>
+                        <div className="flex items-center justify-between mt-3 text-xs">
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            <span
+                              className={
+                                coupon.isExpiringSoon
+                                  ? "text-red-500 font-bold"
+                                  : ""
+                              }
+                            >
+                              {coupon.daysLeft} days left
+                            </span>
+                          </div>
+                          <div className="text-gray-500">
+                            Min: {coupon.displayMinAmount}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
-                      <code className="text-xl font-mono font-bold text-amber-600 dark:text-amber-400">
-                        SUNPOWER20
-                      </code>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Minimum order: KES 5,000
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
-                  <Clock className="h-5 w-5" />
+                  <ShieldCheck className="h-5 w-5" />
                   <p className="text-sm font-medium">
-                    Offers expire in 7 days • One coupon per customer • Cannot
-                    be combined
+                    🚀 Hurry! These coupons are exclusive to Blessed Two
+                    Electronics customers
                   </p>
                 </div>
               </div>
@@ -425,37 +477,85 @@ function CouponSection() {
                     <Bolt className="w-8 h-8 text-white" />
                   </div>
                   <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    How to Use Coupons
+                    Why Join Now?
                   </h4>
-                  <ol className="text-sm text-gray-600 dark:text-gray-400 text-left space-y-2">
-                    <li className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
-                        1
-                      </div>
-                      Add items to cart
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 text-left space-y-3">
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>
+                        Get exclusive coupon codes not available elsewhere
+                      </span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
-                        2
-                      </div>
-                      Proceed to checkout
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Early access to new lighting products</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
-                        3
-                      </div>
-                      Enter coupon code
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Priority customer support</span>
                     </li>
-                    <li className="flex items-center gap-2">
-                      <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-xs">
-                        4
-                      </div>
-                      Enjoy your discount!
+                    <li className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Free installation on orders above KES 10,000</span>
                     </li>
-                  </ol>
+                  </ul>
                 </div>
+
+                <Button
+                  asChild
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold py-6 text-lg shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
+                >
+                  <Link href="/signup">
+                    <Users className="h-5 w-5 mr-2" />
+                    Join Now & Save More!
+                  </Link>
+                </Button>
               </div>
             </div>
+
+            {/* All Coupons Grid */}
+            {formattedCoupons.length > 2 && (
+              <div className="mt-8 pt-8 border-t border-amber-200 dark:border-amber-800/30">
+                <h4 className="text-xl font-bold text-gray-900 dark:text-white mb-6 text-center">
+                  More Amazing Offers
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {formattedCoupons.slice(2).map((coupon) => (
+                    <div
+                      key={coupon.id}
+                      className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-4 rounded-xl border hover:border-amber-300 dark:hover:border-amber-700 transition-all duration-300"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h5 className="font-bold text-gray-900 dark:text-white">
+                            {coupon.displayDiscount}
+                          </h5>
+                          <p className="text-xs text-gray-500">
+                            {coupon.description || "Special offer"}
+                          </p>
+                        </div>
+                        {coupon.usageLeft && coupon.usageLeft <= 5 && (
+                          <ShadBadge variant="destructive" className="text-xs">
+                            {coupon.usageLeft} left
+                          </ShadBadge>
+                        )}
+                      </div>
+
+                      <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-center mb-3">
+                        <code className="font-mono font-bold text-amber-600 dark:text-amber-400 text-lg">
+                          {coupon.code}
+                        </code>
+                      </div>
+                      <CopyCouponBar
+                        code={coupon.code}
+                        minAmount={coupon.displayMinAmount}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </AnimatedSection>
       </div>
@@ -464,115 +564,7 @@ function CouponSection() {
 }
 
 export default async function Home() {
-  const featuredProducts = await fetchFeatured();
-
-  const lightingCategories = [
-    {
-      name: "LED Bulbs",
-      slug: "led-bulbs",
-      icon: Lightbulb,
-      description: "Energy efficient",
-    },
-    {
-      name: "Solar Lights",
-      slug: "solar-lights",
-      icon: Sun,
-      description: "Solar powered",
-    },
-    {
-      name: "Security Lights",
-      slug: "security-lights",
-      icon: Shield,
-      description: "Motion sensor",
-    },
-    {
-      name: "Smart Lighting",
-      slug: "smart-lighting",
-      icon: Zap,
-      description: "Wi-Fi enabled",
-    },
-    {
-      name: "Camera Lights",
-      slug: "camera-lights",
-      icon: ThermometerSun,
-      description: "CCTV integrated",
-    },
-    {
-      name: "Decorative",
-      slug: "decorative-lights",
-      icon: Sparkles,
-      description: "Home & garden",
-    },
-    {
-      name: "Commercial",
-      slug: "commercial-lighting",
-      icon: HomeIcon,
-      description: "Business use",
-    },
-    {
-      name: "Batteries",
-      slug: "batteries",
-      icon: BatteryCharging,
-      description: "Power backup",
-    },
-    {
-      name: "Outdoor",
-      slug: "outdoor-lighting",
-      icon: Moon,
-      description: "Weatherproof",
-    },
-    {
-      name: "Emergency",
-      slug: "emergency-lights",
-      icon: Bolt,
-      description: "Backup lights",
-    },
-  ];
-
-  const shopFeatures = [
-    {
-      title: "Same-Day Nairobi Delivery",
-      description:
-        "Order by 2PM, get it same day. Free delivery within Nairobi CBD for orders above KES 3,000.",
-      icon: Truck,
-      color: "from-green-500 to-emerald-500",
-    },
-    {
-      title: "2-Year Warranty",
-      description:
-        "All products come with 2-year warranty. Quality guaranteed or your money back.",
-      icon: ShieldCheck,
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      title: "Expert Installation",
-      description:
-        "Professional installation services available. Our technicians ensure perfect setup.",
-      icon: Award,
-      color: "from-amber-500 to-yellow-500",
-    },
-    {
-      title: "M-Pesa & Card Payments",
-      description:
-        "Secure payments via M-Pesa, Visa, Mastercard. Lipa Pole Pole financing available.",
-      icon: CreditCard,
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      title: "24/7 Support",
-      description:
-        "Lighting experts available round the clock. Call, WhatsApp, or visit our Duruma Road store.",
-      icon: Headphones,
-      color: "from-red-500 to-orange-500",
-    },
-    {
-      title: "Bulk Order Discounts",
-      description:
-        "Special prices for contractors, businesses, and bulk purchases. Request a quote today.",
-      icon: Users,
-      color: "from-indigo-500 to-purple-500",
-    },
-  ];
+  const data = await fetchFeatured();
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -767,7 +759,7 @@ export default async function Home() {
       </CompactSection>
 
       {/* Coupons Section */}
-      <CouponSection />
+      <CouponSection coupons={data.coupons} />
 
       {/* Featured Products */}
       <CompactSection>
@@ -801,12 +793,12 @@ export default async function Home() {
               </div>
             }
           >
-            <FeaturedProductsGrid products={featuredProducts} />
+            <FeaturedProductsGrid products={data.featuredProducts} />
           </Suspense>
 
           {/* Deal of the day section */}
-          {featuredProducts.some((p) => p.isDealOfTheDay) && (
-            <DealOfTheDaySection products={featuredProducts} />
+          {data.featuredProducts.some((p) => p.isDealOfTheDay) && (
+            <DealOfTheDaySection products={data.featuredProducts} />
           )}
         </div>
       </CompactSection>
@@ -880,13 +872,13 @@ export default async function Home() {
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                   <Phone className="w-8 h-8 mx-auto mb-2" />
                   <h4 className="font-bold mb-1">Call Us</h4>
-                  <p className="text-sm opacity-90">0700 000 000</p>
+                  <p className="text-sm opacity-90">0727 833 691</p>
                   <p className="text-sm opacity-80">24/7 Support</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                   <Mail className="w-8 h-8 mx-auto mb-2" />
                   <h4 className="font-bold mb-1">Email Us</h4>
-                  <p className="text-sm opacity-90">info@blessedtwo.co.ke</p>
+                  <p className="text-sm opacity-90">info@blessedtwo.com</p>
                   <p className="text-sm opacity-80">Quick Response</p>
                 </div>
               </div>

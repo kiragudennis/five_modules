@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+// app/api/products/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { secureRatelimit } from "@/lib/limit";
 
-export async function GET(request: Request, context: any) {
+export async function GET(request: NextRequest) {
   // Rate limiting
   const { success } = await secureRatelimit(request);
   if (!success) {
@@ -10,21 +11,40 @@ export async function GET(request: Request, context: any) {
   }
 
   try {
-    // Fetch products;
-    const { data, error } = await supabaseAdmin.from("products").select("*");
+    const now = new Date().toISOString();
 
-    // Server-side improvement
-    if (error) {
-      console.error("Database error:", error);
+    // Fetch products and coupons in parallel
+    const [productsResponse, couponsResponse] = await Promise.all([
+      supabaseAdmin.from("products").select("*"),
+      supabaseAdmin
+        .from("coupons")
+        .select(
+          `
+          *,
+          coupon_redemptions(count)
+        `
+        )
+        .eq("is_active", true)
+        .lte("valid_from", now)
+        .gte("valid_until", now)
+        .order("created_at", { ascending: false })
+        .limit(3),
+    ]);
+
+    if (productsResponse.error) {
+      console.error("Database error:", productsResponse.error);
       return NextResponse.json(
         { error: "Failed to fetch products" },
         { status: 500 }
       );
     }
 
-    const response = NextResponse.json(data);
+    const response = NextResponse.json({
+      products: productsResponse.data || [],
+      coupons: couponsResponse.data || [],
+    });
 
-    // Cache public products aggressively
+    // Cache products aggressively, but coupons shorter
     response.headers.set(
       "Cache-Control",
       "public, s-maxage=3600, stale-while-revalidate=1800"
@@ -32,10 +52,10 @@ export async function GET(request: Request, context: any) {
 
     return response;
   } catch (error: any) {
-    console.error("Profile fetch error:", error);
+    console.error("Products fetch error:", error);
     return NextResponse.json(
-      { error: error.message || "Profile not found" },
-      { status: error.message ? 500 : 404 }
+      { error: error.message || "Internal server error" },
+      { status: 500 }
     );
   }
 }

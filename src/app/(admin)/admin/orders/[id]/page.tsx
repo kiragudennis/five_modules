@@ -1,3 +1,4 @@
+// Admin Order Detail Page
 "use client";
 
 import { use, useEffect, useState } from "react";
@@ -132,28 +133,80 @@ export default function OrderDetailPage({
     fetchOrder();
   }, [param.id, router, supabase]);
 
+  // Update the OrderDetailPage's updateOrder function
   const updateOrder = async () => {
     if (!order) return;
     setIsUpdating(true);
 
     try {
-      const { data, error } = await supabase
+      // Get old status for comparison
+      const oldStatus = order.status;
+      const oldTracking = order.tracking || "";
+
+      // Update order in database
+      const { data: updatedOrder, error } = await supabase
         .from("orders")
-        .update({ status, tracking_number: tracking })
+        .update({
+          status,
+          tracking_number: tracking,
+        })
         .eq("id", order.id)
-        .select("tracking_number, status")
+        .select(
+          `
+        *,
+        transactions(*)
+      `
+        )
         .single();
 
       if (error) throw error;
 
-      setStatus(data.status);
-      setTracking(data.tracking_number || "");
+      setStatus(updatedOrder.status);
+      setTracking(updatedOrder.tracking_number || "");
+
+      // Send email notification if status changed or tracking added
+      if (oldStatus !== status || (oldTracking !== tracking && tracking)) {
+        await sendOrderUpdateEmail(order, updatedOrder);
+      }
+
       toast.success("Order updated successfully ✅");
     } catch (err: any) {
       console.error("Error updating order:", err);
       toast.error(err.message || "Failed to update order ❌");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // Email notification function
+  const sendOrderUpdateEmail = async (oldOrder: any, newOrder: any) => {
+    try {
+      const response = await fetch("/api/notifications/order-update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: newOrder.id,
+          customerEmail: oldOrder.customer.email,
+          customerName: oldOrder.customer.name,
+          oldStatus: oldOrder.status,
+          newStatus: newOrder.status,
+          trackingNumber: newOrder.tracking_number,
+          orderTotal: newOrder.total,
+          orderDate: oldOrder.date,
+          orderItems: oldOrder.items,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send notification");
+      }
+
+      toast.success("Customer notified via email");
+    } catch (error) {
+      console.error("Error sending email:", error);
+      toast.error("Failed to send email notification");
     }
   };
 
