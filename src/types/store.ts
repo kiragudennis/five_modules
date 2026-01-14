@@ -1,3 +1,5 @@
+import z from "zod";
+
 export type ProductType = "physical" | "digital" | "affiliate";
 export type ProductStatus = "draft" | "published";
 export type OrderStatus = "pending" | "paid" | "fulfilled" | "cancelled";
@@ -162,3 +164,73 @@ export interface ShippingCalculationResult {
   orderTotal: number;
   totalWeight: number;
 }
+
+// Product schema for lighting products
+export const productSchema = z.object({
+  name: z.string().min(3, "Product name must be at least 3 characters."),
+  title: z.string().min(10, "Product title must be at least 10 characters."),
+  sku: z.string().min(2, "SKU must be at least 2 characters."),
+  description: z
+    .string()
+    .min(20, "Description must be at least 20 characters."),
+  slug: z.string().min(3, "Slug must be at least 3 characters."),
+  images: z.array(z.string()).optional(),
+  videoUrl: z.string().optional(),
+  price: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : Number(val)),
+    z.number().min(0, "Price must be a positive number.")
+  ),
+  originalPrice: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : Number(val)),
+    z.number().min(0, "Original price must be a positive number.")
+  ),
+  stock: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : Number(val)),
+    z.number().int().min(0, "Stock must be a non-negative integer.")
+  ),
+  category: z.string().min(1, "Please select a category."),
+  wattage: z
+    .preprocess(
+      (val) => (val === "" || val === null ? undefined : Number(val)),
+      z.number().min(0, "Wattage must be a positive number.")
+    )
+    .optional(),
+  voltage: z.string().optional().default("220-240V"),
+  colorTemperature: z.string().optional(),
+  lumens: z
+    .preprocess(
+      (val) => (val === "" || val === null ? undefined : Number(val)),
+      z.number().min(0, "Lumens must be a positive number.")
+    )
+    .optional(),
+  warrantyMonths: z
+    .preprocess(
+      (val) => (val === "" || val === null ? undefined : Number(val)),
+      z.number().int().min(0, "Warranty must be a positive number.")
+    )
+    .default(24),
+  batteryCapacity: z.string().optional(),
+  solarPanelWattage: z
+    .preprocess(
+      (val) => (val === "" || val === null ? undefined : Number(val)),
+      z.number().min(0, "Solar panel wattage must be a positive number.")
+    )
+    .optional(),
+  dimensions: z.string().optional(),
+  ipRating: z.string().optional(),
+  currency: z.string(),
+  tags: z.array(z.string()).optional().default([]),
+  featured: z.boolean().optional().default(false),
+  dealOfTheDay: z.boolean().optional().default(false),
+  bestSeller: z.boolean().optional().default(false),
+  energySaving: z.boolean().optional().default(false),
+  weight: z
+    .preprocess((val) => {
+      if (val === "" || val === null) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : Number(num.toFixed(2));
+    }, z.number().min(0, "Weight must be a non-negative number."))
+    .optional()
+    .default(0),
+  installationType: z.string().optional().default("DIY"),
+});

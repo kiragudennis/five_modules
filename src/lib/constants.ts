@@ -415,3 +415,29 @@ export const shopFeatures = [
     color: "from-indigo-500 to-purple-500",
   },
 ];
+
+export const businessTypes = [
+  "Individual",
+  "Small Business",
+  "Contractor",
+  "Electrician",
+  "Architecture Firm",
+  "Construction Company",
+  "Real Estate Developer",
+  "Hospitality",
+  "Retail Store",
+  "Other",
+];
+
+export const cities = [
+  "Nairobi",
+  "Mombasa",
+  "Kisumu",
+  "Nakuru",
+  "Eldoret",
+  "Thika",
+  "Malindi",
+  "Kitale",
+  "Kakamega",
+  "Other",
+];

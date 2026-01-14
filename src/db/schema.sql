@@ -75,7 +75,30 @@ CREATE TABLE page_views (
     created_at timestamptz DEFAULT now()
 );
 
--- Updated handle_new_user function with better error handling
+-- Update users table with additional fields
+ALTER TABLE users 
+ADD COLUMN IF NOT EXISTS full_name TEXT,
+ADD COLUMN IF NOT EXISTS phone TEXT,
+ADD COLUMN IF NOT EXISTS address TEXT,
+ADD COLUMN IF NOT EXISTS city TEXT,
+ADD COLUMN IF NOT EXISTS postal_code TEXT,
+ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'Kenya',
+ADD COLUMN IF NOT EXISTS business_name TEXT,
+ADD COLUMN IF NOT EXISTS business_type TEXT,
+ADD COLUMN IF NOT EXISTS receive_offers BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS receive_newsletter BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS verification_token TEXT,
+ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+-- Create index for better performance
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+CREATE INDEX IF NOT EXISTS idx_users_city ON users(city);
+
+-- Update trigger to handle new fields
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -84,16 +107,30 @@ AS $$
 BEGIN
   -- Only insert if email is not null and user doesn't already exist
   IF new.email IS NOT NULL THEN
-    INSERT INTO public.users (id, email, role, metadata, created_at)
+    INSERT INTO public.users (
+      id, 
+      email, 
+      role, 
+      full_name,
+      metadata,
+      created_at,
+      updated_at,
+      country
+    )
     VALUES (
       new.id, 
       new.email, 
       'customer', 
-      '{}'::jsonb, 
-      now()
+      COALESCE(new.raw_user_meta_data->>'full_name', ''),
+      COALESCE(new.raw_user_meta_data, '{}'::jsonb),
+      now(),
+      now(),
+      'Kenya'
     )
     ON CONFLICT (id) DO UPDATE SET
       email = EXCLUDED.email,
+      full_name = COALESCE(EXCLUDED.full_name, users.full_name),
+      metadata = EXCLUDED.metadata,
       updated_at = now()
     WHERE users.email IS DISTINCT FROM EXCLUDED.email;
   END IF;
@@ -108,6 +145,7 @@ END;
 $$;
 
 -- Recreate the trigger
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
@@ -121,7 +159,7 @@ SECURITY DEFINER
 AS $$
 BEGIN
     RETURN EXISTS (
-        SELECT 1 FROM users_profile 
+        SELECT 1 FROM users 
         WHERE id = auth.uid() AND role IN ('admin', 'superadmin')
     );
 END;
@@ -474,13 +512,13 @@ SECURITY DEFINER
 STABLE
 AS $$
   SELECT EXISTS (
-    SELECT 1 FROM users_profile 
+    SELECT 1 FROM users 
     WHERE id = auth.uid() AND role IN ('admin', 'superadmin')
   );
 $$;
 
 -- 2. Update all your admin policies
-CREATE POLICY "Allow admin access" ON users_profile FOR ALL 
+CREATE POLICY "Allow admin access" ON users FOR ALL 
 USING (public.is_admin());
 
 CREATE POLICY "Allow admin access" ON products FOR ALL 
@@ -499,24 +537,24 @@ CREATE POLICY "Allow admin access" ON page_views FOR ALL
 USING (public.is_admin());
 
 
--- Storage bucket RLS using your users_profile.role approach
--- Update storage bucket RLS to use users_profile
+-- Storage bucket RLS using your users.role approach
+-- Update storage bucket RLS to use users
 CREATE POLICY "Allow admin access to product-images"
   ON storage.objects FOR ALL
   USING (
     bucket_id = 'product-images'
     AND EXISTS (
-      SELECT 1 FROM users_profile 
-      WHERE users_profile.id = auth.uid() 
-      AND users_profile.role IN ('admin', 'superadmin')
+      SELECT 1 FROM users 
+      WHERE users.id = auth.uid() 
+      AND users.role IN ('admin', 'superadmin')
     )
   )
   WITH CHECK (
     bucket_id = 'product-images'
     AND EXISTS (
-      SELECT 1 FROM users_profile 
-      WHERE users_profile.id = auth.uid() 
-      AND users_profile.role IN ('admin', 'superadmin')
+      SELECT 1 FROM users 
+      WHERE users.id = auth.uid() 
+      AND users.role IN ('admin', 'superadmin')
     )
   );
 
@@ -525,5 +563,59 @@ CREATE POLICY "Public can view product-images"
   ON storage.objects FOR SELECT
   TO anon, authenticated
   USING (bucket_id = 'product-images');
+
+-- Product Videos
+CREATE POLICY "Allow admin access to product-videos"
+  ON storage.objects FOR ALL
+  USING (
+    bucket_id = 'product-videos'
+    AND EXISTS (
+      SELECT 1 FROM users 
+      WHERE users.id = auth.uid() 
+      AND users.role IN ('admin', 'superadmin')
+    )
+  )
+  WITH CHECK (
+    bucket_id = 'product-videos'
+    AND EXISTS (
+      SELECT 1 FROM users 
+      WHERE users.id = auth.uid() 
+      AND users.role IN ('admin', 'superadmin')
+    )
+  );
+
+-- Allow public to read product images
+CREATE POLICY "Public can view product-videos"
+  ON storage.objects FOR SELECT
+  TO anon, authenticated
+  USING (bucket_id = 'product-videos');
+
 -- Note: You will need to create more specific RLS policies based on your application's needs.
 -- For example, admins should have broader access, while customers should only be able to see and manage their own data.
+
+-- Update products table with lighting-specific fields
+ALTER TABLE products 
+ADD COLUMN IF NOT EXISTS video_url TEXT,
+ADD COLUMN IF NOT EXISTS wattage INTEGER,
+ADD COLUMN IF NOT EXISTS voltage TEXT DEFAULT '220-240V',
+ADD COLUMN IF NOT EXISTS color_temperature TEXT,
+ADD COLUMN IF NOT EXISTS lumens INTEGER,
+ADD COLUMN IF NOT EXISTS warranty_months INTEGER DEFAULT 24,
+ADD COLUMN IF NOT EXISTS battery_capacity TEXT,
+ADD COLUMN IF NOT EXISTS solar_panel_wattage INTEGER,
+ADD COLUMN IF NOT EXISTS dimensions TEXT,
+ADD COLUMN IF NOT EXISTS ip_rating TEXT,
+ADD COLUMN IF NOT EXISTS deal_of_the_day BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS best_seller BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS energy_saving BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS installation_type TEXT DEFAULT 'DIY';
+
+-- Create index for better performance
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured) WHERE featured = TRUE;
+CREATE INDEX IF NOT EXISTS idx_products_deal_of_day ON products(deal_of_the_day) WHERE deal_of_the_day = TRUE;
+CREATE INDEX IF NOT EXISTS idx_products_best_seller ON products(best_seller) WHERE best_seller = TRUE;
+CREATE INDEX IF NOT EXISTS idx_products_energy_saving ON products(energy_saving) WHERE energy_saving = TRUE;
+
+-- Update metadata column to include additional specs
+COMMENT ON COLUMN products.metadata IS 'Additional product specifications in JSON format';

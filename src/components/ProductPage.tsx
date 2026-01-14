@@ -7,21 +7,30 @@ import {
   ChevronLeft,
   ShoppingCart,
   Package,
-  Shield,
   Truck,
   CheckCircle,
   Star,
   Heart,
   Zap,
   Sun,
-  BatteryCharging,
   Clock,
   Bolt,
   MapPin,
   Phone,
-  Users,
   Award,
   ShieldCheck,
+  Play,
+  Ruler,
+  Thermometer,
+  Droplets,
+  Battery,
+  Eye,
+  Volume2,
+  Mail,
+  Sparkles,
+  Power,
+  Globe,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/context/StoreContext";
@@ -46,19 +55,40 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { lightingCategories } from "@/lib/constants";
+
+// Enhanced Product Type
+interface EnhancedProduct extends Product {
+  videoUrl?: string;
+  wattage?: number;
+  voltage?: string;
+  colorTemperature?: string;
+  lumens?: number;
+  warrantyMonths?: number;
+  batteryCapacity?: string;
+  solarPanelWattage?: number;
+  dimensions?: string;
+  ipRating?: string;
+  installationType?: string;
+  energySaving?: boolean;
+  dealOfTheDay?: boolean;
+  bestSeller?: boolean;
+  tags: string[];
+}
 
 export default function ProductDetailPage({
   product,
   relatedProducts,
 }: {
-  product: Product;
-  relatedProducts: Product[];
+  product: EnhancedProduct;
+  relatedProducts: EnhancedProduct[];
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [api, setApi] = useState<CarouselApi>();
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [showVideo, setShowVideo] = useState(false);
 
   const url = typeof window !== "undefined" ? window.location.href : "";
 
@@ -80,13 +110,16 @@ export default function ProductDetailPage({
   // Add to cart with animation
   const { dispatch } = useStore();
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: EnhancedProduct) => {
     setIsAddingToCart(true);
 
     dispatch({
       type: "ADD_TO_CART",
       payload: {
-        product,
+        product: {
+          ...product,
+          tags: product.tags ?? [],
+        },
         quantity: quantity,
       },
     });
@@ -111,21 +144,10 @@ export default function ProductDetailPage({
       )
     : 0;
 
-  // Lighting category icons
-  const getCategoryIcon = (category?: string) => {
-    switch (category) {
-      case "solar-lights":
-        return <Sun className="h-4 w-4" />;
-      case "led-bulbs":
-        return <Zap className="h-4 w-4" />;
-      case "batteries":
-        return <BatteryCharging className="h-4 w-4" />;
-      case "security-lights":
-        return <Shield className="h-4 w-4" />;
-      default:
-        return <Package className="h-4 w-4" />;
-    }
-  };
+  // Get category details
+  const categoryDetails = lightingCategories.find(
+    (cat: any) => cat.id === product.category
+  );
 
   return (
     <div className="container mx-auto py-8 px-2 sm:px-4">
@@ -161,7 +183,9 @@ export default function ProductDetailPage({
             Lighting Products
           </Link>
           <span>/</span>
-          <span className="font-medium">{product.category}</span>
+          <span className="font-medium">
+            {categoryDetails?.name || product.category}
+          </span>
           <span>/</span>
           <span className="font-medium truncate max-w-[200px]">
             {product.title}
@@ -177,7 +201,7 @@ export default function ProductDetailPage({
               {product.images?.length ? (
                 <div className="flex flex-col w-full">
                   {/* Deal of the Day Banner */}
-                  {product.isDealOfTheDay && (
+                  {product.dealOfTheDay && (
                     <div className="mb-4">
                       <div className="bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 text-white p-3 rounded-lg flex items-center justify-between animate-pulse">
                         <div className="flex items-center gap-2">
@@ -198,6 +222,50 @@ export default function ProductDetailPage({
                   <div className="relative">
                     <Carousel className="w-full" setApi={setApi}>
                       <CarouselContent>
+                        {/* Video thumbnail if available */}
+                        {product.videoUrl && (
+                          <CarouselItem>
+                            <div className="aspect-square relative rounded-lg overflow-hidden border border-amber-200 group cursor-pointer">
+                              {showVideo ? (
+                                <video
+                                  src={product.videoUrl}
+                                  controls
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <>
+                                  <Image
+                                    src={product.images[0]}
+                                    alt={product.title}
+                                    fill
+                                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                                    sizes="(max-width: 768px) 100vw, 66vw"
+                                  />
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center transition-all group-hover:bg-black/50">
+                                    <Button
+                                      onClick={() => setShowVideo(true)}
+                                      className="bg-white/20 backdrop-blur-sm border-white/30 hover:bg-white/30"
+                                      size="lg"
+                                    >
+                                      <Play className="h-8 w-8 fill-white" />
+                                      <span className="ml-2 text-white font-semibold">
+                                        Watch Demo
+                                      </span>
+                                    </Button>
+                                  </div>
+                                  <div className="absolute bottom-4 left-4">
+                                    <Badge className="bg-black/70 text-white border-0">
+                                      <Play className="h-3 w-3 mr-1" />
+                                      Video Demo
+                                    </Badge>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </CarouselItem>
+                        )}
+
+                        {/* Product Images */}
                         {product.images.map((img, idx) => (
                           <CarouselItem key={idx}>
                             <div className="aspect-square relative rounded-lg overflow-hidden border border-amber-200">
@@ -224,6 +292,14 @@ export default function ProductDetailPage({
                                   Featured
                                 </Badge>
                               )}
+
+                              {/* Best Seller Badge */}
+                              {product.bestSeller && idx === 0 && (
+                                <Badge className="absolute top-12 right-3 bg-gradient-to-r from-green-500 to-emerald-500 border-0">
+                                  <Sparkles className="w-3 h-3 mr-1" />
+                                  Best Seller
+                                </Badge>
+                              )}
                             </div>
                           </CarouselItem>
                         ))}
@@ -234,18 +310,49 @@ export default function ProductDetailPage({
 
                     {/* Image counter */}
                     <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-                      {activeIndex + 1} / {product.images.length}
+                      {activeIndex + 1} /{" "}
+                      {product.images.length + (product.videoUrl ? 1 : 0)}
                     </div>
                   </div>
 
                   {/* Thumbnail row */}
                   <div className="mt-4 flex gap-2 overflow-x-auto p-2">
+                    {/* Video thumbnail */}
+                    {product.videoUrl && (
+                      <button
+                        onClick={() => {
+                          api?.scrollTo(0);
+                          setShowVideo(false);
+                        }}
+                        className={`relative w-16 h-16 border rounded-lg overflow-hidden flex-shrink-0 transition-all ${
+                          activeIndex === 0
+                            ? "ring-2 ring-amber-500 ring-offset-2"
+                            : "opacity-70 hover:opacity-100 border-amber-100"
+                        }`}
+                      >
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                          <Play className="h-4 w-4 text-white fill-white" />
+                        </div>
+                        <Image
+                          src={product.images[0]}
+                          alt="Video thumbnail"
+                          fill
+                          className="object-cover"
+                          sizes="64px"
+                        />
+                      </button>
+                    )}
+
+                    {/* Image thumbnails */}
                     {product.images.map((img, idx) => (
                       <button
                         key={idx}
-                        onClick={() => api?.scrollTo(idx)}
+                        onClick={() => {
+                          api?.scrollTo(idx + (product.videoUrl ? 1 : 0));
+                          setShowVideo(false);
+                        }}
                         className={`relative w-16 h-16 border rounded-lg overflow-hidden flex-shrink-0 transition-all ${
-                          activeIndex === idx
+                          activeIndex === idx + (product.videoUrl ? 1 : 0)
                             ? "ring-2 ring-amber-500 ring-offset-2"
                             : "opacity-70 hover:opacity-100 border-amber-100"
                         }`}
@@ -259,6 +366,57 @@ export default function ProductDetailPage({
                         />
                       </button>
                     ))}
+                  </div>
+
+                  {/* Technical Highlights */}
+                  <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {product.wattage && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                        <Zap className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                        <div className="text-sm font-semibold">
+                          {product.wattage}W
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Power
+                        </div>
+                      </div>
+                    )}
+
+                    {product.lumens && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                        <Eye className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                        <div className="text-sm font-semibold">
+                          {product.lumens.toLocaleString()} lm
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Brightness
+                        </div>
+                      </div>
+                    )}
+
+                    {product.warrantyMonths && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                        <ShieldCheck className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                        <div className="text-sm font-semibold">
+                          {product.warrantyMonths} mo
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Warranty
+                        </div>
+                      </div>
+                    )}
+
+                    {product.energySaving && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                        <Sparkles className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                        <div className="text-sm font-semibold">
+                          Energy Saving
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Eco Friendly
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Product Rating */}
@@ -339,20 +497,24 @@ export default function ProductDetailPage({
             <CardContent className="p-6">
               {/* Product Header */}
               <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Badge
-                    variant="outline"
-                    className="border-amber-300 text-amber-700"
-                  >
-                    <div className="flex items-center gap-1">
-                      {getCategoryIcon(product.category)}
-                      <span className="capitalize">
-                        {product.category?.replace("-", " ")}
-                      </span>
-                    </div>
-                  </Badge>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {categoryDetails && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-300 text-amber-700"
+                    >
+                      <div className="flex items-center gap-1">
+                        <div
+                          className={`w-3 h-3 rounded-full bg-gradient-to-r ${categoryDetails.color}`}
+                        />
+                        <span className="capitalize">
+                          {categoryDetails.name}
+                        </span>
+                      </div>
+                    </Badge>
+                  )}
 
-                  {product.isDealOfTheDay && (
+                  {product.dealOfTheDay && (
                     <Badge className="bg-gradient-to-r from-red-500 to-orange-500 border-0 text-white animate-pulse">
                       <Bolt className="h-3 w-3 mr-1" />
                       Deal of the Day
@@ -366,6 +528,20 @@ export default function ProductDetailPage({
                     >
                       <Star className="h-3 w-3 mr-1" />
                       Featured
+                    </Badge>
+                  )}
+
+                  {product.bestSeller && (
+                    <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 border-0 text-white">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Best Seller
+                    </Badge>
+                  )}
+
+                  {product.energySaving && (
+                    <Badge className="bg-gradient-to-r from-green-600 to-teal-500 border-0 text-white">
+                      <Zap className="h-3 w-3 mr-1" />
+                      Energy Saving
                     </Badge>
                   )}
                 </div>
@@ -393,6 +569,34 @@ export default function ProductDetailPage({
                         Save {discountPercentage}%
                       </Badge>
                     </>
+                  )}
+                </div>
+
+                {/* Technical Quick View */}
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {product.wattage && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap className="h-4 w-4 text-amber-500" />
+                      <span>{product.wattage} Watts</span>
+                    </div>
+                  )}
+                  {product.voltage && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Power className="h-4 w-4 text-amber-500" />
+                      <span>{product.voltage}</span>
+                    </div>
+                  )}
+                  {product.colorTemperature && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Thermometer className="h-4 w-4 text-amber-500" />
+                      <span>{product.colorTemperature}</span>
+                    </div>
+                  )}
+                  {product.ipRating && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Droplets className="h-4 w-4 text-amber-500" />
+                      <span>{product.ipRating}</span>
+                    </div>
                   )}
                 </div>
 
@@ -431,12 +635,15 @@ export default function ProductDetailPage({
               <div className="space-y-4 mb-6">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-gradient-to-r from-amber-100 to-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-4 w-4 text-amber-600" />
+                    <ShieldCheck className="h-4 w-4 text-amber-600" />
                   </div>
                   <div>
-                    <p className="font-medium">2-Year Warranty</p>
+                    <p className="font-medium">
+                      {product.warrantyMonths || 24}-Month Warranty
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      Quality guaranteed for 24 months
+                      Quality guaranteed for {product.warrantyMonths || 24}{" "}
+                      months
                     </p>
                   </div>
                 </div>
@@ -455,12 +662,18 @@ export default function ProductDetailPage({
 
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 bg-gradient-to-r from-green-100 to-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <ShieldCheck className="h-4 w-4 text-green-600" />
+                    <Award className="h-4 w-4 text-green-600" />
                   </div>
                   <div>
-                    <p className="font-medium">Professional Installation</p>
+                    <p className="font-medium">
+                      {product.installationType || "DIY"} Installation
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      Expert installation available
+                      {product.installationType === "Professional Required"
+                        ? "Expert installation available"
+                        : product.installationType === "Plug & Play"
+                        ? "Easy plug and play setup"
+                        : "Easy do-it-yourself installation"}
                     </p>
                   </div>
                 </div>
@@ -472,7 +685,7 @@ export default function ProductDetailPage({
                   <div>
                     <p className="font-medium">24/7 Expert Support</p>
                     <p className="text-sm text-muted-foreground">
-                      Call 0700 000 000 for lighting advice
+                      Call 0727 833 691 for lighting advice
                     </p>
                   </div>
                 </div>
@@ -552,6 +765,103 @@ export default function ProductDetailPage({
             </CardContent>
           </Card>
 
+          {/* Quick Specs Card */}
+          <Card className="border-amber-100">
+            <CardContent className="p-6">
+              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-600" />
+                Quick Specifications
+              </h3>
+              <div className="space-y-3">
+                {[
+                  {
+                    label: "Wattage",
+                    value: product.wattage
+                      ? `${product.wattage} Watts`
+                      : "Not specified",
+                    icon: Zap,
+                  },
+                  {
+                    label: "Voltage",
+                    value: product.voltage || "220-240V",
+                    icon: Power,
+                  },
+                  {
+                    label: "Lumens",
+                    value: product.lumens
+                      ? `${product.lumens.toLocaleString()} lm`
+                      : "Not specified",
+                    icon: Eye,
+                  },
+                  {
+                    label: "Color Temperature",
+                    value: product.colorTemperature || "Warm White (3000K)",
+                    icon: Thermometer,
+                  },
+                  {
+                    label: "IP Rating",
+                    value: product.ipRating || "IP20 (Indoor)",
+                    icon: Droplets,
+                  },
+                  {
+                    label: "Dimensions",
+                    value: product.dimensions || "Standard",
+                    icon: Ruler,
+                  },
+                  {
+                    label: "Installation",
+                    value: product.installationType || "DIY",
+                    icon: Award,
+                  },
+                ].map((spec, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                      <spec.icon className="h-4 w-4 text-amber-500" />
+                      <span className="text-muted-foreground">
+                        {spec.label}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium">{spec.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Additional Power Specs */}
+              {(product.batteryCapacity || product.solarPanelWattage) && (
+                <>
+                  <Separator className="my-4" />
+                  <h4 className="font-medium mb-3">Power Specifications</h4>
+                  <div className="space-y-3">
+                    {product.batteryCapacity && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Battery className="h-4 w-4 text-green-500" />
+                          <span className="text-muted-foreground">Battery</span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {product.batteryCapacity}
+                        </span>
+                      </div>
+                    )}
+                    {product.solarPanelWattage && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Sun className="h-4 w-4 text-amber-500" />
+                          <span className="text-muted-foreground">
+                            Solar Panel
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {product.solarPanelWattage}W
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Store Benefits Card */}
           <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border-amber-200">
             <CardContent className="p-6">
@@ -563,7 +873,7 @@ export default function ProductDetailPage({
                 <div className="flex items-start gap-3">
                   <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                   <span className="text-sm">
-                    Nairobi's Largest Lighting Selection
+                    Nairobi&apos;s Largest Lighting Selection
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -573,7 +883,7 @@ export default function ProductDetailPage({
                 <div className="flex items-start gap-3">
                   <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                   <span className="text-sm">
-                    2-Year Warranty on All Products
+                    {product.warrantyMonths || 24}-Month Warranty
                   </span>
                 </div>
                 <div className="flex items-start gap-3">
@@ -599,9 +909,9 @@ export default function ProductDetailPage({
                   variant="outline"
                   className="w-full border-amber-300 text-amber-600 hover:bg-amber-50"
                 >
-                  <a href="tel:0700000000">
+                  <a href="tel:0727833691">
                     <Phone className="h-4 w-4 mr-2" />
-                    Call: 0700 000 000
+                    Call: 0727 833 691
                   </a>
                 </Button>
               </div>
@@ -616,10 +926,8 @@ export default function ProductDetailPage({
           <TabsList className="grid grid-cols-4 mb-6 bg-amber-50 dark:bg-amber-950/20">
             <TabsTrigger value="description">Description</TabsTrigger>
             <TabsTrigger value="specifications">Specifications</TabsTrigger>
+            <TabsTrigger value="video">Video Demo</TabsTrigger>
             <TabsTrigger value="warranty">Warranty & Support</TabsTrigger>
-            <TabsTrigger value="reviews">
-              Reviews ({product.reviewsCount || 0})
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="description" className="space-y-4">
@@ -655,6 +963,24 @@ export default function ProductDetailPage({
                     {product.description || "No description available."}
                   </ReactMarkdown>
                 </div>
+
+                {/* Tags */}
+                {product.tags && product.tags.length > 0 && (
+                  <div className="mt-8 pt-8 border-t border-amber-100">
+                    <h4 className="font-medium mb-3">Product Tags</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {product.tags.map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="bg-amber-100 text-amber-700 border-amber-200"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -662,90 +988,262 @@ export default function ProductDetailPage({
           <TabsContent value="specifications">
             <Card className="border-amber-100">
               <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Technical Specifications */}
                   <div>
                     <h4 className="font-medium mb-4 text-lg">
-                      Product Details
+                      Technical Specifications
                     </h4>
-                    <div className="space-y-3">
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">SKU</span>
-                        <span className="font-medium">
-                          {product.sku || "BTE-" + product.id.substring(0, 8)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Category</span>
-                        <span className="font-medium capitalize">
-                          {product.category?.replace("-", " ") || "Lighting"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Wattage</span>
-                        <span className="font-medium">
-                          {product.metadata?.wattage || "N/A"} Watts
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">Voltage</span>
-                        <span className="font-medium">
-                          {product.metadata?.voltage || "220-240V"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between border-b pb-2">
-                        <span className="text-muted-foreground">
-                          Color Temperature
-                        </span>
-                        <span className="font-medium">
-                          {product.metadata?.colorTemp || "Warm White (3000K)"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-medium mb-4 text-lg">
-                      Features & Tags
-                    </h4>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Key Features:
-                        </p>
-                        <div className="flex flex-wrap gap-2">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-3">
                           {[
-                            "Energy Saving",
-                            "Long Lifespan",
-                            "Eco Friendly",
-                            "Dimmable",
-                            "Weatherproof",
-                            ...(product.tags || []),
-                          ]
-                            .slice(0, 6)
-                            .map((tag) => (
-                              <Badge
-                                key={tag}
-                                variant="secondary"
-                                className="bg-amber-100 text-amber-700 border-amber-200"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
+                            {
+                              label: "SKU",
+                              value:
+                                product.sku ||
+                                `BTE-${product.id.substring(0, 8)}`,
+                            },
+                            {
+                              label: "Wattage",
+                              value: product.wattage
+                                ? `${product.wattage}W`
+                                : "N/A",
+                            },
+                            {
+                              label: "Voltage",
+                              value: product.voltage || "220-240V",
+                            },
+                            {
+                              label: "Lumens",
+                              value: product.lumens
+                                ? `${product.lumens.toLocaleString()} lm`
+                                : "N/A",
+                            },
+                            {
+                              label: "Color Temperature",
+                              value: product.colorTemperature || "3000K",
+                            },
+                          ].map((spec, idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between border-b pb-2"
+                            >
+                              <span className="text-muted-foreground">
+                                {spec.label}
+                              </span>
+                              <span className="font-medium">{spec.value}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="space-y-3">
+                          {[
+                            {
+                              label: "IP Rating",
+                              value: product.ipRating || "IP20",
+                            },
+                            {
+                              label: "Warranty",
+                              value: product.warrantyMonths
+                                ? `${product.warrantyMonths} months`
+                                : "24 months",
+                            },
+                            {
+                              label: "Weight",
+                              value: product.weight
+                                ? `${product.weight} kg`
+                                : "N/A",
+                            },
+                            {
+                              label: "Dimensions",
+                              value: product.dimensions || "N/A",
+                            },
+                            {
+                              label: "Installation",
+                              value: product.installationType || "DIY",
+                            },
+                          ].map((spec, idx) => (
+                            <div
+                              key={idx}
+                              className="flex justify-between border-b pb-2"
+                            >
+                              <span className="text-muted-foreground">
+                                {spec.label}
+                              </span>
+                              <span className="font-medium">{spec.value}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
-                      <div className="mt-4">
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Compatibility:
-                        </p>
-                        <p className="text-sm">
-                          Works with standard E27/E26 sockets. Suitable for
-                          indoor and outdoor use.
-                        </p>
+                      {/* Power Specifications */}
+                      {(product.batteryCapacity ||
+                        product.solarPanelWattage) && (
+                        <div className="mt-6">
+                          <h5 className="font-medium mb-3">
+                            Power Specifications
+                          </h5>
+                          <div className="space-y-3">
+                            {product.batteryCapacity && (
+                              <div className="flex justify-between border-b pb-2">
+                                <span className="text-muted-foreground">
+                                  Battery Capacity
+                                </span>
+                                <span className="font-medium">
+                                  {product.batteryCapacity}
+                                </span>
+                              </div>
+                            )}
+                            {product.solarPanelWattage && (
+                              <div className="flex justify-between border-b pb-2">
+                                <span className="text-muted-foreground">
+                                  Solar Panel
+                                </span>
+                                <span className="font-medium">
+                                  {product.solarPanelWattage}W
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Features & Benefits */}
+                  <div>
+                    <h4 className="font-medium mb-4 text-lg">
+                      Features & Benefits
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <h5 className="font-medium mb-2 text-amber-700">
+                          Key Features:
+                        </h5>
+                        <ul className="space-y-2">
+                          {[
+                            product.energySaving && "Energy Saving (Up to 80%)",
+                            product.lumens &&
+                              `High Brightness (${product.lumens.toLocaleString()} lm)`,
+                            product.warrantyMonths &&
+                              `${product.warrantyMonths}-Month Warranty`,
+                            product.ipRating &&
+                              `Weather Resistant (${product.ipRating})`,
+                            product.colorTemperature &&
+                              `Natural Light (${product.colorTemperature})`,
+                            "Long Lifespan (50,000+ hours)",
+                            "Eco Friendly",
+                            "Instant On",
+                            "No Flickering",
+                            "Low Heat Emission",
+                          ]
+                            .filter(Boolean)
+                            .map((feature, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                                <span>{feature}</span>
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+
+                      <div>
+                        <h5 className="font-medium mb-2 text-amber-700">
+                          Benefits:
+                        </h5>
+                        <ul className="space-y-2">
+                          {[
+                            "Reduces electricity bills significantly",
+                            "Perfect for home, office, and commercial use",
+                            "Easy installation with detailed instructions",
+                            "Safe and reliable operation",
+                            "Environmentally friendly",
+                            "Maintenance-free design",
+                          ].map((benefit, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <Sparkles className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                              <span>{benefit}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="video">
+            <Card className="border-amber-100">
+              <CardContent className="p-6">
+                {product.videoUrl ? (
+                  <div className="space-y-6">
+                    <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                      <video
+                        src={product.videoUrl}
+                        controls
+                        className="w-full h-full object-contain"
+                        poster={product.images?.[0]}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Play className="h-5 w-5 text-amber-600" />
+                          <h5 className="font-medium">Product Demo</h5>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Watch how this lighting product works in real-life
+                          conditions
+                        </p>
+                      </div>
+
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Award className="h-5 w-5 text-blue-600" />
+                          <h5 className="font-medium">Installation Guide</h5>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Step-by-step installation instructions for easy setup
+                        </p>
+                      </div>
+
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Volume2 className="h-5 w-5 text-green-600" />
+                          <h5 className="font-medium">Expert Tips</h5>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Professional tips for optimal performance and
+                          placement
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
+                      <Play className="h-10 w-10 text-amber-600" />
+                    </div>
+                    <h4 className="text-lg font-medium mb-2">
+                      Video Demo Coming Soon
+                    </h4>
+                    <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                      We&apos;re preparing a detailed video demonstration for
+                      this product. In the meantime, check out the images and
+                      specifications above.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="border-amber-300 text-amber-600"
+                    >
+                      Request Video Demo
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -758,199 +1256,100 @@ export default function ProductDetailPage({
                     <ShieldCheck className="h-8 w-8 text-green-600 flex-shrink-0" />
                     <div>
                       <h4 className="font-bold text-lg mb-2">
-                        2-Year Warranty
+                        {product.warrantyMonths || 24}-Month Comprehensive
+                        Warranty
                       </h4>
                       <p className="text-gray-700">
                         All Blessed Two Electronics products come with a
-                        comprehensive 24-month warranty covering manufacturing
-                        defects and premature failures.
+                        comprehensive {product.warrantyMonths || 24}-month
+                        warranty covering manufacturing defects and premature
+                        failures.
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
-                      <h5 className="font-medium">Warranty Coverage</h5>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                          <span>Manufacturing defects</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                          <span>Premature component failure</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
-                          <span>Electrical faults</span>
-                        </li>
+                      <h5 className="font-medium text-lg">Warranty Coverage</h5>
+                      <ul className="space-y-3">
+                        {[
+                          "Manufacturing defects in materials and workmanship",
+                          "Premature component failure under normal use",
+                          "Electrical faults and connection issues",
+                          "Performance below specified specifications",
+                          "Premature LED failure or dimming",
+                        ].map((coverage, idx) => (
+                          <li
+                            key={idx}
+                            className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg"
+                          >
+                            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                            <span>{coverage}</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
 
                     <div className="space-y-4">
-                      <h5 className="font-medium">Support Services</h5>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-start gap-2">
-                          <Users className="h-4 w-4 text-blue-500 mt-0.5" />
-                          <span>Free installation consultation</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Phone className="h-4 w-4 text-blue-500 mt-0.5" />
-                          <span>24/7 technical support</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Truck className="h-4 w-4 text-blue-500 mt-0.5" />
-                          <span>On-site repair service</span>
-                        </li>
+                      <h5 className="font-medium text-lg">Support Services</h5>
+                      <ul className="space-y-3">
+                        {[
+                          {
+                            icon: Phone,
+                            text: "24/7 technical support hotline",
+                          },
+                          {
+                            icon: Users,
+                            text: "Free installation consultation",
+                          },
+                          {
+                            icon: Truck,
+                            text: "On-site repair service in Nairobi",
+                          },
+                          {
+                            icon: Mail,
+                            text: "Email support with 4-hour response",
+                          },
+                          {
+                            icon: Globe,
+                            text: "Online troubleshooting guides",
+                          },
+                        ].map((service, idx) => (
+                          <li
+                            key={idx}
+                            className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
+                          >
+                            <service.icon className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                            <span>{service.text}</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   </div>
 
-                  <div className="bg-amber-50 rounded-lg p-4">
-                    <h5 className="font-medium mb-2">Need Help?</h5>
-                    <p className="text-sm text-gray-700 mb-3">
-                      Contact our support team for warranty claims or technical
-                      assistance.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button size="sm" asChild>
-                        <a href="tel:0700000000">
-                          <Phone className="h-3 w-3 mr-1" />
-                          Call Support
-                        </a>
-                      </Button>
-                      <Button size="sm" variant="outline" asChild>
-                        <a href="mailto:support@blessedtwo.co.ke">
-                          <Mail className="h-3 w-3 mr-1" />
-                          Email Support
-                        </a>
-                      </Button>
+                  <div className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white rounded-lg p-6">
+                    <h5 className="font-bold text-lg mb-3">
+                      Need Immediate Assistance?
+                    </h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <Phone className="h-6 w-6 mx-auto mb-2" />
+                        <p className="font-bold">0727 833 691</p>
+                        <p className="text-sm opacity-90">Call Now</p>
+                      </div>
+                      <div className="text-center">
+                        <Mail className="h-6 w-6 mx-auto mb-2" />
+                        <p className="font-bold">support@blessedtwo.co.ke</p>
+                        <p className="text-sm opacity-90">Email Support</p>
+                      </div>
+                      <div className="text-center">
+                        <MapPin className="h-6 w-6 mx-auto mb-2" />
+                        <p className="font-bold">Duruma Road, Nairobi</p>
+                        <p className="text-sm opacity-90">Visit Store</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="reviews">
-            <Card className="border-amber-100">
-              <CardContent className="p-6">
-                {product.reviewsCount && product.reviewsCount > 0 ? (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-6">
-                      <div className="text-center">
-                        <div className="text-4xl font-bold text-amber-600">
-                          {product.rating?.toFixed(1) || "4.8"}
-                        </div>
-                        <div className="flex items-center justify-center my-2">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${
-                                i < Math.floor(product.rating || 0)
-                                  ? "fill-amber-400 text-amber-400"
-                                  : "text-gray-300"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {product.reviewsCount} verified reviews
-                        </p>
-                      </div>
-
-                      <div className="flex-1">
-                        {[5, 4, 3, 2, 1].map((stars) => (
-                          <div
-                            key={stars}
-                            className="flex items-center gap-2 mb-1"
-                          >
-                            <span className="text-sm w-4">{stars}</span>
-                            <Star className="h-3 w-3 text-amber-400" />
-                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-amber-400"
-                                style={{
-                                  width: `${
-                                    stars === 5
-                                      ? 75
-                                      : stars === 4
-                                      ? 15
-                                      : stars === 3
-                                      ? 5
-                                      : stars === 2
-                                      ? 3
-                                      : 2
-                                  }%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Sample Reviews */}
-                    <div className="space-y-4">
-                      {[
-                        {
-                          name: "John M.",
-                          rating: 5,
-                          comment:
-                            "Excellent product! Bright and energy efficient. Perfect for my home.",
-                          date: "2 days ago",
-                        },
-                        {
-                          name: "Sarah K.",
-                          rating: 4,
-                          comment:
-                            "Good quality and fast delivery. Could be brighter though.",
-                          date: "1 week ago",
-                        },
-                        {
-                          name: "David W.",
-                          rating: 5,
-                          comment:
-                            "Professional installation team. The light transformed my backyard!",
-                          date: "2 weeks ago",
-                        },
-                      ].map((review, idx) => (
-                        <div key={idx} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <div>
-                              <p className="font-medium">{review.name}</p>
-                              <div className="flex items-center gap-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`h-3 w-3 ${
-                                      i < review.rating
-                                        ? "fill-amber-400 text-amber-400"
-                                        : "text-gray-300"
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            <span className="text-sm text-muted-foreground">
-                              {review.date}
-                            </span>
-                          </div>
-                          <p className="text-gray-700">{review.comment}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Star className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <h4 className="font-medium mb-2">No Reviews Yet</h4>
-                    <p className="text-muted-foreground mb-4">
-                      Be the first to review this product
-                    </p>
-                    <Button variant="outline">Write a Review</Button>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -998,9 +1397,14 @@ export default function ProductDetailPage({
                           className="object-cover transition-transform duration-500 group-hover:scale-110"
                           sizes="(max-width: 768px) 50vw, 25vw"
                         />
-                        {relatedProduct.isDealOfTheDay && (
+                        {relatedProduct.dealOfTheDay && (
                           <Badge className="absolute top-2 left-2 bg-gradient-to-r from-red-500 to-orange-500 border-0 text-white text-xs">
                             🔥 Deal
+                          </Badge>
+                        )}
+                        {relatedProduct.bestSeller && (
+                          <Badge className="absolute top-2 right-2 bg-gradient-to-r from-green-500 to-emerald-500 border-0 text-white text-xs">
+                            ⭐ Best
                           </Badge>
                         )}
                       </>
@@ -1015,19 +1419,33 @@ export default function ProductDetailPage({
                     <h3 className="font-medium line-clamp-1 mb-2 group-hover:text-amber-600 transition-colors">
                       {relatedProduct.title}
                     </h3>
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-600">
-                        {formatCurrency(
-                          relatedProduct.price,
-                          relatedProduct.currency
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-600">
+                          {formatCurrency(
+                            relatedProduct.price,
+                            relatedProduct.currency
+                          )}
+                        </span>
+                        {relatedProduct.wattage && (
+                          <span className="text-xs text-muted-foreground">
+                            {relatedProduct.wattage}W
+                          </span>
                         )}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-amber-200"
-                      >
-                        {relatedProduct.category}
-                      </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Badge
+                          variant="outline"
+                          className="text-xs border-amber-200"
+                        >
+                          {relatedProduct.category}
+                        </Badge>
+                        {relatedProduct.energySaving && (
+                          <span className="text-xs text-green-600">
+                            ⚡ Energy Saving
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Link>
@@ -1087,6 +1505,7 @@ export default function ProductDetailPage({
                   <a
                     href="https://maps.google.com/?q=Duruma+Road+Nairobi"
                     target="_blank"
+                    rel="noopener noreferrer"
                   >
                     Get Directions
                   </a>
@@ -1104,24 +1523,5 @@ export default function ProductDetailPage({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-// Add Mail icon
-function Mail({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-      />
-    </svg>
   );
 }

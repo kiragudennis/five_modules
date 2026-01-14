@@ -58,7 +58,7 @@ export async function proxy(request: NextRequest) {
     if (isProtectedRoute && user) {
       // 🔍 Get user role + profile.username in one shot
       const { data: userData } = await supabaseAdmin
-        .from("users_profile")
+        .from("users")
         .select(`role`)
         .eq("id", user.id)
         .single();

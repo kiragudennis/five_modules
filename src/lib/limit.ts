@@ -21,7 +21,7 @@ const defaultRateLimit = new Ratelimit({
 });
 
 // 🔒 Booking limit: 2 reqs / 5 mins
-const bookingPageRateLimit = new Ratelimit({
+export const rateLimit = new Ratelimit({
   redis,
   limiter: Ratelimit.fixedWindow(2, "300 s"),
   analytics: true,
@@ -40,12 +40,6 @@ export async function secureRatelimit(req: Request) {
   }
 
   return await defaultRateLimit.limit(ip);
-}
-
-// 🔐 Booking limiter
-export async function secureBookingRateLimit(req: Request) {
-  const ip = getIP(req);
-  return await bookingPageRateLimit.limit(ip);
 }
 
 // 🛡️ Revised country-aware, IP-priority limiter with soft sinkhole

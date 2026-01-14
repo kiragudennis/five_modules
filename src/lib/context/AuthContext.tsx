@@ -15,7 +15,7 @@ import {
   AuthError,
 } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabase/client";
-import { ProfileData } from "@/types/student";
+import { ProfileData } from "@/types/customer";
 
 interface AuthContextType {
   profile: ProfileData | null;
@@ -49,10 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const { data, error } = await supabase
-          .from("users_profile")
+          .from("users")
           .select("*")
           .eq("id", supabaseUser.id)
           .maybeSingle();
+
+        console.log("User info:", data);
 
         if (error) {
           console.error("Error fetching user role:", error.message);
@@ -76,18 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const profileData: ProfileData = {
           id: data.id,
           email: data.email,
-          full_name: data.full_name,
-          country_code: data.country_code,
-          county_code: data.county_code,
-          postal_address: data.postal_address,
-          phone_number: data.phone_number || "",
-          avatar_url: data.avatar_url,
-          language: data.language,
-          gender: data.gender,
-          admission_no: data.admission_no,
-          belt_level: data.belt_level,
           role: data.role,
-          referred_by: data.referred_by,
+          metadata: data.metadata,
+          created_at: data.created_at,
         };
 
         setProfile(profileData);

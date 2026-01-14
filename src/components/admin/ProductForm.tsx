@@ -1,5 +1,4 @@
 // @ts-nocheck
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,7 +6,15 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Loader2, Weight } from "lucide-react";
+import {
+  Loader2,
+  Weight,
+  Zap,
+  Battery,
+  Sun,
+  Shield,
+  Ruler,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,63 +35,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUpload } from "./ImageUpload";
+import { VideoUpload } from "./VideoUpload";
 import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "sonner";
 import { getCurrencyOptions } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
-import { categoryOptions } from "@/lib/constants";
+import { lightingCategories, lightingTags } from "@/lib/constants";
 import { TagInput } from "../tag-input";
-
-// Product schema
-const productSchema = z.object({
-  name: z.string().min(3, "Name must be at least 3 characters."),
-  title: z.string().min(10, "Title must be at least 10 characters."),
-  sku: z.string().min(2, "SKU must be at least 2 characters."),
-  description: z
-    .string()
-    .min(10, "Description must be at least 10 characters."),
-  slug: z.string().min(3, "Slug must be at least 10 characters."),
-  images: z.array(z.string()).optional(),
-  price: z.preprocess(
-    (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().min(0, "Price must be a positive number.")
-  ),
-  originalPrice: z.preprocess(
-    (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().min(0, "Original price must be a positive number.")
-  ),
-  stock: z.preprocess(
-    (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().int().min(0, "Stock must be a non-negative integer.")
-  ),
-  category: z.string().min(1, "Please select a category."),
-  belt_level: z.string(),
-  currency: z.string(),
-  tags: z.array(z.string()).optional().default([]),
-  featured: z.boolean().optional().default(false),
-  weight: z
-    .preprocess((val) => {
-      if (val === "" || val === null) return undefined;
-      const num = Number(val);
-      return isNaN(num) ? undefined : Number(num.toFixed(2)); // force 2 decimals
-    }, z.number().min(0, "Weight must be a non-negative number."))
-    .optional()
-    .default(0),
-});
-
-// Belt level options
-const beltLevels = [
-  { id: "all", name: "All Levels" },
-  { id: "white", name: "White Belt" },
-  { id: "yellow", name: "Yellow Belt" },
-  { id: "orange", name: "Orange Belt" },
-  { id: "green", name: "Green Belt" },
-  { id: "blue", name: "Blue Belt" },
-  { id: "purple", name: "Purple Belt" },
-  { id: "brown", name: "Brown Belt" },
-  { id: "black", name: "Black Belt" },
-];
+import { Badge } from "../ui/badge";
+import { Separator } from "../ui/separator";
+import { Card, CardContent } from "../ui/card";
+import { productSchema } from "@/types/store";
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -100,6 +62,7 @@ export default function ProductForm({
   const router = useRouter();
   const { supabase } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
 
   // Initialize form with default values or initial data
   const form = useForm<ProductFormValues>({
@@ -111,24 +74,36 @@ export default function ProductForm({
       description: "",
       slug: "",
       images: [],
+      videoUrl: "",
       price: 0,
       originalPrice: 0,
       stock: 0,
       category: "",
-      belt_level: "all",
+      wattage: 0,
+      voltage: "220-240V",
+      colorTemperature: "",
+      lumens: 0,
+      warrantyMonths: 24,
+      batteryCapacity: "",
+      solarPanelWattage: 0,
+      dimensions: "",
+      ipRating: "",
       currency: "KES",
       tags: [],
       featured: false,
-      Weight: 0,
+      dealOfTheDay: false,
+      bestSeller: false,
+      energySaving: false,
+      weight: 0,
+      installationType: "DIY",
     },
   });
 
-  // Watch the name field and generate slug automatically
+  // Watch the title field and generate slug automatically
   const titleValue = form.watch("title");
 
   useEffect(() => {
     if (titleValue && !isEditing) {
-      // Only auto-generate for new products
       const generatedSlug = titleValue
         .trim()
         .toLowerCase()
@@ -139,6 +114,30 @@ export default function ProductForm({
       form.setValue("slug", generatedSlug);
     }
   }, [titleValue, form, isEditing]);
+
+  // Watch category for dynamic fields
+  const categoryValue = form.watch("category");
+  useEffect(() => {
+    setSelectedCategory(categoryValue);
+  }, [categoryValue]);
+
+  // Technical specifications based on category
+  const getCategorySpecs = (category: string) => {
+    const specs: { [key: string]: boolean } = {
+      showWattage: true,
+      showVoltage: true,
+      showLumens: true,
+      showBattery: category.includes("solar") || category.includes("emergency"),
+      showSolarPanel: category.includes("solar"),
+      showIPRating:
+        category.includes("outdoor") || category.includes("security"),
+      showColorTemp: true,
+      showDimensions: true,
+    };
+    return specs;
+  };
+
+  const categorySpecs = getCategorySpecs(selectedCategory);
 
   // Form submission handler
   const onSubmit = async (values: ProductFormValues) => {
@@ -153,8 +152,13 @@ export default function ProductForm({
             ? Number(values.originalPrice)
             : null,
         stock: Number(values.stock),
+        wattage: values.wattage || null,
+        lumens: values.lumens || null,
+        solarPanelWattage: values.solarPanelWattage || null,
+        weight: values.weight || 0,
         tags: values.tags || [],
         images: values.images || [],
+        videoUrl: values.videoUrl || null,
       };
 
       let result;
@@ -172,384 +176,786 @@ export default function ProductForm({
 
       router.push("/admin/products");
       router.refresh();
-      toast.success(isEditing ? "Product updated" : "Product created");
+      toast.success(
+        isEditing
+          ? "Product updated successfully"
+          : "Product created successfully"
+      );
     } catch (error: any) {
       console.error("Error saving product:", error);
-
-      // Clean up any uploaded images if the product creation failed
-      if (values.images && values.images.length > 0) {
-        try {
-          const imagePaths = values.images.map((url) => {
-            const urlParts = url.split("/");
-            return urlParts
-              .slice(urlParts.indexOf("product-images") + 1)
-              .join("/");
-          });
-
-          await supabase.storage.from("product-images").remove(imagePaths);
-        } catch (cleanupError) {
-          console.error("Error cleaning up images:", cleanupError);
-        }
-      }
-
       toast.error(error.message || "Error saving product");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Technical specifications options
+  const voltageOptions = ["110V", "220-240V", "12V", "24V", "48V"];
+  const colorTemperatureOptions = [
+    "2700K (Warm White)",
+    "3000K (Soft White)",
+    "4000K (Cool White)",
+    "5000K (Daylight)",
+    "6500K (Cool Daylight)",
+    "RGB (Multi Color)",
+  ];
+  const ipRatingOptions = [
+    "IP20 (Indoor)",
+    "IP44 (Splash Proof)",
+    "IP65 (Water Resistant)",
+    "IP67 (Waterproof)",
+    "IP68 (Submersible)",
+  ];
+  const installationOptions = ["DIY", "Professional Required", "Plug & Play"];
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Name */}
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Product Name</FormLabel>
-                <FormControl>
-                  <Input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Elite Gi"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {isEditing ? "Edit Lighting Product" : "Add New Lighting Product"}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300">
+            {isEditing
+              ? "Update your lighting product details"
+              : "Fill in the details for your new lighting product"}
+          </p>
+        </div>
+        <Badge
+          variant="outline"
+          className="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+        >
+          <Zap className="w-3 h-3 mr-1" />
+          Blessed Two Electronics
+        </Badge>
+      </div>
 
-          {/* Title */}
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Product Title</FormLabel>
-                <FormControl>
-                  <Input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="Premium Gi"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+      <Separator />
 
-          {/* SKU */}
-          <FormField
-            control={form.control}
-            name="sku"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>SKU</FormLabel>
-                <FormControl>
-                  <Input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="KG-001"
-                    {...field}
-                  />
-                </FormControl>
-                <FormDescription>Unique product identifier</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Price */}
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Price</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <span className="absolute left-3 top-5 -translate-y-1/2 text-muted-foreground">
-                      KES
-                    </span>
-                    <Input
-                      step="0.01"
-                      className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="1500"
-                      {...field}
-                      type="number"
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Original Price */}
-          <FormField
-            control={form.control}
-            name="originalPrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Original Price</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <span className="absolute left-3 top-5 -translate-y-1/2 text-muted-foreground">
-                      KES
-                    </span>
-                    <Input
-                      step="0.01"
-                      className="flex h-10 w-full rounded-md border border-input bg-background pl-10 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      {...field}
-                      type="number"
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Stock */}
-          <FormField
-            control={form.control}
-            name="stock"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Stock</FormLabel>
-                <FormControl>
-                  <Input
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder="10"
-                    type="number"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Category */}
-          <FormField
-            control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Category</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {categoryOptions.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Belt Level */}
-          {/* <FormField
-            control={form.control}
-            name="belt_level"
-            disabled
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Belt Level</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a belt level" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {beltLevels.map((level) => (
-                      <SelectItem key={level.id} value={level.id}>
-                        {level.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          /> */}
-
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Currency</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                  disabled
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a currency" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {getCurrencyOptions().map((currency) => (
-                      <SelectItem key={currency.value} value={currency.value}>
-                        {currency.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          {/* Weight */}
-          <FormField
-            control={form.control}
-            name="weight"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Weight (kg)</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <span className="absolute left-3 top-5 -translate-y-1/2 text-muted-foreground">
-                      <Weight size={16} />
-                    </span>
-                    <Input
-                      step="0.01"
-                      className="flex h-10 w-full rounded-md border border-input bg-background pl-7 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="0.5"
-                      {...field}
-                      type="number"
-                    />
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Featured */}
-          <FormField
-            control={form.control}
-            name="featured"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {/* Product Information Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-6">
                 <div>
-                  <FormLabel>Featured</FormLabel>
-                  <FormDescription>
-                    Mark product as featured on the homepage
-                  </FormDescription>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                    Product Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Product Name *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 20W LED Solar Street Light"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>Short product name</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Product Title *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., Premium 20W Solar Street Light with Motion Sensor"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Detailed product title for display
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="sku"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SKU *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., BTE-SL20W-M"
+                              {...field}
+                              className="font-mono"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Unique stock keeping unit
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>URL Slug *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., 20w-led-solar-street-light"
+                              {...field}
+                              className="font-mono"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            URL-friendly identifier
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    className="rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary"
+
+                {/* Pricing & Stock */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Selling Price (KES) *</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                              KES
+                            </span>
+                            <Input
+                              className="pl-12"
+                              placeholder="2499"
+                              {...field}
+                              type="number"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        </div>
 
-        {/* Description */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Enter product description..."
-                  className="min-h-32 resize-y"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                  <FormField
+                    control={form.control}
+                    name="originalPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Original Price (KES)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                              KES
+                            </span>
+                            <Input
+                              className="pl-12"
+                              placeholder="2999"
+                              {...field}
+                              type="number"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>For showing discount</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-        {/* Tags Field */}
-        <FormField
-          control={form.control}
-          name="tags"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tags (max {5})</FormLabel>
-              <FormControl>
-                <TagInput
-                  value={field.value || []}
-                  onChange={field.onChange}
-                  category={form.watch("category")} // Watch category for filtering
-                  placeholder="Type to add tags..."
-                  maxTags={5}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="images"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Product Images</FormLabel>
-              <FormControl>
-                <ImageUpload
-                  value={field.value || []}
-                  onChange={field.onChange}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                  <FormField
+                    control={form.control}
+                    name="stock"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Stock Quantity *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="50" type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-        {/* Submit Button */}
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            className="mr-2"
-            onClick={() => router.push("/admin/products")}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isEditing ? "Updating..." : "Creating..."}
-              </>
-            ) : isEditing ? (
-              "Update Product"
-            ) : (
-              "Create Product"
-            )}
-          </Button>
-        </div>
-      </form>
-    </Form>
+                  <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weight (kg)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                              <Weight size={16} />
+                            </span>
+                            <Input
+                              className="pl-10"
+                              placeholder="2.5"
+                              {...field}
+                              type="number"
+                              step="0.01"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Category & Features Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Category & Features
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category *</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            const category = lightingCategories.find(
+                              (c) => c.id === value
+                            );
+                            if (category?.subcategories?.[0]) {
+                              form.setValue("tags", [
+                                category.subcategories[0],
+                              ]);
+                            }
+                          }}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11">
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {lightingCategories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className={`w-6 h-6 rounded bg-gradient-to-r ${category.color} flex items-center justify-center`}
+                                  >
+                                    {category.icon && (
+                                      <category.icon className="w-3 h-3 text-white" />
+                                    )}
+                                  </div>
+                                  <span>{category.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="installationType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Installation Type</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11">
+                              <SelectValue placeholder="Select installation type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {installationOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="featured"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="rounded border-gray-300 text-amber-600 focus:ring-2 focus:ring-amber-500"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Featured Product</FormLabel>
+                          <FormDescription>Display on homepage</FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="dealOfTheDay"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="rounded border-gray-300 text-red-600 focus:ring-2 focus:ring-red-500"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Deal of the Day</FormLabel>
+                          <FormDescription>Special daily offer</FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="bestSeller"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            className="rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Best Seller</FormLabel>
+                          <FormDescription>Mark as top seller</FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="tags"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Product Tags</FormLabel>
+                      <FormControl>
+                        <TagInput
+                          value={field.value || []}
+                          onChange={field.onChange}
+                          placeholder="e.g., waterproof, motion-sensor, solar-powered"
+                          maxTags={10}
+                          suggestions={lightingTags.map((tag) => tag.id)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Add relevant tags for filtering and search
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Technical Specifications Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className="w-5 h-5 text-amber-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Technical Specifications
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {categorySpecs.showWattage && (
+                    <FormField
+                      control={form.control}
+                      name="wattage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Wattage</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2.5 text-muted-foreground">
+                                <Zap size={16} />
+                              </span>
+                              <Input
+                                className="pl-10"
+                                placeholder="20"
+                                {...field}
+                                type="number"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>Power consumption</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {categorySpecs.showVoltage && (
+                    <FormField
+                      control={form.control}
+                      name="voltage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Voltage</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Select voltage" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {voltageOptions.map((voltage) => (
+                                <SelectItem key={voltage} value={voltage}>
+                                  {voltage}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {categorySpecs.showLumens && (
+                    <FormField
+                      control={form.control}
+                      name="lumens"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lumens (Brightness)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="2000"
+                              {...field}
+                              type="number"
+                            />
+                          </FormControl>
+                          <FormDescription>Light output</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="colorTemperature"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Color Temperature</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11">
+                              <SelectValue placeholder="Select color temperature" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {colorTemperatureOptions.map((temp) => (
+                              <SelectItem key={temp} value={temp}>
+                                {temp}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="warrantyMonths"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Warranty (Months)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                              <Shield size={16} />
+                            </span>
+                            <Input
+                              className="pl-10"
+                              placeholder="24"
+                              {...field}
+                              type="number"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {categorySpecs.showIPRating && (
+                    <FormField
+                      control={form.control}
+                      name="ipRating"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IP Rating</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Select IP rating" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {ipRatingOptions.map((rating) => (
+                                <SelectItem key={rating} value={rating}>
+                                  {rating}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {categorySpecs.showBattery && (
+                    <FormField
+                      control={form.control}
+                      name="batteryCapacity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Battery Capacity</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2.5 text-muted-foreground">
+                                <Battery size={16} />
+                              </span>
+                              <Input
+                                className="pl-10"
+                                placeholder="e.g., 12V 20Ah"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {categorySpecs.showSolarPanel && (
+                    <FormField
+                      control={form.control}
+                      name="solarPanelWattage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Solar Panel Wattage</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2.5 text-muted-foreground">
+                                <Sun size={16} />
+                              </span>
+                              <Input
+                                className="pl-10"
+                                placeholder="30"
+                                {...field}
+                                type="number"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="dimensions"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dimensions (L×W×H)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                              <Ruler size={16} />
+                            </span>
+                            <Input
+                              className="pl-10"
+                              placeholder="e.g., 300×200×100mm"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Media Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Media
+                </h3>
+
+                <div className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="images"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Images *</FormLabel>
+                        <FormControl>
+                          <ImageUpload
+                            value={field.value || []}
+                            onChange={field.onChange}
+                            disabled={isSubmitting}
+                            maxImages={8}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Upload product images (first image will be the main
+                          image)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="videoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Video</FormLabel>
+                        <FormControl>
+                          <VideoUpload
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            disabled={isSubmitting}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Upload a product demonstration video (optional)
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Description Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Product Description *</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe your lighting product in detail. Include features, benefits, specifications, and installation instructions..."
+                        className="min-h-48 resize-y"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Detailed product description for customers. Include key
+                      features and benefits.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Submit Buttons */}
+          <div className="flex justify-end gap-4 pt-6 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.push("/admin/products")}
+              disabled={isSubmitting}
+              className="min-w-24"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="min-w-24 bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditing ? "Updating..." : "Creating..."}
+                </>
+              ) : isEditing ? (
+                "Update Product"
+              ) : (
+                "Create Product"
+              )}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
 }
