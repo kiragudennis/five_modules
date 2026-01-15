@@ -441,3 +441,497 @@ export const cities = [
   "Kakamega",
   "Other",
 ];
+
+// lib/constants/tags.ts
+// Customer-focused tags for Blessed Two Electronics
+
+export const customerTags = {
+  // Use Cases (How customers will use the product)
+  useCases: [
+    "home-lighting",
+    "office-lighting",
+    "shop-lighting",
+    "outdoor-garden",
+    "security-lighting",
+    "emergency-lighting",
+    "decorative-lighting",
+    "kitchen-lighting",
+    "bedroom-lighting",
+    "bathroom-lighting",
+    "living-room",
+    "garage-lighting",
+    "pathway-lighting",
+    "street-lighting",
+    "warehouse-lighting",
+  ],
+
+  // Customer Needs & Benefits
+  needsBenefits: [
+    "energy-saving",
+    "cost-saving",
+    "easy-install",
+    "long-lasting",
+    "bright-lighting",
+    "dimmable",
+    "weatherproof",
+    "child-safe",
+    "eco-friendly",
+    "low-maintenance",
+    "smart-home",
+    "remote-control",
+    "motion-sensor",
+    "auto-on-off",
+    "battery-backup",
+  ],
+
+  // Project Types
+  projectTypes: [
+    "home-renovation",
+    "new-construction",
+    "business-setup",
+    "security-upgrade",
+    "energy-upgrade",
+    "emergency-preparedness",
+    "holiday-decoration",
+    "garden-makeover",
+    "shop-renovation",
+    "office-upgrade",
+  ],
+
+  // Customer Types
+  customerTypes: [
+    "homeowner",
+    "renter",
+    "business-owner",
+    "contractor",
+    "electrician",
+    "property-manager",
+    "hotel-owner",
+    "restaurant-owner",
+    "school-admin",
+    "hospital-admin",
+  ],
+
+  // Budget Levels
+  budgetLevels: [
+    "budget-friendly",
+    "mid-range",
+    "premium",
+    "value-pack",
+    "bulk-discount",
+  ],
+
+  // Special Offers
+  specialOffers: [
+    "deal-of-day",
+    "clearance-sale",
+    "new-arrival",
+    "best-seller",
+    "staff-pick",
+    "nairobi-popular",
+    "free-installation",
+    "free-delivery",
+  ],
+
+  // Energy & Cost Saving
+  energyCost: [
+    "save-electricity",
+    "reduce-bills",
+    "solar-powered",
+    "battery-operated",
+    "low-wattage",
+    "led-technology",
+    "energy-star",
+  ],
+
+  // Installation & Maintenance
+  installation: [
+    "diy-friendly",
+    "plug-play",
+    "professional-install",
+    "no-wiring-needed",
+    "wireless",
+    "easy-replace",
+    "maintenance-free",
+  ],
+
+  // Smart Features
+  smartFeatures: [
+    "wifi-enabled",
+    "bluetooth",
+    "voice-control",
+    "app-controlled",
+    "timer-function",
+    "color-changing",
+    "scene-setting",
+  ],
+};
+
+// Map product categories to relevant customer tags
+export const categoryCustomerTagMap: Record<string, string[]> = {
+  // LED Bulbs
+  "led-bulbs": [
+    "home-lighting",
+    "energy-saving",
+    "cost-saving",
+    "easy-install",
+    "long-lasting",
+    "homeowner",
+    "budget-friendly",
+    "save-electricity",
+    "diy-friendly",
+  ],
+
+  // Solar Lights
+  "solar-lights": [
+    "outdoor-garden",
+    "security-lighting",
+    "solar-powered",
+    "energy-saving",
+    "weatherproof",
+    "eco-friendly",
+    "no-wiring-needed",
+    "garden-makeover",
+    "homeowner",
+  ],
+
+  // Security Lights
+  "security-lights": [
+    "security-lighting",
+    "motion-sensor",
+    "weatherproof",
+    "auto-on-off",
+    "home-security",
+    "business-owner",
+    "property-manager",
+    "security-upgrade",
+  ],
+
+  // Smart Lighting
+  "smart-lighting": [
+    "smart-home",
+    "wifi-enabled",
+    "voice-control",
+    "app-controlled",
+    "dimmable",
+    "color-changing",
+    "tech-enthusiast",
+    "premium",
+    "home-automation",
+  ],
+
+  // Camera Lights
+  "camera-lights": [
+    "security-lighting",
+    "motion-sensor",
+    "business-security",
+    "property-manager",
+    "cctv-integration",
+    "professional-install",
+    "security-upgrade",
+  ],
+
+  // Decorative Lights
+  "decorative-lights": [
+    "decorative-lighting",
+    "living-room",
+    "bedroom-lighting",
+    "holiday-decoration",
+    "mood-lighting",
+    "renter-friendly",
+    "easy-install",
+    "plug-play",
+  ],
+
+  // Commercial Lighting
+  "commercial-lighting": [
+    "shop-lighting",
+    "office-lighting",
+    "warehouse-lighting",
+    "business-owner",
+    "contractor",
+    "commercial-grade",
+    "professional-install",
+    "bulk-discount",
+  ],
+
+  // Batteries
+  batteries: [
+    "emergency-lighting",
+    "battery-backup",
+    "backup-power",
+    "uninterrupted-power",
+    "emergency-preparedness",
+    "business-continuity",
+  ],
+
+  // Outdoor Lighting
+  "outdoor-lighting": [
+    "outdoor-garden",
+    "pathway-lighting",
+    "weatherproof",
+    "garden-makeover",
+    "home-exterior",
+    "motion-sensor",
+    "security-lighting",
+  ],
+
+  // Emergency Lights
+  "emergency-lights": [
+    "emergency-lighting",
+    "safety-first",
+    "backup-power",
+    "emergency-preparedness",
+    "mandatory-safety",
+    "business-compliance",
+    "property-manager",
+  ],
+
+  // Ceiling Fans with Lights
+  "ceiling-fans": [
+    "bedroom-lighting",
+    "living-room",
+    "energy-saving",
+    "hot-weather",
+    "home-cooling",
+    "diy-friendly",
+    "long-lasting",
+  ],
+
+  // Solar Panels
+  "solar-panels": [
+    "solar-powered",
+    "energy-saving",
+    "reduce-bills",
+    "eco-friendly",
+    "long-term-investment",
+    "off-grid",
+    "business-energy",
+  ],
+};
+
+// Popular Nairobi-specific tags
+export const nairobiTags = [
+  "nairobi-delivery",
+  "same-day-delivery",
+  "free-nairobi-shipping",
+  "popular-in-nairobi",
+  "nairobi-essential",
+  "duruma-road",
+  "nairobi-showroom",
+  "nairobi-installation",
+];
+
+// Tag display names (for better UI)
+export const tagDisplayNames: Record<string, string> = {
+  // Use Cases
+  "home-lighting": "Home Lighting",
+  "office-lighting": "Office Lighting",
+  "shop-lighting": "Shop Lighting",
+  "outdoor-garden": "Outdoor & Garden",
+  "security-lighting": "Security Lighting",
+  "emergency-lighting": "Emergency Lighting",
+  "decorative-lighting": "Decorative Lighting",
+  "kitchen-lighting": "Kitchen Lighting",
+  "bedroom-lighting": "Bedroom Lighting",
+  "bathroom-lighting": "Bathroom Lighting",
+  "living-room": "Living Room",
+  "garage-lighting": "Garage Lighting",
+  "pathway-lighting": "Pathway Lighting",
+  "street-lighting": "Street Lighting",
+  "warehouse-lighting": "Warehouse Lighting",
+
+  // Needs & Benefits
+  "energy-saving": "Energy Saving",
+  "cost-saving": "Cost Saving",
+  "easy-install": "Easy Installation",
+  "long-lasting": "Long Lasting",
+  "bright-lighting": "Bright Lighting",
+  dimmable: "Dimmable",
+  weatherproof: "Weatherproof",
+  "child-safe": "Child Safe",
+  "eco-friendly": "Eco Friendly",
+  "low-maintenance": "Low Maintenance",
+  "smart-home": "Smart Home Compatible",
+  "remote-control": "Remote Control",
+  "motion-sensor": "Motion Sensor",
+  "auto-on-off": "Auto On/Off",
+  "battery-backup": "Battery Backup",
+
+  // Budget
+  "budget-friendly": "Budget Friendly",
+  "mid-range": "Mid Range",
+  premium: "Premium Quality",
+  "value-pack": "Value Pack",
+  "bulk-discount": "Bulk Discount",
+
+  // Special Offers
+  "deal-of-day": "Deal of the Day",
+  "clearance-sale": "Clearance Sale",
+  "new-arrival": "New Arrival",
+  "best-seller": "Best Seller",
+  "staff-pick": "Staff Pick",
+  "nairobi-popular": "Popular in Nairobi",
+  "free-installation": "Free Installation",
+  "free-delivery": "Free Delivery",
+
+  // Nairobi-specific
+  "nairobi-delivery": "Nairobi Delivery",
+  "same-day-delivery": "Same Day Delivery",
+  "free-nairobi-shipping": "Free Nairobi Shipping",
+  "popular-in-nairobi": "Popular in Nairobi",
+  "nairobi-essential": "Nairobi Essential",
+  "duruma-road": "Duruma Road Store",
+  "nairobi-showroom": "Nairobi Showroom",
+  "nairobi-installation": "Nairobi Installation",
+};
+
+// Get suggested tags for a category
+export function getCustomerTagsForCategory(
+  category: string,
+  limit: number = 8
+): string[] {
+  const categoryTags = categoryCustomerTagMap[category] || [];
+  const allTags = [
+    ...categoryTags,
+    ...customerTags.useCases.slice(0, 2),
+    ...customerTags.needsBenefits.slice(0, 2),
+    ...customerTags.budgetLevels.slice(0, 1),
+    ...nairobiTags.slice(0, 1),
+  ];
+
+  // Remove duplicates and limit
+  return [...new Set(allTags)].slice(0, limit);
+}
+
+// Get all available tags (for admin)
+export function getAllCustomerTags(): string[] {
+  const allTags = new Set<string>();
+
+  // Add all tag categories
+  Object.values(customerTags).forEach((tagArray) => {
+    tagArray.forEach((tag) => allTags.add(tag));
+  });
+
+  // Add Nairobi tags
+  nairobiTags.forEach((tag) => allTags.add(tag));
+
+  return Array.from(allTags);
+}
+
+// Get tag display name
+export function getTagDisplayName(tag: string): string {
+  return (
+    tagDisplayNames[tag] ||
+    tag
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  );
+}
+
+/**
+ * Get available tags for a specific category
+ */
+export function getAvailableTagsForCategory(category: string): string[] {
+  const categoryTags = categoryCustomerTagMap[category] || [];
+  const allTags = [
+    ...categoryTags,
+    ...customerTags.useCases,
+    ...customerTags.needsBenefits,
+    ...customerTags.specialOffers,
+  ];
+
+  // Remove duplicates
+  return [...new Set(allTags)];
+}
+
+/**
+ * Filter products by tags
+ */
+export function filterProductsByTags(products: any[], tags: string[]): any[] {
+  if (!tags.length) return products;
+
+  return products.filter((product) => {
+    const productTags = product.tags || [];
+    return tags.some((tag) => productTags.includes(tag));
+  });
+}
+
+/**
+ * Group tags by category for display
+ */
+export function groupTagsByCategory(tags: string[]) {
+  const grouped: { [key: string]: string[] } = {};
+
+  tags.forEach((tag) => {
+    // Find which category this tag belongs to
+    let category = "Other";
+
+    if (customerTags.useCases.includes(tag)) category = "Use Cases";
+    else if (customerTags.needsBenefits.includes(tag)) category = "Benefits";
+    else if (customerTags.projectTypes.includes(tag))
+      category = "Project Types";
+    else if (customerTags.customerTypes.includes(tag)) category = "For";
+    else if (customerTags.budgetLevels.includes(tag)) category = "Budget";
+    else if (customerTags.specialOffers.includes(tag)) category = "Special";
+    else if (customerTags.energyCost.includes(tag)) category = "Energy Saving";
+    else if (customerTags.installation.includes(tag)) category = "Installation";
+    else if (customerTags.smartFeatures.includes(tag))
+      category = "Smart Features";
+
+    if (!grouped[category]) grouped[category] = [];
+    grouped[category].push(tag);
+  });
+
+  return grouped;
+}
+
+/**
+ * Get tag icon based on category
+ */
+export function getTagIcon(tag: string) {
+  const tagCategories = [
+    { category: customerTags.useCases, icon: "🏠" },
+    { category: customerTags.needsBenefits, icon: "⭐" },
+    { category: customerTags.projectTypes, icon: "🔨" },
+    { category: customerTags.customerTypes, icon: "👤" },
+    { category: customerTags.budgetLevels, icon: "💰" },
+    { category: customerTags.specialOffers, icon: "🎯" },
+    { category: customerTags.energyCost, icon: "⚡" },
+    { category: customerTags.installation, icon: "🔧" },
+    { category: customerTags.smartFeatures, icon: "📱" },
+  ];
+
+  for (const { category, icon } of tagCategories) {
+    if (category.includes(tag)) return icon;
+  }
+
+  return "🏷️";
+}
+
+/**
+ * Format tags for display with icons and proper names
+ */
+export function formatTagsForDisplay(tags: string[], limit?: number) {
+  const tagsToDisplay = limit ? tags.slice(0, limit) : tags;
+
+  return tagsToDisplay.map((tag) => ({
+    id: tag,
+    name: getTagDisplayName(tag),
+    icon: getTagIcon(tag),
+  }));
+}
+
+/**
+ * Sort tags by relevance (category-specific first, then general)
+ */
+export function sortTagsByRelevance(tags: string[], category?: string) {
+  const categorySpecific = category
+    ? tags.filter((tag) => categoryCustomerTagMap[category]?.includes(tag))
+    : [];
+
+  const generalTags = tags.filter((tag) => !categorySpecific.includes(tag));
+
+  return [...categorySpecific, ...generalTags];
+}

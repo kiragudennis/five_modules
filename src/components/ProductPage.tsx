@@ -197,7 +197,7 @@ export default function ProductDetailPage({
         {/* Product Images & Gallery */}
         <div className="lg:col-span-2">
           <Card className="border-amber-100 dark:border-amber-800/30">
-            <CardContent className="p-6">
+            <CardContent>
               {product.images?.length ? (
                 <div className="flex flex-col w-full">
                   {/* Deal of the Day Banner */}
@@ -369,7 +369,7 @@ export default function ProductDetailPage({
                   </div>
 
                   {/* Technical Highlights */}
-                  <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="mt-4 sm:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
                     {product.wattage && (
                       <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
                         <Zap className="h-5 w-5 text-amber-600 mx-auto mb-1" />
@@ -494,7 +494,7 @@ export default function ProductDetailPage({
         {/* Product Details & Actions */}
         <div className="space-y-6">
           <Card className="sticky top-24 border-amber-100 dark:border-amber-800/30">
-            <CardContent className="p-6">
+            <CardContent>
               {/* Product Header */}
               <div className="mb-6">
                 <div className="flex flex-wrap items-center gap-2 mb-3">

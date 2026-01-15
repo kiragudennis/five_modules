@@ -54,8 +54,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq("id", supabaseUser.id)
           .maybeSingle();
 
-        console.log("User info:", data);
-
         if (error) {
           console.error("Error fetching user role:", error.message);
 
@@ -74,13 +72,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Remove password fields and ensure type consistency
         const profileData: ProfileData = {
           id: data.id,
           email: data.email,
           role: data.role,
+
+          full_name: data.full_name,
+          phone: data.phone,
+          address: data.address,
+          city: data.city,
+          postal_code: data.postal_code,
+          country: data.country,
+
+          business_name: data.business_name,
+          business_type: data.business_type,
+          business_customer: data.metadata?.business_customer,
+
+          receive_offers: data.receive_offers,
+          receive_newsletter: data.receive_newsletter,
+
+          email_verified: data.email_verified,
+          last_login: data.last_login,
+
           metadata: data.metadata,
+
           created_at: data.created_at,
+          updated_at: data.updated_at,
         };
 
         setProfile(profileData);

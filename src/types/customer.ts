@@ -70,13 +70,43 @@ export type Customer = z.infer<typeof CustomerSchema>;
 // Use the same type for ProfileData to avoid inconsistencies
 export type Profile = Omit<Customer, "password" | "confirmPassword">;
 
-// Or if you prefer the interface approach, make sure it matches exactly:
 export interface ProfileData {
-  id?: string;
+  id: string;
   email: string;
-  metadata: any;
-  created_at: string;
   role: string;
+
+  // personal
+  full_name?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  postal_code?: string;
+  country?: string;
+
+  // business
+  business_name?: string;
+  business_type?: string;
+  business_customer?: boolean;
+
+  // preferences
+  receive_offers?: boolean;
+  receive_newsletter?: boolean;
+
+  // auth/meta
+  email_verified?: boolean;
+  last_login?: string | null;
+
+  // raw metadata fallback
+  metadata?: {
+    city?: string;
+    phone?: string;
+    full_name?: string;
+    business_customer?: boolean;
+    [key: string]: any;
+  };
+
+  created_at: string;
+  updated_at?: string;
   referred_by?: string;
 }
 

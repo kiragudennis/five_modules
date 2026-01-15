@@ -236,7 +236,7 @@ export default function ProductForm({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           {/* Product Information Card */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -335,7 +335,7 @@ export default function ProductForm({
                         <FormLabel>Selling Price (KES) *</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                            <span className="absolute left-3 top-1.5 text-muted-foreground">
                               KES
                             </span>
                             <Input
@@ -359,7 +359,7 @@ export default function ProductForm({
                         <FormLabel>Original Price (KES)</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-muted-foreground">
+                            <span className="absolute left-3 top-1.5 text-muted-foreground">
                               KES
                             </span>
                             <Input
@@ -370,7 +370,6 @@ export default function ProductForm({
                             />
                           </div>
                         </FormControl>
-                        <FormDescription>For showing discount</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -421,7 +420,7 @@ export default function ProductForm({
 
           {/* Category & Features Card */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Category & Features
@@ -594,7 +593,7 @@ export default function ProductForm({
 
           {/* Technical Specifications Card */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <div className="space-y-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Zap className="w-5 h-5 text-amber-600" />
@@ -842,9 +841,8 @@ export default function ProductForm({
             </CardContent>
           </Card>
 
-          {/* Media Card */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <div className="space-y-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Media
@@ -879,14 +877,19 @@ export default function ProductForm({
                     name="videoUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Product Video</FormLabel>
-                        <FormControl>
-                          <VideoUpload
-                            value={field.value || ""}
-                            onChange={field.onChange}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
+                        <div className="space-y-2 w-full">
+                          <FormLabel>Product Video</FormLabel>
+                          <FormControl>
+                            {/* Add strict width constraints */}
+                            <div className="w-full max-w-full overflow-x-hidden">
+                              <VideoUpload
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                disabled={isSubmitting}
+                              />
+                            </div>
+                          </FormControl>
+                        </div>
                         <FormDescription>
                           Upload a product demonstration video (optional)
                         </FormDescription>
@@ -901,7 +904,7 @@ export default function ProductForm({
 
           {/* Description Card */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent>
               <FormField
                 control={form.control}
                 name="description"
@@ -911,7 +914,7 @@ export default function ProductForm({
                     <FormControl>
                       <Textarea
                         placeholder="Describe your lighting product in detail. Include features, benefits, specifications, and installation instructions..."
-                        className="min-h-48 resize-y"
+                        className="min-h-48 resize-y text-sm"
                         {...field}
                       />
                     </FormControl>

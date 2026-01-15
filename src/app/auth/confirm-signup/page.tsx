@@ -48,6 +48,7 @@ export default function ConfirmSignupPage() {
         const hash = window.location.hash.substring(1);
         if (!hash) {
           // Not a magic link, redirect to home
+          toast.dismiss();
           router.push("/");
           return;
         }

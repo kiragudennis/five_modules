@@ -94,8 +94,8 @@ function FeaturedProductsGrid({ products }: { products: Product[] }) {
             )}
 
             {/* Product Rating */}
-            {product.rating && (
-              <div className="absolute top-2 right-2 z-10">
+            <div className="absolute top-2 right-2 z-10">
+              {product.rating && (
                 <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
                   <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                   <span>{product.rating.toFixed(1)}</span>
@@ -103,9 +103,8 @@ function FeaturedProductsGrid({ products }: { products: Product[] }) {
                     ({product.reviewsCount})
                   </span>
                 </div>
-              </div>
-            )}
-
+              )}
+            </div>
             <div className="aspect-square relative flex-shrink-0">
               {product.images?.[0] ? (
                 <>

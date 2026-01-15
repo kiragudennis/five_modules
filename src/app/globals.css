@@ -3,6 +3,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Add to your global CSS or component */
+@layer utilities {
+  /* Force video elements to stay within bounds */
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Fix for video player overflow */
+  .video-container {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  /* Ensure form inputs don't overflow */
+  input[type="url"] {
+    max-width: 100%;
+  }
+
+  /* Mobile-specific fixes */
+  @media (max-width: 640px) {
+    .mobile-overflow-fix {
+      max-width: 100vw;
+      margin-left: calc(-1 * var(--padding-inline, 1rem));
+      margin-right: calc(-1 * var(--padding-inline, 1rem));
+      padding-left: var(--padding-inline, 1rem);
+      padding-right: var(--padding-inline, 1rem);
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -82,10 +82,10 @@ export default function CategoriesPage() {
         </div>
 
         {/* Store Info */}
-        <div className="mt-6 p-4 dark:bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg max-w-xl mx-auto">
+        <div className="mt-6 p-4 rounded-lg max-w-xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-amber-600" />
+              <MapPin className="h-4 w-4" />
               <span>Duruma Road, Nairobi</span>
             </div>
             <div className="flex items-center gap-2">
