@@ -13,6 +13,7 @@ export const productCategories = [
   "emergency-lights",
 ];
 
+import { CartItem } from "@/types/store";
 import {
   Lightbulb,
   Sun,
@@ -35,6 +36,7 @@ import {
   CreditCard,
   Headphones,
   Users,
+  MapPin,
 } from "lucide-react";
 
 // Blessed Two Electronics categories - Enhanced version
@@ -439,9 +441,38 @@ export const cities = [
   "Malindi",
   "Kitale",
   "Kakamega",
+  "Garissa",
+  "Nyeri",
+  "Meru",
   "Other",
 ];
 
+export const shippingMethods = [
+  {
+    id: "standard",
+    name: "Standard Delivery",
+    cost: 200,
+    time: "3-5 business days",
+    description: "via our trusted logistics partners",
+    icon: Truck,
+  },
+  {
+    id: "express",
+    name: "Same-Day Express",
+    cost: 500,
+    time: "Within Nairobi CBD",
+    description: "Order by 2PM, delivered today",
+    icon: Zap,
+  },
+  {
+    id: "pickup",
+    name: "Store Pickup",
+    cost: 0,
+    time: "Ready within 2 hours",
+    description: "Collect from Duruma Road, Nairobi",
+    icon: MapPin,
+  },
+];
 // lib/constants/tags.ts
 // Customer-focused tags for Blessed Two Electronics
 
@@ -784,6 +815,272 @@ export const tagDisplayNames: Record<string, string> = {
   "duruma-road": "Duruma Road Store",
   "nairobi-showroom": "Nairobi Showroom",
   "nairobi-installation": "Nairobi Installation",
+};
+
+// Realistic Installation Services for Kenyan Lighting Market
+export const installationOptions = [
+  {
+    id: "basic-bulb",
+    name: "Basic Bulb Installation",
+    cost: 150,
+    description: "Simple bulb replacement (up to 5 bulbs)",
+    duration: "30-60 mins",
+    includes: [
+      "Safe removal of old bulbs",
+      "New bulb installation",
+      "Basic safety testing",
+      "Disposal of old bulbs",
+    ],
+    bestFor: ["LED bulbs", "CFL bulbs", "Energy savers"],
+    icon: "💡",
+    recommended: true,
+  },
+  {
+    id: "tube-light",
+    name: "Tube Light Installation",
+    cost: 300,
+    description: "Fluorescent/LED tube installation (up to 3 tubes)",
+    duration: "1-2 hours",
+    includes: [
+      "Choke/ballast checking",
+      "Tube mounting",
+      "Wiring connection",
+      "Starter replacement if needed",
+    ],
+    bestFor: ["4ft LED tubes", "2ft tubes", "Office lighting"],
+    icon: "📏",
+  },
+  {
+    id: "ceiling-light",
+    name: "Ceiling Light Fitting",
+    cost: 500,
+    description: "Ceiling-mounted light fixture installation",
+    duration: "1-2 hours",
+    includes: [
+      "Mounting bracket installation",
+      "Wiring connection",
+      "Fixture assembly",
+      "Bulb installation",
+    ],
+    bestFor: ["Pendant lights", "Chandeliers", "Downlights"],
+    icon: "🔩",
+  },
+  {
+    id: "solar-light",
+    name: "Solar Light Installation",
+    cost: 1000,
+    description: "Complete solar lighting system setup",
+    duration: "3-4 hours",
+    includes: [
+      "Solar panel mounting",
+      "Battery connection",
+      "Light fixture installation",
+      "System testing",
+      "Basic orientation",
+    ],
+    bestFor: [
+      "Solar street lights",
+      "Solar garden lights",
+      "Solar security lights",
+    ],
+    icon: "☀️",
+    recommended: true,
+  },
+  {
+    id: "security-light",
+    name: "Security Light Setup",
+    cost: 800,
+    description: "Motion sensor security light installation",
+    duration: "2-3 hours",
+    includes: [
+      "Mounting at optimal height",
+      "Motion sensor calibration",
+      "Weatherproof wiring",
+      "Angle adjustment",
+    ],
+    bestFor: ["PIR security lights", "Flood lights", "Camera lights"],
+    icon: "👁️",
+  },
+  {
+    id: "emergency-light",
+    name: "Emergency Light Installation",
+    cost: 1200,
+    description: "Emergency backup lighting system",
+    duration: "3-4 hours",
+    includes: [
+      "Main power connection",
+      "Battery backup setup",
+      "Auto-switch testing",
+      "Exit sign installation if needed",
+    ],
+    bestFor: ["Emergency lights", "Exit signs", "Backup systems"],
+    icon: "🚨",
+  },
+  {
+    id: "commercial-lighting",
+    name: "Commercial Lighting Setup",
+    cost: 2500,
+    description: "Multiple point commercial lighting installation",
+    duration: "1 full day",
+    includes: [
+      "Up to 10 light points",
+      "Wiring conduit installation",
+      "Switchboard connection",
+      "Energy consumption testing",
+    ],
+    bestFor: ["Shops", "Offices", "Restaurants", "Showrooms"],
+    icon: "🏢",
+    recommended: true,
+  },
+  {
+    id: "smart-lighting",
+    name: "Smart Lighting Setup",
+    cost: 1500,
+    description: "Smart/automated lighting system configuration",
+    duration: "2-3 hours",
+    includes: [
+      "App installation guidance",
+      "Wi-Fi/Bluetooth pairing",
+      "Schedule programming",
+      "Voice assistant setup",
+    ],
+    bestFor: ["Smart bulbs", "Wi-Fi lights", "App-controlled systems"],
+    icon: "📱",
+  },
+  {
+    id: "outdoor-lighting",
+    name: "Outdoor/Garden Lighting",
+    cost: 1200,
+    description: "Weatherproof outdoor lighting installation",
+    duration: "3-4 hours",
+    includes: [
+      "Waterproof connections",
+      "Burial cable installation",
+      "Transformer setup for low voltage",
+      "Landscape lighting placement",
+    ],
+    bestFor: ["Garden lights", "Pathway lights", "Wall washers"],
+    icon: "🌳",
+  },
+  {
+    id: "industrial-lighting",
+    name: "Industrial/High Bay",
+    cost: 3500,
+    description: "High bay/industrial lighting installation",
+    duration: "1-2 days",
+    includes: [
+      "High ceiling mounting",
+      "Heavy-duty fixture installation",
+      "Three-phase connection if needed",
+      "Safety harness setup",
+    ],
+    bestFor: ["Warehouses", "Factories", "Workshops"],
+    icon: "🏭",
+  },
+  {
+    id: "custom-wiring",
+    name: "Custom Wiring Service",
+    cost: 800,
+    description: "Additional wiring and electrical work",
+    duration: "Varies",
+    includes: [
+      "Additional conduit installation",
+      "Wall chasing and patching",
+      "Switch/dimmer installation",
+      "Circuit extension",
+    ],
+    bestFor: ["New installations", "Renovations", "Additional points"],
+    icon: "🔌",
+  },
+  {
+    id: "maintenance-check",
+    name: "Lighting Maintenance Check",
+    cost: 400,
+    description: "Comprehensive lighting system inspection",
+    duration: "1-2 hours",
+    includes: [
+      "All bulb/fixture inspection",
+      "Wiring safety check",
+      "Energy efficiency assessment",
+      "Maintenance report",
+    ],
+    bestFor: ["Existing setups", "Routine maintenance", "Energy audits"],
+    icon: "🔍",
+  },
+];
+
+export const getRecommendedInstallations = (cartItems: CartItem[]) => {
+  const recommendations = [];
+  const productTypes = new Set();
+
+  // Analyze cart items
+  cartItems.forEach((item) => {
+    const category = item.product.category?.toLowerCase() || "";
+    const tags = item.product.tags || [];
+
+    // Check for solar products
+    if (
+      category.includes("solar") ||
+      tags.some((tag) => tag.includes("solar"))
+    ) {
+      productTypes.add("solar");
+    }
+
+    // Check for security products
+    if (
+      category.includes("security") ||
+      tags.some((tag) => tag.includes("security"))
+    ) {
+      productTypes.add("security");
+    }
+
+    // Check for commercial/industrial
+    if (category.includes("commercial") || category.includes("industrial")) {
+      productTypes.add("commercial");
+    }
+
+    // Check for emergency lights
+    if (
+      category.includes("emergency") ||
+      tags.some((tag) => tag.includes("emergency"))
+    ) {
+      productTypes.add("emergency");
+    }
+  });
+
+  // Add recommendations based on product types
+  if (productTypes.has("solar")) {
+    recommendations.push(
+      installationOptions.find((s) => s.id === "solar-light")
+    );
+  }
+
+  if (productTypes.has("security")) {
+    recommendations.push(
+      installationOptions.find((s) => s.id === "security-light")
+    );
+  }
+
+  if (productTypes.has("commercial")) {
+    recommendations.push(
+      installationOptions.find((s) => s.id === "commercial-lighting")
+    );
+  }
+
+  if (productTypes.has("emergency")) {
+    recommendations.push(
+      installationOptions.find((s) => s.id === "emergency-light")
+    );
+  }
+
+  // Always include basic bulb installation as a safe option
+  if (recommendations.length === 0 || cartItems.length <= 3) {
+    recommendations.push(
+      installationOptions.find((s) => s.id === "basic-bulb")
+    );
+  }
+
+  return recommendations.filter(Boolean).slice(0, 4); // Limit to 4 recommendations
 };
 
 // Get suggested tags for a category

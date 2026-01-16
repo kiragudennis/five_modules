@@ -1,3 +1,4 @@
+// /api/checkout/mpesa/initial/route.ts
 import { secureRatelimit } from "@/lib/limit";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -9,12 +10,28 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   const { cart, phoneNumber } = body;
-  const { total, items, currency, shipping } = cart;
-  const access_key = process.env.EXCHANGE_API_KEY;
-  const endpoint = process.env.ENDPOINT;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
-  // IF NO PHONE NUMBER
+  // Destructure the new cart structure
+  const {
+    items,
+    customer,
+    shipping,
+    payment,
+    services,
+    coupon,
+    totals,
+    metadata,
+  } = cart;
+
+  // Validate required fields
+  if (!items || !customer || !shipping || !totals) {
+    return NextResponse.json(
+      { error: "Missing required cart data" },
+      { status: 400 }
+    );
+  }
+
+  // Validate phone number
   if (
     !phoneNumber ||
     phoneNumber.length !== 12 ||
@@ -22,6 +39,19 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: "Invalid phone number" },
+      { status: 400 }
+    );
+  }
+
+  // Validate customer info
+  if (
+    !customer.firstName ||
+    !customer.lastName ||
+    !customer.email ||
+    !customer.phone
+  ) {
+    return NextResponse.json(
+      { error: "Missing customer information" },
       { status: 400 }
     );
   }
@@ -34,26 +64,30 @@ export async function POST(req: Request) {
   const supabase = await createClient();
   const {
     data: { user },
-    error,
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (error || !user) {
+  if (authError || !user) {
     return NextResponse.json(
       { error: "Unauthorized", redirect: "/login" },
       { status: 401 }
     );
   }
 
-  // Convert CURRENCY → KES with 12h caching
-  let amountKES = total;
-  if (currency !== "KSH") {
+  // Convert currency to KES if needed (using totals.total)
+  let amountKES = totals.total;
+  const currency = totals.currency || "KES"; // Assuming currency is in totals
+
+  if (currency !== "KES") {
     try {
+      const access_key = process.env.EXCHANGE_API_KEY;
+      const endpoint = process.env.ENDPOINT;
+
       const res = await fetch(
         `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=${currency}&to=KES&amount=${amountKES}`,
-        { next: { revalidate: 3600 * 12 } } // 12h cache
+        { next: { revalidate: 3600 * 12 } }
       );
       const json = await res.json();
-
       const rate = json.result;
 
       if (!rate) throw new Error("Rate missing");
@@ -63,10 +97,11 @@ export async function POST(req: Request) {
         "Exchange rate fetch failed, defaulting to hardcoded rate",
         err
       );
-      amountKES = Math.round(total * 131); // fallback
+      amountKES = Math.round(totals.total * 131); // fallback
     }
   }
 
+  // Prepare M-Pesa timestamp and password
   const current_time = new Date();
   const year = current_time.getFullYear();
   const month = String(current_time.getMonth() + 1).padStart(2, "0");
@@ -83,51 +118,181 @@ export async function POST(req: Request) {
   );
 
   try {
-    const token = await generateToken();
+    // 📦 1. Create order with new schema
+    const orderPayload = {
+      // User information
+      user_id: user.id,
 
-    // 📦 1. Create order
+      // Customer Information (flattened)
+      customer_name: `${customer.firstName} ${customer.lastName}`.trim(),
+      customer_email: customer.email,
+      customer_phone: customer.phone,
+
+      // Shipping Information (flattened)
+      shipping_address: shipping.address,
+      shipping_city: shipping.city,
+      shipping_county: shipping.county,
+      shipping_postal_code: shipping.postalCode,
+      shipping_country: shipping.country || "Kenya",
+      shipping_method: shipping.method,
+      shipping_cost: shipping.cost || 0,
+      shipping_total: shipping.cost || 0,
+      estimated_delivery: shipping.estimatedDelivery,
+
+      // Payment Information
+      payment_method: payment.method,
+      payment_status: "pending",
+      payment_reference: null,
+
+      // Order Totals
+      subtotal: totals.subtotal,
+      wholesale_savings: totals.wholesaleSavings || 0,
+      coupon_discount: totals.couponDiscount || 0,
+      installation_cost: totals.installation || 0,
+      total_amount: totals.total,
+      currency: "KES", // Converted to KES for M-Pesa
+
+      // Installation Services
+      installation_required: services?.installation?.required || false,
+      installation_service: services?.installation?.required
+        ? {
+            name: services.installation.service?.name,
+            description: services.installation.service?.description,
+            price: services.installation.cost,
+          }
+        : null,
+      installation_date: services?.installation?.date,
+      installation_time: services?.installation?.time,
+      special_instructions: services?.installation?.instructions,
+
+      // Coupon Information
+      coupon_code: coupon?.code || null,
+      coupon_data: coupon?.data || null,
+
+      // Order Status
+      status: "pending",
+
+      // Metadata
+      notes: metadata?.notes || null,
+      metadata: {
+        original_currency: currency,
+        converted_amount_kes: amountKES,
+        cart_count: metadata?.cartCount,
+        wholesale_applied: metadata?.wholesaleApplied,
+        user_agent: req.headers.get("user-agent"),
+        ip_address:
+          req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"),
+      },
+    };
+
     const { data: orderData, error: orderErr } = await supabaseAdmin
       .from("orders")
-      .insert({
-        user_id: user.id,
-        total,
-        currency,
-        status: "pending", // default
-        shipping_info: shipping,
-      })
+      .insert(orderPayload)
       .select()
       .single();
 
-    if (orderErr) throw orderErr;
+    if (orderErr) {
+      console.error("Order creation error:", orderErr);
+      throw orderErr;
+    }
 
-    // 📦 2. Insert order items
+    // 📦 2. Insert order items (snapshot_product_details trigger will populate product details)
     const orderItems = items.map((item: any) => ({
       order_id: orderData.id,
       product_id: item.id,
-      qty: item.quantity,
+      product_name: item.name,
+      product_title: item.title,
+      product_sku: item.sku,
+      product_category: item.category,
+      product_image: item.image,
       unit_price: item.price,
+      wholesale_price: item.wholesale_price,
+      wholesale_min_quantity: item.wholesale_min_quantity,
+      has_wholesale: item.has_wholesale,
+      applied_price: item.applied_price,
+      quantity: item.quantity,
+      metadata: {
+        original_data: {
+          name: item.name,
+          title: item.title,
+          sku: item.sku,
+          category: item.category,
+        },
+      },
     }));
+
     const { error: itemsErr } = await supabaseAdmin
       .from("order_items")
       .insert(orderItems);
-    if (itemsErr) throw itemsErr;
 
-    const { data } = await axios.post(
+    if (itemsErr) {
+      console.error("Order items creation error:", itemsErr);
+
+      // Rollback order if items fail
+      await supabaseAdmin.from("orders").delete().eq("id", orderData.id);
+
+      throw itemsErr;
+    }
+
+    // 📦 3. APPLY COUPON IF PROVIDED
+    let couponResult = null;
+    if (coupon?.code) {
+      try {
+        // Call the PostgreSQL function to apply coupon
+        const { data: couponData, error: couponError } =
+          await supabaseAdmin.rpc("apply_coupon_to_order", {
+            order_uuid: orderData.id,
+            coupon_code: coupon.code,
+            customer_email: customer.email,
+          });
+
+        if (couponError) {
+          console.warn(
+            "Coupon application failed, continuing without coupon:",
+            couponError.message
+          );
+          // Continue without coupon - order already created
+        } else {
+          couponResult = couponData;
+          console.log("Coupon applied successfully:", couponData);
+        }
+      } catch (couponErr) {
+        console.warn(
+          "Coupon application error, continuing without coupon:",
+          couponErr
+        );
+        // Continue without coupon
+      }
+    }
+
+    // Update amountKES with final total after coupon
+    if (couponResult && couponResult.discount_amount) {
+      amountKES = Math.max(1, amountKES - couponResult.discount_amount); // Ensure positive amount
+    }
+
+    // 📦 3. Initiate M-Pesa payment
+    const token = await generateToken();
+
+    const { data: mpesaData } = await axios.post(
       "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
       {
         BusinessShortCode: shortCode,
         Password: password,
         Timestamp: timestamp,
         TransactionType: "CustomerBuyGoodsOnline",
-        Amount: amountKES, // Use converted amount in KES
+        Amount: amountKES,
         PartyA: phoneNumber,
         PartyB: process.env.MPESA_TILL!,
         PhoneNumber: phoneNumber,
-        CallBackURL: `${siteUrl}/api/webhooks/mpesa?orderId=${
-          orderData.id
-        }&callbackSecret=${process.env.MPESA_CALLBACK_SECRET!}`,
-        AccountReference: "World Samma Federation",
-        TransactionDesc: "Payment for order",
+        CallBackURL: `${
+          process.env.NEXT_PUBLIC_SITE_URL
+        }/api/webhooks/mpesa?orderId=${orderData.id}&callbackSecret=${process
+          .env.MPESA_CALLBACK_SECRET!}`,
+        AccountReference:
+          orderData.order_number || `ORDER-${orderData.id.substring(0, 8)}`,
+        TransactionDesc: `Payment for order ${
+          orderData.order_number || orderData.id
+        }`,
       },
       {
         headers: {
@@ -136,28 +301,52 @@ export async function POST(req: Request) {
         },
       }
     );
-    if (data.ResponseCode !== "0") {
-      throw new Error(`M-Pesa error: ${data.ResponseDescription}`);
+
+    if (mpesaData.ResponseCode !== "0") {
+      throw new Error(`M-Pesa error: ${mpesaData.ResponseDescription}`);
+    }
+
+    // Update order with M-Pesa reference
+    await supabaseAdmin
+      .from("orders")
+      .update({
+        payment_reference: mpesaData.CheckoutRequestID,
+        metadata: {
+          ...orderData.metadata,
+          mpesa_request_id: mpesaData.CheckoutRequestID,
+          mpesa_response: mpesaData,
+          coupon_attempted: !!coupon?.code,
+          coupon_result: couponResult,
+        },
+      })
+      .eq("id", orderData.id);
+
+    return NextResponse.json(
+      {
+        orderId: orderData.id,
+        orderNumber: orderData.order_number,
+        mpesa: mpesaData,
+        message: "Order created successfully. Please complete payment.",
+      },
+      { status: 200 }
+    );
+  } catch (error: any) {
+    console.error("Checkout error:", error);
+
+    // More detailed error logging
+    if (error.response) {
+      console.error("API response error:", error.response.data);
+      console.error("Status code:", error.response.status);
+    } else if (error.message) {
+      console.error("Error message:", error.message);
     }
 
     return NextResponse.json(
-      { orderId: orderData.id, mpesa: data },
       {
-        status: 200,
-      }
-    );
-  } catch (error: any) {
-    console.error("M-Pesa checkout error:", error);
-    if (error.response) {
-      // This logs the full M-Pesa response when the request fails
-      console.error("M-Pesa API response error:", error.response.data);
-      console.error("Status code:", error.response.status);
-      console.error("Headers:", error.response.headers);
-    } else {
-      console.error("Unknown M-Pesa error:", error.message);
-    }
-    return NextResponse.json(
-      { error: "Failed to initiate payment" },
+        error: "Failed to process checkout",
+        details: error.message,
+        ...(error.response?.data && { mpesaError: error.response.data }),
+      },
       { status: 500 }
     );
   }

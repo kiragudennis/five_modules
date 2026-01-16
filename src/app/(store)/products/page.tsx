@@ -666,9 +666,9 @@ export default function ProductsPage({
       )}
 
       {/* Products Grid */}
-      <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
         {loading
-          ? Array.from({ length: 8 }).map((_, index) => (
+          ? Array.from({ length: 12 }).map((_, index) => (
               <ProductCardSkeleton key={index} />
             ))
           : filteredProducts.map((product) => (
@@ -862,7 +862,7 @@ export default function ProductsPage({
 
                   {/* Urgent Badge */}
                   {daysLeft <= 3 && (
-                    <div className="absolute top-12 right-4">
+                    <div className="absolute top-4 right-32">
                       <Badge variant="destructive" className="text-xs">
                         ⏰ {daysLeft} days left!
                       </Badge>
@@ -879,7 +879,7 @@ export default function ProductsPage({
                           {coupon.description || "Special lighting offer"}
                         </p>
                       </div>
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs mt-6">
                         Min: {minAmount}
                       </Badge>
                     </div>

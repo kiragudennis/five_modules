@@ -1,4 +1,3 @@
-// components/TrackingPage.tsx
 "use client";
 
 import { useState } from "react";
@@ -18,6 +17,13 @@ import {
   Printer,
   Download,
   Share2,
+  ShoppingBag,
+  Calendar,
+  CreditCard,
+  AlertCircle,
+  ArrowRight,
+  Hash,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,53 +32,122 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface TrackingOrder {
   id: string;
-  shipping_info: any;
-  total: number;
-  status: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_county: string;
+  shipping_country: string;
+  shipping_postal_code: string;
+  shipping_method: string;
+  shipping_total: number;
+  estimated_delivery: string;
+  total_amount: number;
+  currency: string;
+  status:
+    | "pending"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled"
+    | "completed";
+  payment_status:
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "refunded";
+  payment_method: string;
+  payment_reference: string;
+  subtotal: number;
+  wholesale_savings: number;
+  coupon_discount: number;
+  installation_cost: number;
+  installation_required: boolean;
   tracking_number: string;
   created_at: string;
-  order_items: Array<{
+  updated_at: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  items: Array<{
     id: string;
-    qty: number;
+    product_name: string;
+    product_title: string;
+    product_sku: string;
+    product_category: string;
+    product_image: string;
     unit_price: number;
-    products: {
-      name: string;
-      sku: string;
-      images?: string[];
-    };
+    wholesale_price: number;
+    has_wholesale: boolean;
+    applied_price: number;
+    quantity: number;
+    total_price: number;
   }>;
-  transactions?: Array<{
-    gateway: string;
-    amount: number;
-    status: string;
-    phone_number?: string;
-  }>;
+  metadata?: any;
 }
 
 interface TrackingHistory {
   id: string;
   status: string;
+  description?: string;
+  location?: string;
   tracking_number: string;
   shipping_method?: string;
   estimated_delivery?: string;
   created_at: string;
 }
 
+interface Transaction {
+  id: string;
+  order_id: string;
+  gateway: string;
+  amount: number;
+  currency: string;
+  status: string;
+  receipt_number: string;
+  phone_number?: string;
+  payload?: any;
+  created_at: string;
+}
+
 interface TrackingData {
   orders: TrackingOrder[];
   trackingHistory: TrackingHistory[];
+  transactions: Transaction[];
 }
 
 const TRACKING_STEPS = [
-  { status: "pending", label: "Order Placed", icon: FileText },
-  { status: "paid", label: "Payment Confirmed", icon: CheckCircle },
-  { status: "processing", label: "Processing", icon: Package },
-  { status: "shipped", label: "Shipped", icon: Truck },
-  { status: "delivered", label: "Delivered", icon: Home },
+  {
+    status: "pending",
+    label: "Order Placed",
+    icon: FileText,
+    color: "bg-gray-500",
+  },
+  {
+    status: "processing",
+    label: "Processing",
+    icon: Package,
+    color: "bg-blue-500",
+  },
+  { status: "shipped", label: "Shipped", icon: Truck, color: "bg-purple-500" },
+  {
+    status: "delivered",
+    label: "Delivered",
+    icon: Home,
+    color: "bg-green-500",
+  },
+  {
+    status: "completed",
+    label: "Completed",
+    icon: CheckCircle,
+    color: "bg-green-600",
+  },
 ];
 
 export default function TrackingPage({
@@ -83,17 +158,17 @@ export default function TrackingPage({
   trackingNumber: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const { orders, trackingHistory } = trackingData;
+  const { orders, trackingHistory, transactions } = trackingData;
   const mainOrder = orders[0];
 
-  // Calculate current step index
+  // Calculate current step index based on order status
   const getCurrentStepIndex = () => {
     const steps = TRACKING_STEPS.map((s) => s.status);
     const currentStatus = mainOrder.status;
     let stepIndex = steps.indexOf(currentStatus);
 
-    // If status is delivered, show all steps completed
-    if (currentStatus === "delivered") {
+    // If status is delivered or completed, show all steps completed
+    if (currentStatus === "delivered" || currentStatus === "completed") {
       return steps.length - 1;
     }
 
@@ -134,11 +209,119 @@ export default function TrackingPage({
   // Calculate total items and amount
   const totalItems = orders.reduce(
     (sum, order) =>
-      sum + order.order_items.reduce((itemSum, item) => itemSum + item.qty, 0),
+      sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
     0
   );
 
-  const totalAmount = orders.reduce((sum, order) => sum + order.total, 0);
+  const totalAmount = orders.reduce(
+    (sum, order) => sum + order.total_amount,
+    0
+  );
+  const currency = mainOrder.currency || "KES";
+
+  // Format status for display
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+      case "delivered":
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200">
+            ✓ Delivered
+          </Badge>
+        );
+      case "shipped":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+            🚚 Shipped
+          </Badge>
+        );
+      case "processing":
+        return (
+          <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+            ⚙️ Processing
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+            ⏳ Pending
+          </Badge>
+        );
+      case "cancelled":
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200">
+            ✗ Cancelled
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Format payment status for display
+  const getPaymentBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200">
+            💰 Paid
+          </Badge>
+        );
+      case "processing":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+            ⏳ Processing
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+            ⏳ Pending
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200">
+            ✗ Failed
+          </Badge>
+        );
+      case "refunded":
+        return (
+          <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+            ↩️ Refunded
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Get estimated delivery date
+  const getEstimatedDelivery = () => {
+    if (mainOrder.estimated_delivery) {
+      return mainOrder.estimated_delivery;
+    }
+    if (mainOrder.created_at) {
+      const orderDate = new Date(mainOrder.created_at);
+      const estimatedDate = new Date(orderDate);
+      estimatedDate.setDate(
+        estimatedDate.getDate() +
+          (mainOrder.shipping_method === "express" ? 2 : 7)
+      );
+      return estimatedDate.toLocaleDateString("en-KE", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    }
+    return "Within 7 business days";
+  };
+
+  // Get transaction for an order
+  const getOrderTransaction = (orderId: string) => {
+    return transactions.find((tx) => tx.order_id === orderId);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -193,22 +376,21 @@ export default function TrackingPage({
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                       Tracking #{trackingNumber}
                     </h2>
-                    <p className="text-amber-600 dark:text-amber-400 font-medium">
-                      {mainOrder.status === "delivered"
-                        ? "✅ Delivered"
-                        : mainOrder.status === "shipped"
-                        ? "🚚 In Transit"
-                        : "🔄 Processing"}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {getStatusBadge(mainOrder.status)}
+                      {getPaymentBadge(mainOrder.payment_status)}
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                   <div>
                     <p className="text-sm text-muted-foreground">
-                      Total Orders
+                      Order Number
                     </p>
-                    <p className="text-lg font-bold">{orders.length}</p>
+                    <p className="text-lg font-bold">
+                      {mainOrder.order_number}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Items</p>
@@ -219,13 +401,11 @@ export default function TrackingPage({
                       Total Amount
                     </p>
                     <p className="text-lg font-bold">
-                      KES {totalAmount.toFixed(2)}
+                      {formatCurrency(totalAmount, currency)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
-                      Shipment Date
-                    </p>
+                    <p className="text-sm text-muted-foreground">Order Date</p>
                     <p className="text-lg font-bold">
                       {format(new Date(mainOrder.created_at), "MMM dd")}
                     </p>
@@ -251,7 +431,7 @@ export default function TrackingPage({
                     </>
                   ) : (
                     <>
-                      <Copy className="h-4 w-4 mr-2" />
+                      <CopyIcon className="h-4 w-4 mr-2" />
                       Copy Tracking
                     </>
                   )}
@@ -260,7 +440,7 @@ export default function TrackingPage({
                   asChild
                   className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600"
                 >
-                  <a href={`tel:0700000000`}>
+                  <a href={`tel:${mainOrder.customer_phone || "0700000000"}`}>
                     <Phone className="h-4 w-4 mr-2" />
                     Contact Support
                   </a>
@@ -276,7 +456,12 @@ export default function TrackingPage({
             {/* Tracking Timeline */}
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-6">Shipment Progress</h3>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-bold">Shipment Progress</h3>
+                  <Badge variant="outline">
+                    {currentStepIndex + 1} of {TRACKING_STEPS.length} steps
+                  </Badge>
+                </div>
 
                 {/* Progress Bar */}
                 <div className="relative mb-8">
@@ -295,35 +480,72 @@ export default function TrackingPage({
                           left: `${
                             (index / (TRACKING_STEPS.length - 1)) * 100
                           }%`,
+                          transform: "translateX(-50%)",
                         }}
                       >
                         <div
                           className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center mb-2",
+                            "w-10 h-10 rounded-full flex items-center justify-center mb-2 border-2",
                             index <= currentStepIndex
-                              ? "bg-gradient-to-r from-amber-500 to-yellow-500 text-white"
-                              : "bg-gray-200 dark:bg-gray-700 text-gray-500"
+                              ? `${step.color} text-white border-white shadow-lg`
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-500 border-gray-300"
                           )}
                         >
-                          <step.icon className="h-4 w-4" />
+                          <step.icon className="h-5 w-5" />
                         </div>
                         <span
                           className={cn(
-                            "text-xs font-medium whitespace-nowrap",
+                            "text-xs font-medium whitespace-nowrap text-center",
                             index <= currentStepIndex
-                              ? "text-gray-900 dark:text-white"
+                              ? "text-gray-900 dark:text-white font-semibold"
                               : "text-gray-500"
                           )}
                         >
                           {step.label}
                         </span>
                         {index === currentStepIndex && (
-                          <Badge className="mt-2 bg-gradient-to-r from-green-500 to-emerald-500">
-                            Current
+                          <Badge className="mt-2 bg-gradient-to-r from-green-500 to-emerald-500 text-xs">
+                            Current Status
                           </Badge>
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Key Dates */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Order Placed
+                    </p>
+                    <p className="font-medium text-sm">
+                      {format(new Date(mainOrder.created_at), "MMM dd")}
+                    </p>
+                  </div>
+                  {mainOrder.shipped_at && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Shipped</p>
+                      <p className="font-medium text-sm">
+                        {format(new Date(mainOrder.shipped_at), "MMM dd")}
+                      </p>
+                    </div>
+                  )}
+                  {mainOrder.delivered_at && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Delivered</p>
+                      <p className="font-medium text-sm">
+                        {format(new Date(mainOrder.delivered_at), "MMM dd")}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Est. Delivery
+                    </p>
+                    <p className="font-medium text-sm">
+                      {getEstimatedDelivery()}
+                    </p>
                   </div>
                 </div>
 
@@ -332,7 +554,7 @@ export default function TrackingPage({
                   <h4 className="font-medium">Recent Updates</h4>
                   {trackingHistory.length > 0 ? (
                     <div className="space-y-3">
-                      {trackingHistory.map((update, index) => (
+                      {trackingHistory.map((update) => (
                         <div
                           key={update.id}
                           className="flex items-start gap-3 p-3 rounded-lg border"
@@ -341,7 +563,8 @@ export default function TrackingPage({
                             <div
                               className={cn(
                                 "w-3 h-3 rounded-full",
-                                update.status === "delivered"
+                                update.status === "delivered" ||
+                                  update.status === "completed"
                                   ? "bg-green-500"
                                   : update.status === "shipped"
                                   ? "bg-blue-500"
@@ -352,7 +575,7 @@ export default function TrackingPage({
                           <div className="flex-1">
                             <div className="flex justify-between items-start">
                               <p className="font-medium capitalize">
-                                {update.status}
+                                {update.description || update.status}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {format(
@@ -361,18 +584,9 @@ export default function TrackingPage({
                                 )}
                               </p>
                             </div>
-                            {update.shipping_method && (
+                            {update.location && (
                               <p className="text-sm text-muted-foreground">
-                                Method: {update.shipping_method}
-                              </p>
-                            )}
-                            {update.estimated_delivery && (
-                              <p className="text-sm text-muted-foreground">
-                                Est. Delivery:{" "}
-                                {format(
-                                  new Date(update.estimated_delivery),
-                                  "MMM dd"
-                                )}
+                                📍 {update.location}
                               </p>
                             )}
                           </div>
@@ -399,154 +613,295 @@ export default function TrackingPage({
               <CardContent className="p-6">
                 <h3 className="text-lg font-bold mb-6">Order Details</h3>
 
-                {orders.map((order, orderIndex) => (
-                  <div
-                    key={order.id}
-                    className={orderIndex > 0 ? "mt-6 pt-6 border-t" : ""}
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="font-medium">
-                          Order #{order.id.substring(0, 8)}
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          Placed on{" "}
-                          {format(new Date(order.created_at), "MMMM dd, yyyy")}
-                        </p>
-                      </div>
-                      <Badge
-                        className={cn(
-                          order.status === "delivered"
-                            ? "bg-green-100 text-green-800"
-                            : order.status === "shipped"
-                            ? "bg-blue-100 text-blue-800"
-                            : order.status === "paid"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-gray-100 text-gray-800"
-                        )}
-                      >
-                        {order.status}
-                      </Badge>
-                    </div>
-
-                    {/* Order Items */}
-                    <div className="space-y-3 mb-4">
-                      {order.order_items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-start gap-3 p-3 rounded-lg border"
-                        >
-                          <div className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                            <Package className="h-6 w-6 text-gray-400" />
+                {orders.map((order, orderIndex) => {
+                  const orderTransaction = getOrderTransaction(order.id);
+                  return (
+                    <div
+                      key={order.id}
+                      className={orderIndex > 0 ? "mt-6 pt-6 border-t" : ""}
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-medium flex items-center gap-2">
+                            <Hash className="h-4 w-4" />
+                            {order.order_number}
+                          </h4>
+                          <p className="text-sm text-muted-foreground">
+                            Placed on{" "}
+                            {format(
+                              new Date(order.created_at),
+                              "MMMM dd, yyyy HH:mm"
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {getStatusBadge(order.status)}
+                          <div className="text-xs text-muted-foreground">
+                            Payment: {getPaymentBadge(order.payment_status)}
                           </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between">
-                              <div>
+                        </div>
+                      </div>
+
+                      {/* Order Items */}
+                      <div className="space-y-3 mb-4">
+                        {order.items.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-start gap-3 p-3 rounded-lg border"
+                          >
+                            <div className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              {item.product_image ? (
+                                <img
+                                  src={item.product_image}
+                                  alt={item.product_name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Package className="h-6 w-6 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex justify-between">
+                                <div>
+                                  <p className="font-medium">
+                                    {item.product_title || item.product_name}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      SKU: {item.product_sku}
+                                    </Badge>
+                                    {item.has_wholesale &&
+                                      item.applied_price ===
+                                        item.wholesale_price && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                                        >
+                                          Wholesale
+                                        </Badge>
+                                      )}
+                                  </div>
+                                </div>
                                 <p className="font-medium">
-                                  {item.products.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  SKU: {item.products.sku}
+                                  {formatCurrency(item.total_price, currency)}
                                 </p>
                               </div>
-                              <p className="font-medium">
-                                KES {(item.unit_price * item.qty).toFixed(2)}
-                              </p>
-                            </div>
-                            <div className="flex justify-between text-sm mt-1">
-                              <p className="text-muted-foreground">
-                                Qty: {item.qty}
-                              </p>
-                              <p className="text-muted-foreground">
-                                KES {item.unit_price.toFixed(2)} each
-                              </p>
+                              <div className="flex justify-between text-sm mt-1">
+                                <p className="text-muted-foreground">
+                                  Qty: {item.quantity}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  {formatCurrency(item.applied_price, currency)}{" "}
+                                  each
+                                </p>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
 
-                    {/* Order Summary */}
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">
-                            Subtotal
-                          </span>
-                          <span>KES {order.total.toFixed(2)}</span>
+                      {/* Order Summary */}
+                      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Subtotal
+                            </span>
+                            <span>
+                              {formatCurrency(order.subtotal, currency)}
+                            </span>
+                          </div>
+
+                          {order.wholesale_savings > 0 && (
+                            <div className="flex justify-between text-green-600">
+                              <span className="text-muted-foreground">
+                                Wholesale Savings
+                              </span>
+                              <span>
+                                -
+                                {formatCurrency(
+                                  order.wholesale_savings,
+                                  currency
+                                )}
+                              </span>
+                            </div>
+                          )}
+
+                          {order.coupon_discount > 0 && (
+                            <div className="flex justify-between text-green-600">
+                              <span className="text-muted-foreground">
+                                Coupon Discount
+                              </span>
+                              <span>
+                                -
+                                {formatCurrency(
+                                  order.coupon_discount,
+                                  currency
+                                )}
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Shipping
+                            </span>
+                            <span>
+                              {formatCurrency(order.shipping_total, currency)}
+                            </span>
+                          </div>
+
+                          {order.installation_cost > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Installation
+                              </span>
+                              <span>
+                                {formatCurrency(
+                                  order.installation_cost,
+                                  currency
+                                )}
+                              </span>
+                            </div>
+                          )}
+
+                          <Separator />
+
+                          <div className="flex justify-between font-bold pt-2">
+                            <span>Total</span>
+                            <span className="text-lg text-green-600">
+                              {formatCurrency(order.total_amount, currency)}
+                            </span>
+                          </div>
+
+                          {orderTransaction && (
+                            <>
+                              <Separator className="my-2" />
+                              <div className="text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    Payment Method
+                                  </span>
+                                  <span className="font-medium capitalize">
+                                    {order.payment_method}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    Payment Status
+                                  </span>
+                                  <span className="font-medium capitalize">
+                                    {order.payment_status}
+                                  </span>
+                                </div>
+                                {orderTransaction.receipt_number && (
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">
+                                      Receipt #
+                                    </span>
+                                    <span className="font-mono">
+                                      {orderTransaction.receipt_number}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
-                        {order.transactions?.[0] && (
-                          <>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                Payment Method
-                              </span>
-                              <span>{order.transactions[0].gateway}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">
-                                Payment Status
-                              </span>
-                              <span className="capitalize">
-                                {order.transactions[0].status}
-                              </span>
-                            </div>
-                          </>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           </div>
 
           {/* Shipping Info Sidebar */}
           <div className="space-y-6">
+            {/* Customer Information */}
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-amber-500" />
+                  Customer Information
+                </h3>
+
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Name</p>
+                    <p className="font-medium">{mainOrder.customer_name}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Phone</p>
+                    <a
+                      href={`tel:${mainOrder.customer_phone}`}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      {mainOrder.customer_phone}
+                    </a>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Email</p>
+                    <a
+                      href={`mailto:${mainOrder.customer_email}`}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      {mainOrder.customer_email}
+                    </a>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Shipping Address */}
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-amber-500" />
+                  <MapPin className="h-5 w-5 text-blue-500" />
                   Shipping Address
                 </h3>
 
                 <address className="not-italic space-y-2">
-                  <p className="font-medium">
-                    {mainOrder.shipping_info?.firstName}{" "}
-                    {mainOrder.shipping_info?.lastName}
-                  </p>
-                  <p>{mainOrder.shipping_info?.address}</p>
+                  <p className="font-medium">{mainOrder.customer_name}</p>
+                  <p>{mainOrder.shipping_address}</p>
                   <p>
-                    {mainOrder.shipping_info?.city},{" "}
-                    {mainOrder.shipping_info?.state}
+                    {mainOrder.shipping_city}, {mainOrder.shipping_county}
                   </p>
-                  <p>{mainOrder.shipping_info?.country}</p>
-                  <p className="text-muted-foreground">
-                    Postal: {mainOrder.shipping_info?.postalCode}
-                  </p>
+                  <p>{mainOrder.shipping_country}</p>
+                  {mainOrder.shipping_postal_code && (
+                    <p className="text-muted-foreground">
+                      Postal: {mainOrder.shipping_postal_code}
+                    </p>
+                  )}
                 </address>
 
                 <Separator className="my-4" />
 
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a
-                      href={`tel:${mainOrder.shipping_info?.phone}`}
-                      className="text-primary hover:underline"
-                    >
-                      {mainOrder.shipping_info?.phone}
-                    </a>
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Shipping Method
+                      </p>
+                      <p className="font-medium capitalize">
+                        {mainOrder.shipping_method}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a
-                      href={`mailto:${mainOrder.shipping_info?.email}`}
-                      className="text-primary hover:underline"
-                    >
-                      {mainOrder.shipping_info?.email}
-                    </a>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Estimated Delivery
+                      </p>
+                      <p className="font-medium">{getEstimatedDelivery()}</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -556,56 +911,45 @@ export default function TrackingPage({
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-blue-500" />
+                  <Truck className="h-5 w-5 text-green-500" />
                   Delivery Information
                 </h3>
 
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Carrier
-                    </p>
-                    <p className="font-medium">Blessed Two Delivery Network</p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Service
-                    </p>
-                    <p className="font-medium">Standard Delivery</p>
-                    <p className="text-sm text-muted-foreground">
-                      1-2 business days within Nairobi
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      Delivery Hours
-                    </p>
-                    <p className="font-medium">9:00 AM - 7:00 PM</p>
-                    <p className="text-sm text-muted-foreground">
-                      Monday - Saturday
-                    </p>
-                  </div>
-
-                  <Separator className="my-2" />
-
                   <div className="bg-amber-50 dark:bg-amber-950/30 p-4 rounded-lg">
                     <h4 className="font-medium mb-2 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Delivery Instructions
+                      <AlertCircle className="h-4 w-4" />
+                      Important Notes
                     </h4>
-                    <p className="text-sm text-muted-foreground">
-                      • Please ensure someone is available to receive the
-                      package
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      • Have your ID ready for verification
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      • Contact 0700 000 000 for delivery questions
-                    </p>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                        Please ensure someone is available to receive the
+                        package
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                        Have your ID ready for verification
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <CheckCircle className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                        Contact support if you need to reschedule
+                      </li>
+                    </ul>
                   </div>
+
+                  {mainOrder.installation_required && (
+                    <div className="bg-blue-50 dark:bg-blue-950/30 p-4 rounded-lg">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Installation Service
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        A technician will contact you to schedule the
+                        installation. Please ensure all items are accessible.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -623,7 +967,7 @@ export default function TrackingPage({
                   >
                     <a href={`tel:0700000000`}>
                       <Phone className="h-4 w-4 mr-2" />
-                      Call Support: 0700 000 000
+                      Call Support
                     </a>
                   </Button>
 
@@ -632,7 +976,7 @@ export default function TrackingPage({
                     variant="outline"
                     className="w-full justify-start"
                   >
-                    <a href="mailto:support@blessedtwo.co.ke">
+                    <a href="mailto:support@blessedtwo.com">
                       <Mail className="h-4 w-4 mr-2" />
                       Email Support
                     </a>
@@ -645,7 +989,7 @@ export default function TrackingPage({
                   >
                     <Link href="/contact">
                       <Users className="h-4 w-4 mr-2" />
-                      Live Chat Support
+                      Contact Form
                     </Link>
                   </Button>
                 </div>
@@ -653,10 +997,10 @@ export default function TrackingPage({
                 <Separator className="my-4" />
 
                 <div className="text-sm text-muted-foreground">
-                  <p className="font-medium mb-2">Office Hours:</p>
+                  <p className="font-medium mb-2">Customer Support Hours:</p>
                   <p>Monday - Friday: 8:00 AM - 8:00 PM</p>
                   <p>Saturday: 9:00 AM - 6:00 PM</p>
-                  <p>Sunday: 10:00 AM - 4:00 PM</p>
+                  <p>Sunday: 10:00 AM - 4:00 PM EAT</p>
                 </div>
               </CardContent>
             </Card>
@@ -666,20 +1010,26 @@ export default function TrackingPage({
         {/* CTA Section */}
         <div className="mt-12 text-center">
           <div className="inline-flex flex-col items-center gap-4">
-            <h3 className="text-xl font-bold">Shop More Lighting Solutions</h3>
+            <h3 className="text-xl font-bold">Shop More Products</h3>
             <p className="text-muted-foreground max-w-2xl">
-              Explore our wide range of LED bulbs, solar lights, and security
-              lighting for your home or business.
+              Explore our wide range of electronics, home appliances, and
+              lighting solutions for your home or business.
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button
                 asChild
                 className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600"
               >
-                <Link href="/products">Continue Shopping</Link>
+                <Link href="/products">
+                  <ShoppingBag className="h-4 w-4 mr-2" />
+                  Browse Products
+                </Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/contact">Contact Support</Link>
+                <Link href="/contact">
+                  <ArrowRight className="h-4 w-4 mr-2" />
+                  Contact Sales
+                </Link>
               </Button>
             </div>
           </div>
@@ -689,8 +1039,8 @@ export default function TrackingPage({
   );
 }
 
-// Add Copy icon component
-function Copy({ className }: { className?: string }) {
+// Copy icon component
+function CopyIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}

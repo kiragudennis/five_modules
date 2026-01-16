@@ -89,12 +89,17 @@ export async function POST(req: Request) {
           },
         ],
         application_context: {
-          brand_name: "World Samma Academy Shop",
-          landing_page: "BILLING", // 👈 opens card form directly
-          shipping_preference: "NO_SHIPPING", // optional, if no shipping
+          brand_name: "Blessed Two Electronics",
+          locale: "en-US",
+          landing_page: "BILLING", // LOGIN, BILLING, or NO_PREFERENCE
+          shipping_preference:
+            order.shipping.method === "pickup"
+              ? "NO_SHIPPING"
+              : "SET_PROVIDED_ADDRESS",
           user_action: "PAY_NOW",
-          return_url: `${siteUrl}/checkout/success?orderId=${order.id}`,
-          cancel_url: `${siteUrl}/checkout/cancel?orderId=${order.id}`,
+          payment_method_preference: "IMMEDIATE_PAYMENT_REQUIRED",
+          return_url: `${siteUrl}/checkout/success?orderId=${order.id}&paymentMethod=paypal`,
+          cancel_url: `${siteUrl}/checkout?canceled=true&orderId=${order.id}`,
         },
       }),
     });

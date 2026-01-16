@@ -1,5 +1,4 @@
 "use client";
-
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,25 +13,35 @@ import {
   Info,
   Globe,
   Smartphone,
+  Zap,
+  ShieldCheck,
+  Clock,
+  Package,
+  Phone,
+  Mail,
+  MapPin,
+  Gift,
+  Sparkles,
+  Battery,
+  Sun,
+  Loader2,
+  CheckCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
-import { buildOrderData, useCart, useStore } from "@/lib/context/StoreContext";
-import {
-  calculateOrderTotals,
-  calculateShipping,
-  formatCurrency,
-} from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
+import { useCart, useStore } from "@/lib/context/StoreContext";
+import { formatCurrency } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -44,105 +53,87 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-// Form schema
-const formSchema = z.object({
-  firstName: z.string().min(2, "First name must be at least 2 characters."),
-  lastName: z.string().min(2, "Last name must be at least 2 characters."),
-  email: z.string().email("Please enter a valid email address."),
-  phone: z.string().min(10, "Please enter a valid phone number."),
-  address: z.string().min(5, "Address must be at least 5 characters."),
-  city: z.string().min(2, "City must be at least 2 characters."),
-  state: z.string().min(2, "State must be at least 2 characters."),
-  postalCode: z.string().min(5, "Postal code must be at least 5 characters."),
-  country: z.string().min(2, "Country must be at least 2 characters."),
-  shippingMethod: z.enum(["standard", "express", "pickup"], {
-    message: "Please select a shipping method.",
-  }),
-  paymentMethod: z.enum(["paypal", "mpesa"], {
-    message: "Please select a payment method.",
-  }),
-});
-
-// Country and city options for Kenya
-const kenyanCounties = [
-  "Nairobi",
-  "Mombasa",
-  "Kisumu",
-  "Nakuru",
-  "Eldoret",
-  "Thika",
-  "Malindi",
-  "Kitale",
-  "Garissa",
-  "Kakamega",
-  "Nyeri",
-  "Meru",
-];
-
-const shippingMethods = [
-  {
-    id: "standard",
-    name: "Standard Delivery",
-    cost: 200,
-    time: "3-5 business days",
-    description: "via local courier",
-  },
-  {
-    id: "express",
-    name: "Express Delivery",
-    cost: 500,
-    time: "1-2 business days",
-    description: "via express service",
-  },
-  {
-    id: "pickup",
-    name: "Store Pickup",
-    cost: 0,
-    time: "Ready for pickup",
-    description: "Collect from our location",
-  },
-];
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { cities, installationOptions, shippingMethods } from "@/lib/constants";
+import { useAuth } from "@/lib/context/AuthContext";
+import { toast } from "sonner";
+import { formSchema } from "@/types/store";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { state, dispatch } = useStore();
-  const { cartItems } = useCart();
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const { dispatch } = useStore();
+  const { cartItems, totalItems } = useCart();
+  const { profile } = useAuth();
   const [shippingCost, setShippingCost] = useState(0);
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponError, setCouponError] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponData, setCouponData] = useState<any>(null);
+  const [showCouponInput, setShowCouponInput] = useState(false);
+  const [selectedInstallation, setSelectedInstallation] = useState<any>(null);
+  const [installationDate, setInstallationDate] = useState("");
+  const [installationTime, setInstallationTime] = useState("");
 
   // If cart is empty, redirect to products
   useEffect(() => {
-    if (cartItems.length === 0) {
+    if (totalItems === 0) {
       router.push("/products");
     }
-  }, [cartItems, router]);
+  }, [totalItems]);
 
   // Initialize form
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      firstName: "",
+      firstName: profile?.full_name || "",
       lastName: "",
-      email: "",
-      phone: "",
-      address: "",
-      city: "",
-      state: "",
-      postalCode: "",
-      country: "Kenya",
+      email: profile?.email || "",
+      phone: profile?.phone || "",
+      address: profile?.address || "",
+      city: profile?.city || "Nairobi",
+      county: profile?.city || "Nairobi County",
+      postalCode: profile?.postal_code || "",
+      country: profile?.country || "Kenya",
       shippingMethod: "standard",
       paymentMethod: "mpesa",
+      couponCode: "",
+      installationRequired: false,
+      specialInstructions: "",
     },
     mode: "onBlur",
   });
 
-  // Watch form values for shipping calculation
+  // Watch form values
   const country = form.watch("country");
   const city = form.watch("city");
   const selectedShippingMethod = form.watch("shippingMethod");
+  const installationRequired = form.watch("installationRequired");
 
-  // Calculate shipping based on location and method
+  const {
+    formState: { errors },
+  } = form;
+
+  useEffect(() => {
+    const errorEntries = Object.entries(errors);
+
+    if (errorEntries.length > 0) {
+      const firstError = errorEntries[0][1];
+
+      toast.error("Fix shiping form errors", {
+        description: firstError?.message ?? "Some fields are invalid",
+        id: "form-error-toast", // prevents spam
+      });
+    }
+  }, [errors]);
+
+  // Calculate shipping
   useEffect(() => {
     if (country && city && selectedShippingMethod) {
       const method = shippingMethods.find(
@@ -150,7 +141,7 @@ export default function CheckoutPage() {
       );
       let calculatedCost = method?.cost || 0;
 
-      // Adjust cost based on location (Kenyan context)
+      // Adjust cost based on location
       if (country === "Kenya") {
         if (city === "Nairobi") {
           calculatedCost = method?.cost || 200;
@@ -165,15 +156,249 @@ export default function CheckoutPage() {
     }
   }, [country, city, selectedShippingMethod]);
 
+  // Calculate subtotal with wholesale pricing
+  const calculateSubtotal = () => {
+    return cartItems.reduce((sum, item) => {
+      const unitPrice =
+        item.product.has_wholesale &&
+        item.quantity >= (item.product.wholesale_min_quantity || 10)
+          ? item.product.wholesale_price || item.product.price
+          : item.product.price;
+      return sum + unitPrice * item.quantity;
+    }, 0);
+  };
+
+  // Calculate wholesale savings
+  const calculateWholesaleSavings = () => {
+    return cartItems.reduce((savings, item) => {
+      if (
+        item.product.has_wholesale &&
+        item.quantity >= (item.product.wholesale_min_quantity || 10)
+      ) {
+        const wholesalePrice =
+          item.product.wholesale_price || item.product.price;
+        return savings + (item.product.price - wholesalePrice) * item.quantity;
+      }
+      return savings;
+    }, 0);
+  };
+
   // Calculate order totals
-  const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  );
-  const orderTotal = subtotal + shippingCost;
-  const totalWeight = cartItems.reduce(
-    (sum, item) => sum + (item.product.weight || 0.5) * item.quantity,
-    0
+  const subtotal = calculateSubtotal();
+  const wholesaleSavings = calculateWholesaleSavings();
+  const installationCost = selectedInstallation?.cost || 0;
+  const orderTotal =
+    subtotal + shippingCost + installationCost - couponDiscount;
+
+  // Validate coupon via API
+  const validateCoupon = async () => {
+    if (!couponCode.trim()) {
+      setCouponError("Please enter a coupon code");
+      return;
+    }
+
+    setIsValidatingCoupon(true);
+    setCouponError("");
+
+    try {
+      const response = await fetch("/api/coupons/validate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          couponCode: couponCode.toUpperCase(),
+          orderAmount: subtotal,
+          customerEmail: form.getValues("email") || profile?.email,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to validate coupon");
+      }
+
+      if (!data.valid) {
+        setCouponError(data.message);
+        return;
+      }
+
+      // Coupon is valid
+      setCouponApplied(true);
+      setCouponDiscount(data.coupon.discount_amount);
+      setCouponData(data.coupon);
+      form.setValue("couponCode", couponCode.toUpperCase());
+
+      toast.success("Coupon applied successfully!");
+    } catch (error: any) {
+      setCouponError(error.message || "Invalid coupon code");
+      toast.error(error.message || "Failed to apply coupon");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  // Remove coupon
+  const removeCoupon = () => {
+    setCouponApplied(false);
+    setCouponDiscount(0);
+    setCouponCode("");
+    setCouponData(null);
+    form.setValue("couponCode", "");
+    setCouponError("");
+    toast.info("Coupon removed");
+  };
+
+  // Get recommended installations based on cart items
+  const getRecommendedInstallations = () => {
+    const recommendations = [];
+    const productTypes = new Set();
+
+    // Analyze cart items
+    cartItems.forEach((item) => {
+      const category = item.product.category?.toLowerCase() || "";
+      const tags = Array.isArray(item.product.tags)
+        ? item.product.tags.map((t) => t.toLowerCase())
+        : [];
+
+      if (
+        category.includes("solar") ||
+        tags.some((tag) => tag.includes("solar"))
+      ) {
+        productTypes.add("solar");
+      }
+      if (
+        category.includes("security") ||
+        tags.some((tag) => tag.includes("security"))
+      ) {
+        productTypes.add("security");
+      }
+      if (
+        category.includes("commercial") ||
+        category.includes("industrial") ||
+        tags.some(
+          (tag) => tag.includes("commercial") || tag.includes("industrial")
+        )
+      ) {
+        productTypes.add("commercial");
+      }
+      if (
+        category.includes("emergency") ||
+        tags.some((tag) => tag.includes("emergency"))
+      ) {
+        productTypes.add("emergency");
+      }
+    });
+
+    // Add recommendations
+    if (productTypes.has("solar")) {
+      recommendations.push(
+        installationOptions.find((s) => s.id === "solar-light")
+      );
+    }
+    if (productTypes.has("security")) {
+      recommendations.push(
+        installationOptions.find((s) => s.id === "security-light")
+      );
+    }
+    if (productTypes.has("commercial")) {
+      recommendations.push(
+        installationOptions.find((s) => s.id === "commercial-lighting")
+      );
+    }
+
+    // Always include basic option
+    if (recommendations.length === 0 || cartItems.length <= 3) {
+      recommendations.push(
+        installationOptions.find((s) => s.id === "basic-bulb")
+      );
+    }
+
+    return recommendations.filter(Boolean).slice(0, 4);
+  };
+
+  // Installation Service Card Component
+  const InstallationServiceCard = ({ service, selected, onSelect }) => (
+    <div
+      className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
+        selected
+          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+          : "border-gray-200 dark:border-gray-700 hover:border-blue-300"
+      } ${service.recommended ? "relative" : ""}`}
+      onClick={onSelect}
+    >
+      {service.recommended && (
+        <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+          <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs">
+            Recommended
+          </Badge>
+        </div>
+      )}
+
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{service.icon}</span>
+            <h4 className="font-bold">{service.name}</h4>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+            {service.description}
+          </p>
+        </div>
+        <div className="w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0">
+          {selected && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-gray-500" />
+            {service.duration}
+          </span>
+          <span className="font-bold text-lg text-blue-600 dark:text-blue-400">
+            {formatCurrency(service.cost, "KES")}
+          </span>
+        </div>
+
+        {service.bestFor && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {service.bestFor.slice(0, 2).map((item: any, idx: number) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {item}
+              </Badge>
+            ))}
+            {service.bestFor.length > 2 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                +{service.bestFor.length - 2} more
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {service.includes && (
+        <div className="mt-3 pt-3 border-t dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+            Includes:
+          </p>
+          <div className="space-y-1">
+            {service.includes.slice(0, 2).map((item: any, idx: number) => (
+              <div key={idx} className="flex items-center gap-2 text-xs">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="truncate">{item}</span>
+              </div>
+            ))}
+            {service.includes.length > 2 && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                + {service.includes.length - 2} more services
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   // Form submission handler
@@ -181,15 +406,99 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      // Build order data with shipping cost
+      // Build comprehensive order data
       const orderData = {
-        ...buildOrderData(state, values),
-        shippingCost,
-        shippingMethod: values.shippingMethod,
-        totalAmount: orderTotal,
+        // Basic order info
+        items: cartItems.map((item) => ({
+          id: item.product.id,
+          name: item.product.name,
+          title: item.product.title,
+          sku: item.product.sku,
+          price: item.product.price,
+          wholesale_price: item.product.wholesale_price,
+          wholesale_min_quantity: item.product.wholesale_min_quantity,
+          has_wholesale: item.product.has_wholesale,
+          quantity: item.quantity,
+          image: item.product.images?.[0],
+          category: item.product.category,
+          applied_price:
+            item.product.has_wholesale &&
+            item.quantity >= (item.product.wholesale_min_quantity || 10)
+              ? item.product.wholesale_price || item.product.price
+              : item.product.price,
+        })),
+
+        // Customer information
+        customer: {
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+          phone: values.phone,
+        },
+
+        // Shipping information
+        shipping: {
+          address: values.address,
+          city: values.city,
+          county: values.county,
+          postalCode: values.postalCode,
+          country: values.country,
+          method: values.shippingMethod,
+          cost: shippingCost,
+          estimatedDelivery: shippingMethods.find(
+            (m) => m.id === values.shippingMethod
+          )?.time,
+        },
+
+        // Payment information
+        payment: {
+          method: values.paymentMethod,
+        },
+
+        // Additional services
+        services: {
+          installation: installationRequired
+            ? {
+                required: true,
+                service: selectedInstallation,
+                cost: installationCost,
+                date: installationDate,
+                time: installationTime,
+                instructions: values.specialInstructions,
+              }
+            : {
+                required: false,
+              },
+        },
+
+        // Coupon information
+        coupon: couponApplied
+          ? {
+              code: values.couponCode,
+              discount: couponDiscount,
+              data: couponData,
+            }
+          : null,
+
+        // Financial breakdown
+        totals: {
+          subtotal: subtotal,
+          wholesaleSavings: wholesaleSavings,
+          shipping: shippingCost,
+          installation: installationCost,
+          couponDiscount: couponDiscount,
+          total: orderTotal,
+        },
+
+        // Metadata
+        metadata: {
+          createdAt: new Date().toISOString(),
+          cartCount: cartItems.length,
+          wholesaleApplied: wholesaleSavings > 0,
+        },
       };
 
-      // Store in context so payment page can access
+      // Store in context
       dispatch({ type: "SET_PENDING_ORDER", payload: orderData });
       dispatch({ type: "SET_TOTAL", payload: orderTotal });
 
@@ -197,547 +506,977 @@ export default function CheckoutPage() {
       router.push("/checkout/payment");
     } catch (error) {
       console.error("Checkout error:", error);
+      toast.error("Failed to process checkout. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="container mx-auto py-8 px-2 sm:px-4">
-      {/* Header */}
-      <div className="mb-8">
-        <Link
-          href="/cart"
-          className="flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Back to Cart
-        </Link>
+    <div className="min-h-screen bg-gradient-to-b from-amber-50/30 to-white dark:from-gray-900 dark:to-gray-950">
+      {/* Checkout Progress */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between mb-4">
+              <div>
+                <Link
+                  href="/cart"
+                  className="flex items-center text-amber-700 hover:text-amber-800 font-medium"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Back to Cart
+                </Link>
+                <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">
+                  Complete Your Lighting Order
+                </h1>
+                <p className="text-gray-600 dark:text-gray-300 mt-2">
+                  Fill in your details to illuminate your space with quality
+                  lighting
+                </p>
+              </div>
+              <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                <ShieldCheck className="h-3 w-3 mr-1" />
+                Secure Checkout
+              </Badge>
+            </div>
 
-        <div className="mb-6">
-          <Badge
-            variant="outline"
-            className="bg-blue-50 text-blue-700 border-blue-200 mb-3"
-          >
-            <Truck className="w-3 h-3 mr-1" />
-            Checkout Demo
-          </Badge>
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">
-            Complete Your Order
-          </h1>
-          <p className="text-muted-foreground max-w-3xl">
-            Fill in your details to see shipping calculations in action. The
-            next step is a <strong>test payment interface</strong> - charges
-            will be made if you complete the transaction.
-          </p>
-        </div>
-      </div>
-
-      {/* Payment Notice */}
-      <Card className="mb-8 border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <AlertCircle className="h-6 w-6 text-blue-600 flex-shrink-0" />
-            <div>
-              <h3 className="font-bold text-lg mb-2">
-                Important: Test Payment Experience
-              </h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                After filling this form, you'll proceed to a{" "}
-                <strong>test payment interface</strong>. You can:
-              </p>
-              <ul className="text-sm space-y-1 text-muted-foreground mb-4">
-                <li className="flex items-start gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
-                  <span>
-                    <strong>Test M-Pesa STK Push</strong>: You'll see a
-                    simulated M-Pesa prompt (Actual payment)
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2 overflow-auto">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-amber-600 text-white flex items-center justify-center">
+                    1
+                  </div>
+                  <span className="font-medium">Details</span>
+                </div>
+                <div className="h-px flex-1 bg-gray-300 mx-4" />
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">
+                    2
+                  </div>
+                  <span className="font-medium text-gray-500">Payment</span>
+                </div>
+                <div className="h-px flex-1 bg-gray-300 mx-4" />
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center">
+                    3
+                  </div>
+                  <span className="font-medium text-gray-500">
+                    Confirmation
                   </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
-                  <span>
-                    <strong>Test PayPal flow</strong>: Experience the PayPal
-                    checkout process in live mode
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
-                  <span>
-                    <strong>Complete or cancel</strong>: You can proceed to see
-                    order confirmation or cancel at any point
-                  </span>
-                </li>
-              </ul>
-              <p className="text-xs text-blue-700 dark:text-blue-400">
-                💡 This demo shows how real customers will experience checkout
-                in your custom store.
-              </p>
+                </div>
+              </div>
+              <Progress value={33} className="h-2" />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Checkout Form */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <Globe className="h-5 w-5 text-blue-600" />
-                Shipping Information
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Fill in your details to calculate shipping costs
-              </p>
-            </div>
+          {/* Quick Help Banner */}
+          <Alert className="mb-8 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="flex items-center justify-between flex-wrap gap-2">
+              <span className="font-medium">
+                Need expert advice on your lighting setup?
+              </span>
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-2">
+                  <Phone className="h-3 w-3" />
+                  <a
+                    href="tel:+254727833691"
+                    className="font-bold hover:text-amber-700"
+                  >
+                    0727 833 691
+                  </a>
+                </span>
+                <span className="flex items-center gap-2">
+                  <Clock className="h-3 w-3" />
+                  8AM - 6PM Daily
+                </span>
+              </div>
+            </AlertDescription>
+          </Alert>
 
-            <div className="p-6">
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onSubmit)}
-                  className="space-y-6"
-                >
-                  {/* Contact Information */}
-                  <div>
-                    <h3 className="font-medium mb-4">Contact Information</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="firstName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>First Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="John" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Checkout Form */}
+            <div className="lg:col-span-2 space-y-6">
+              <Tabs defaultValue="shipping" className="w-full">
+                <TabsList className="grid grid-cols-3 mb-6 bg-amber-50 dark:bg-amber-950/20">
+                  <TabsTrigger
+                    value="shipping"
+                    className="data-[state=active]:bg-amber-500"
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    Shipping
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="installation"
+                    className="data-[state=active]:bg-amber-500"
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Installation
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="payment"
+                    className="data-[state=active]:bg-amber-500"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Payment
+                  </TabsTrigger>
+                </TabsList>
 
-                      <FormField
-                        control={form.control}
-                        name="lastName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Last Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Kamau" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-6"
+                  >
+                    {/* Shipping Tab */}
+                    <TabsContent value="shipping" className="space-y-6">
+                      <Card>
+                        <CardHeader className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20">
+                          <CardTitle className="flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-amber-600" />
+                            Delivery Information
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="space-y-6">
+                            {/* Personal Information */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-4">
+                                Personal Information
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name="firstName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>First Name *</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="John" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="lastName"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Last Name *</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Kamau" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <FormField
+                                  control={form.control}
+                                  name="email"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Email *</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type="email"
+                                          placeholder="john@example.com"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="phone"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Phone *</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type="tel"
+                                          placeholder="+254 7XX XXX XXX"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="email"
-                                placeholder="john@example.com"
-                                {...field}
+                            <Separator />
+
+                            {/* Shipping Address */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-4">
+                                Shipping Address
+                              </h3>
+                              <FormField
+                                control={form.control}
+                                name="address"
+                                render={({ field }) => (
+                                  <FormItem className="mb-4">
+                                    <FormLabel>Street Address *</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="e.g., Duruma Road, Industrial Area"
+                                        {...field}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FormField
+                                  control={form.control}
+                                  name="city"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>City/Town *</FormLabel>
+                                      <FormControl>
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          defaultValue={field.value}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select city" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {cities.map((county) => (
+                                              <SelectItem
+                                                key={county}
+                                                value={county}
+                                              >
+                                                {county}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="county"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>County *</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          placeholder="e.g., Nairobi County"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name="postalCode"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Postal Code</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="00100" {...field} />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <div className="mt-4">
+                                <FormField
+                                  control={form.control}
+                                  name="country"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Country</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          readOnly
+                                          value="Kenya"
+                                          {...field}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                            </div>
 
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Phone Number</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="tel"
-                                placeholder="+254 7XX XXX XXX"
-                                {...field}
+                            <Separator />
+
+                            {/* Shipping Method */}
+                            <div>
+                              <h3 className="text-lg font-semibold mb-4">
+                                Delivery Method
+                              </h3>
+                              <FormField
+                                control={form.control}
+                                name="shippingMethod"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <RadioGroup
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                        className="space-y-3"
+                                      >
+                                        {shippingMethods.map((method) => {
+                                          const Icon = method.icon;
+                                          return (
+                                            <div
+                                              key={method.id}
+                                              className="flex items-start space-x-3 border rounded-lg p-4 hover:bg-amber-50/50 cursor-pointer transition-all"
+                                            >
+                                              <RadioGroupItem
+                                                value={method.id}
+                                                id={method.id}
+                                              />
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2">
+                                                  <Icon className="h-4 w-4 text-amber-600" />
+                                                  <Label
+                                                    htmlFor={method.id}
+                                                    className="font-medium cursor-pointer"
+                                                  >
+                                                    {method.name}
+                                                  </Label>
+                                                  {method.id === "express" && (
+                                                    <Badge className="bg-gradient-to-r from-red-500 to-orange-500">
+                                                      Popular
+                                                    </Badge>
+                                                  )}
+                                                </div>
+                                                <p className="text-sm text-gray-600 mt-1">
+                                                  {method.description}
+                                                </p>
+                                                <p className="text-sm text-amber-600 font-medium mt-1">
+                                                  <Clock className="h-3 w-3 inline mr-1" />
+                                                  {method.time}
+                                                </p>
+                                              </div>
+                                              <div className="font-bold text-lg">
+                                                {method.cost === 0 ? (
+                                                  <span className="text-green-600">
+                                                    FREE
+                                                  </span>
+                                                ) : (
+                                                  `KES ${method.cost}`
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
                               />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
 
-                  <Separator />
-
-                  {/* Shipping Address */}
-                  <div>
-                    <h3 className="font-medium mb-4">Shipping Address</h3>
-
-                    <FormField
-                      control={form.control}
-                      name="address"
-                      render={({ field }) => (
-                        <FormItem className="mb-4">
-                          <FormLabel>Street Address</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="123 Main Street, Westlands"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="city"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>City/Town</FormLabel>
-                            <FormControl>
-                              <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select city" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Nairobi">
-                                    Nairobi
-                                  </SelectItem>
-                                  <SelectItem value="Mombasa">
-                                    Mombasa
-                                  </SelectItem>
-                                  <SelectItem value="Kisumu">Kisumu</SelectItem>
-                                  <SelectItem value="Nakuru">Nakuru</SelectItem>
-                                  <SelectItem value="Eldoret">
-                                    Eldoret
-                                  </SelectItem>
-                                  <SelectItem value="Thika">Thika</SelectItem>
-                                  <SelectItem value="Other">Other</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="state"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>County</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Nairobi County" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="postalCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Postal Code</FormLabel>
-                            <FormControl>
-                              <Input placeholder="00100" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="mt-4">
-                      <FormField
-                        control={form.control}
-                        name="country"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Country</FormLabel>
-                            <FormControl>
-                              <Input
-                                defaultValue={"Kenya"}
-                                readOnly
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Shipping Method */}
-                  <div>
-                    <h3 className="font-medium mb-4">Shipping Method</h3>
-                    <FormField
-                      control={form.control}
-                      name="shippingMethod"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="space-y-3"
-                            >
-                              {shippingMethods.map((method) => (
-                                <div
-                                  key={method.id}
-                                  className="flex items-start space-x-3 border rounded-lg p-4 hover:bg-muted/50 cursor-pointer"
-                                >
-                                  <RadioGroupItem
-                                    value={method.id}
-                                    id={method.id}
-                                  />
-                                  <div className="flex-1">
-                                    <Label
-                                      htmlFor={method.id}
-                                      className="font-medium cursor-pointer"
-                                    >
-                                      {method.name}
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      {method.time} • {method.description}
-                                    </p>
+                    {/* Installation Tab */}
+                    <TabsContent value="installation" className="space-y-6">
+                      <Card>
+                        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20">
+                          <CardTitle className="flex items-center gap-2">
+                            <Zap className="h-5 w-5 text-blue-600" />
+                            Professional Installation Services (Optional)
+                          </CardTitle>
+                          <p className="text-sm text-gray-600 font-normal mt-2">
+                            Our certified electricians provide safe and reliable
+                            installation.
+                            <span className="text-amber-600 font-medium">
+                              {" "}
+                              Certified by EPRA Kenya
+                            </span>
+                          </p>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="space-y-6">
+                            <FormField
+                              control={form.control}
+                              name="installationRequired"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4 bg-blue-50/50">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                      className="border-gray-300 text-blue-600 h-5 w-5"
+                                    />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel className="font-semibold text-lg">
+                                      Add Professional Installation
+                                    </FormLabel>
+                                    <FormDescription>
+                                      Recommended for solar systems, commercial
+                                      setups, and complex installations.
+                                    </FormDescription>
                                   </div>
-                                  <div className="font-bold">
-                                    {method.cost === 0
-                                      ? "FREE"
-                                      : `KES ${method.cost}`}
+                                </FormItem>
+                              )}
+                            />
+
+                            {installationRequired && (
+                              <div className="space-y-6">
+                                {/* Recommended Services */}
+                                {getRecommendedInstallations().length > 0 && (
+                                  <div>
+                                    <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                                      <Sparkles className="h-5 w-5 text-amber-500" />
+                                      Recommended for Your Order
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {getRecommendedInstallations().map(
+                                        (service: any) => (
+                                          <InstallationServiceCard
+                                            key={service.id}
+                                            service={service}
+                                            selected={
+                                              selectedInstallation?.id ===
+                                              service.id
+                                            }
+                                            onSelect={() =>
+                                              setSelectedInstallation(service)
+                                            }
+                                          />
+                                        )
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* All Installation Options */}
+                                <div>
+                                  <h3 className="font-semibold text-lg mb-4">
+                                    All Installation Services
+                                  </h3>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {installationOptions.map((service) => (
+                                      <InstallationServiceCard
+                                        key={service.id}
+                                        service={service}
+                                        selected={
+                                          selectedInstallation?.id ===
+                                          service.id
+                                        }
+                                        onSelect={() =>
+                                          setSelectedInstallation(service)
+                                        }
+                                      />
+                                    ))}
                                   </div>
                                 </div>
-                              ))}
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
 
-                  <Separator />
+                                {/* Installation Details */}
+                                {selectedInstallation && (
+                                  <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+                                    <h4 className="font-semibold flex items-center gap-2">
+                                      <Info className="h-4 w-4" />
+                                      Installation Details
+                                    </h4>
 
-                  {/* Payment Method */}
-                  <div>
-                    <h3 className="font-medium mb-4 flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Payment Method (Live Environment)
-                    </h3>
-                    <FormField
-                      control={form.control}
-                      name="paymentMethod"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="space-y-3"
-                            >
-                              <div className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer">
-                                <div className="flex items-center space-x-3">
-                                  <RadioGroupItem value="mpesa" id="mpesa" />
-                                  <div className="flex-1">
-                                    <Label
-                                      htmlFor="mpesa"
-                                      className="font-medium cursor-pointer"
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        M-Pesa
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        <Label>
+                                          Preferred Installation Date
+                                        </Label>
+                                        <Input
+                                          type="date"
+                                          min={
+                                            new Date()
+                                              .toISOString()
+                                              .split("T")[0]
+                                          }
+                                          value={installationDate}
+                                          onChange={(e) =>
+                                            setInstallationDate(e.target.value)
+                                          }
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label>Preferred Time Slot</Label>
+                                        <Select
+                                          value={installationTime}
+                                          onValueChange={setInstallationTime}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select time" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="morning">
+                                              Morning (9AM - 12PM)
+                                            </SelectItem>
+                                            <SelectItem value="afternoon">
+                                              Afternoon (1PM - 4PM)
+                                            </SelectItem>
+                                            <SelectItem value="evening">
+                                              Evening (5PM - 7PM)
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    </div>
+
+                                    <FormField
+                                      control={form.control}
+                                      name="specialInstructions"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>
+                                            Special Instructions
+                                          </FormLabel>
+                                          <FormControl>
+                                            <Textarea
+                                              placeholder="e.g., Need ladder access, specific wall colors, existing wiring notes..."
+                                              className="min-h-24"
+                                              {...field}
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+
+                                    <Alert className="border-green-200 bg-green-50">
+                                      <ShieldCheck className="h-4 w-4 text-green-600" />
+                                      <AlertDescription className="text-sm">
+                                        <span className="font-medium">
+                                          6-month Installation Warranty:
+                                        </span>{" "}
+                                        All installations are covered by our
+                                        workmanship warranty.
+                                      </AlertDescription>
+                                    </Alert>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {!installationRequired && (
+                              <div className="p-4 border rounded-lg bg-gray-50">
+                                <div className="flex items-start gap-3">
+                                  <Info className="h-5 w-5 text-gray-500 mt-0.5" />
+                                  <div>
+                                    <p className="font-medium">
+                                      DIY Installation
+                                    </p>
+                                    <p className="text-sm text-gray-600 mt-1">
+                                      Most products include installation guides.
+                                      Professional installation is recommended
+                                      for solar systems.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    {/* Payment Method Tab */}
+                    <TabsContent value="payment" className="space-y-6">
+                      <Card>
+                        <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20">
+                          <CardTitle className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-purple-600" />
+                            Payment Method
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="space-y-6">
+                            {/* Coupon Section */}
+                            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 p-4 rounded-lg">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <Gift className="h-5 w-5 text-amber-600" />
+                                  <h4 className="font-semibold">
+                                    Have a coupon code?
+                                  </h4>
+                                </div>
+                                {!showCouponInput && !couponApplied && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowCouponInput(true)}
+                                  >
+                                    Apply Coupon
+                                  </Button>
+                                )}
+                              </div>
+
+                              {(showCouponInput || couponApplied) && (
+                                <div className="space-y-3">
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Enter coupon code"
+                                      value={couponCode}
+                                      onChange={(e) =>
+                                        setCouponCode(e.target.value)
+                                      }
+                                      disabled={couponApplied}
+                                      className="flex-1"
+                                    />
+                                    {couponApplied ? (
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={removeCoupon}
+                                      >
+                                        Remove
+                                      </Button>
+                                    ) : (
+                                      <Button
+                                        type="button"
+                                        onClick={validateCoupon}
+                                        disabled={isValidatingCoupon}
+                                      >
+                                        {isValidatingCoupon ? (
+                                          <>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                            Validating...
+                                          </>
+                                        ) : (
+                                          "Apply"
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+                                  {couponError && (
+                                    <p className="text-sm text-red-600">
+                                      {couponError}
+                                    </p>
+                                  )}
+                                  {couponApplied && (
+                                    <div className="flex items-center gap-2 text-green-600 text-xs">
+                                      <CheckCircle className="h-4 w-4" />
+                                      <span>
+                                        Coupon applied! You saved{" "}
+                                        {formatCurrency(couponDiscount, "KES")}
+                                      </span>
+                                      {couponData?.max_discount && (
                                         <Badge
                                           variant="outline"
                                           className="text-xs"
                                         >
-                                          Kenyan Mobile Money
+                                          Max discount:{" "}
+                                          {formatCurrency(
+                                            couponData.max_discount,
+                                            "KES"
+                                          )}
                                         </Badge>
-                                      </span>
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      Test the M-Pesa STK Push flow (live)
-                                    </p>
-                                  </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
+                              )}
+                            </div>
 
-                              <div className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer">
-                                <div className="flex items-center space-x-3">
-                                  <RadioGroupItem value="paypal" id="paypal" />
-                                  <div className="flex-1">
-                                    <Label
-                                      htmlFor="paypal"
-                                      className="font-medium cursor-pointer"
-                                    >
-                                      PayPal / Credit Card
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                      Test international payment processing
-                                      (live mode)
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                            <Separator />
+
+                            {/* Payment Methods */}
+                            <div>
+                              <h4 className="font-semibold mb-4">
+                                Choose Payment Method
+                              </h4>
+                              <FormField
+                                control={form.control}
+                                name="paymentMethod"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormControl>
+                                      <RadioGroup
+                                        onValueChange={field.onChange}
+                                        defaultValue={field.value}
+                                        className="space-y-3"
+                                      >
+                                        {/* M-Pesa */}
+                                        <div className="border rounded-lg p-4 hover:bg-purple-50/50 cursor-pointer">
+                                          <div className="flex items-center space-x-3">
+                                            <RadioGroupItem
+                                              value="mpesa"
+                                              id="mpesa"
+                                            />
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                                  <Smartphone className="h-5 w-5 text-green-600" />
+                                                </div>
+                                                <div>
+                                                  <Label
+                                                    htmlFor="mpesa"
+                                                    className="font-medium cursor-pointer text-lg"
+                                                  >
+                                                    M-Pesa
+                                                  </Label>
+                                                  <p className="text-sm text-gray-600">
+                                                    Pay instantly via mobile
+                                                    money
+                                                  </p>
+                                                </div>
+                                                <div className="mt-3 pl-12 hidden sm:flex sm:flex-col">
+                                                  <div className="flex items-center gap-2 text-sm">
+                                                    <ShieldCheck className="h-3 w-3 text-green-500" />
+                                                    <span>
+                                                      Instant confirmation
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center gap-2 text-sm mt-1">
+                                                    <Zap className="h-3 w-3 text-green-500" />
+                                                    <span>
+                                                      Receive STK push on your
+                                                      phone
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* PayPal */}
+                                        <div className="border rounded-lg p-4 hover:bg-purple-50/50 cursor-pointer">
+                                          <div className="flex items-center space-x-3">
+                                            <RadioGroupItem
+                                              value="paypal"
+                                              id="paypal"
+                                            />
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                                  <CreditCard className="h-5 w-5 text-blue-600" />
+                                                </div>
+                                                <div>
+                                                  <Label
+                                                    htmlFor="paypal"
+                                                    className="font-medium cursor-pointer text-lg"
+                                                  >
+                                                    PayPal / Credit Card
+                                                  </Label>
+                                                  <p className="text-sm text-gray-600">
+                                                    International cards accepted
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+
+                    {/* Submit Button */}
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full h-12 text-lg bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600 text-white"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Continue to Payment
+                          <ChevronLeft className="ml-2 h-4 w-4 rotate-180" />
+                        </>
                       )}
-                    />
+                    </Button>
+                  </form>
+                </Form>
+              </Tabs>
+            </div>
+
+            {/* Order Summary */}
+            <div className="space-y-6">
+              <Card className="sticky top-6 border-amber-200">
+                <CardHeader className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-amber-600" />
+                    Order Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {/* Order Items */}
+                  <div className="space-y-4 mb-6 max-h-80 overflow-y-auto pr-2">
+                    {cartItems.map((item) => {
+                      const unitPrice =
+                        item.product.has_wholesale &&
+                        item.quantity >=
+                          (item.product.wholesale_min_quantity || 10)
+                          ? item.product.wholesale_price || item.product.price
+                          : item.product.price;
+                      const isWholesale =
+                        item.product.has_wholesale &&
+                        item.quantity >=
+                          (item.product.wholesale_min_quantity || 10);
+
+                      return (
+                        <div key={item.product.id} className="space-y-2">
+                          <div className="flex justify-between">
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">
+                                {item.product.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs">
+                                  Qty: {item.quantity}
+                                </Badge>
+                                {isWholesale && (
+                                  <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs">
+                                    Wholesale
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">
+                                {formatCurrency(
+                                  unitPrice * item.quantity,
+                                  "KES"
+                                )}
+                              </p>
+                              {isWholesale &&
+                                item.product.price !== unitPrice && (
+                                  <p className="text-xs text-green-600">
+                                    Save{" "}
+                                    {formatCurrency(
+                                      (item.product.price - unitPrice) *
+                                        item.quantity,
+                                      "KES"
+                                    )}
+                                  </p>
+                                )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-lg"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>Processing...</>
-                    ) : (
-                      <>Continue to Test Payment →</>
+                  <Separator />
+
+                  {/* Cost Breakdown */}
+                  <div className="space-y-3 pt-4">
+                    <div className="flex justify-between">
+                      <span>Subtotal</span>
+                      <span className="font-medium">
+                        {formatCurrency(subtotal, "KES")}
+                      </span>
+                    </div>
+
+                    {wholesaleSavings > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Wholesale Savings</span>
+                        <span className="font-medium">
+                          -{formatCurrency(wholesaleSavings, "KES")}
+                        </span>
+                      </div>
                     )}
-                  </Button>
-                </form>
-              </Form>
-            </div>
-          </Card>
-        </div>
 
-        {/* Order Summary */}
-        <div className="space-y-6">
-          <Card className="sticky top-24">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold">Order Summary</h2>
-            </div>
+                    {couponApplied && (
+                      <div className="flex justify-between text-purple-600">
+                        <span>Coupon Discount</span>
+                        <span className="font-medium">
+                          -{formatCurrency(couponDiscount, "KES")}
+                        </span>
+                      </div>
+                    )}
 
-            <div className="p-6">
-              {/* Order Items */}
-              <div className="space-y-3 mb-6 max-h-64 overflow-y-auto pr-2">
-                {cartItems.map((item) => (
-                  <div
-                    key={item.product.id}
-                    className="flex justify-between items-start"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">
-                        {item.product.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          Qty: {item.quantity}
-                        </Badge>
-                        {item.product.category && (
-                          <Badge variant="secondary" className="text-xs">
-                            {item.product.category}
-                          </Badge>
-                        )}
+                    <div className="flex justify-between">
+                      <div>
+                        <span>Shipping</span>
+                        <p className="text-xs text-gray-500">
+                          {selectedShippingMethod === "pickup"
+                            ? "Store pickup"
+                            : `to ${city || "Nairobi"}`}
+                        </p>
+                      </div>
+                      <span className="font-medium">
+                        {shippingCost === 0
+                          ? "FREE"
+                          : formatCurrency(shippingCost, "KES")}
+                      </span>
+                    </div>
+
+                    {installationRequired && selectedInstallation && (
+                      <div className="flex justify-between">
+                        <div>
+                          <span>Installation</span>
+                          <p className="text-xs text-gray-500">
+                            {selectedInstallation.name}
+                          </p>
+                        </div>
+                        <span className="font-medium">
+                          {formatCurrency(installationCost, "KES")}
+                        </span>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <div className="flex justify-between text-xl font-bold pt-2">
+                      <span>Total</span>
+                      <span className="text-amber-600">
+                        {formatCurrency(orderTotal, "KES")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Trust Badges */}
+                  <div className="mt-6 pt-6 border-t">
+                    <div className="grid grid-cols-2 gap-3 text-center">
+                      <div className="space-y-1">
+                        <ShieldCheck className="h-5 w-5 text-green-500 mx-auto" />
+                        <p className="text-xs font-medium">Secure Payment</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Truck className="h-5 w-5 text-blue-500 mx-auto" />
+                        <p className="text-xs font-medium">Fast Delivery</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Zap className="h-5 w-5 text-amber-500 mx-auto" />
+                        <p className="text-xs font-medium">24/7 Support</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Battery className="h-5 w-5 text-purple-500 mx-auto" />
+                        <p className="text-xs font-medium">Warranty</p>
                       </div>
                     </div>
-                    <p className="font-medium">
-                      {formatCurrency(
-                        item.product.price * item.quantity,
-                        "KES"
-                      )}
-                    </p>
                   </div>
-                ))}
-              </div>
-
-              <Separator />
-
-              {/* Cost Breakdown */}
-              <div className="space-y-3 pt-4">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">
-                    {formatCurrency(subtotal, "KES")}
-                  </span>
-                </div>
-
-                <div className="flex justify-between">
-                  <div>
-                    <span className="text-muted-foreground">Shipping</span>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedShippingMethod === "pickup"
-                        ? "Store pickup"
-                        : `to ${city || "Nairobi"}`}
-                    </p>
-                  </div>
-                  <span className="font-medium">
-                    {shippingCost === 0
-                      ? "FREE"
-                      : formatCurrency(shippingCost, "KES")}
-                  </span>
-                </div>
-
-                <div className="border-t pt-3">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>{formatCurrency(orderTotal, "KES")}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Shipping Info Note */}
-              <div className="mt-4 p-3 bg-muted/30 rounded-lg">
-                <p className="text-xs text-muted-foreground">
-                  <Info className="h-3 w-3 inline mr-1" />
-                  Shipping cost updates in real-time based on location and
-                  method selected.
-                </p>
-              </div>
+                </CardContent>
+              </Card>
             </div>
-          </Card>
-
-          {/* Next Steps Info */}
-          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200">
-            <CardContent className="p-6">
-              <h3 className="font-bold text-lg mb-3">What Happens Next?</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-blue-600">1</span>
-                  </div>
-                  <span>
-                    <strong>Test Payment Interface:</strong> You'll see a
-                    payment screen
-                  </span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-blue-600">2</span>
-                  </div>
-                  <span>
-                    <strong>Experience Payment Flow:</strong> Try M-Pesa STK
-                    Push or PayPal live mode
-                  </span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-bold text-blue-600">3</span>
-                  </div>
-                  <span>
-                    <strong>Order Confirmation:</strong> See the order tracking
-                    page regardless of completion
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
       </div>
     </div>

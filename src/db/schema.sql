@@ -596,6 +596,18 @@ CREATE POLICY "Public can view product-videos"
   TO anon, authenticated
   USING (bucket_id = 'product-videos');
 
+CREATE POLICY "Users can read transactions for their orders"
+ON transactions
+FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1 FROM orders
+    WHERE orders.id = transactions.order_id
+    AND orders.user_id = auth.uid()
+  )
+);
+
+
 -- Note: You will need to create more specific RLS policies based on your application's needs.
 -- For example, admins should have broader access, while customers should only be able to see and manage their own data.
 

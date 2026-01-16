@@ -35,14 +35,6 @@ export async function POST(request: Request) {
 
     const stkCallback = Body.stkCallback;
 
-    // Handle failed/cancelled payments
-    if (stkCallback.ResultCode !== 0) {
-      return NextResponse.json(
-        { message: "Payment not successful" },
-        { status: 200 }
-      );
-    }
-
     // Extract metadata safely
     const items = stkCallback.CallbackMetadata?.Item || [];
     const amountItem = items.find((item: any) => item.Name === "Amount");
@@ -50,44 +42,152 @@ export async function POST(request: Request) {
       (item: any) => item.Name === "MpesaReceiptNumber"
     );
     const phoneItem = items.find((item: any) => item.Name === "PhoneNumber");
+    const transactionDateItem = items.find(
+      (item: any) => item.Name === "TransactionDate"
+    );
 
     const amount = amountItem?.Value || 0;
     const receipt = receiptItem?.Value || "N/A";
     const phone = phoneItem?.Value || "N/A";
+    const transactionDate = transactionDateItem?.Value || null;
 
-    const { data: Order } = await supabaseAdmin
+    // Handle failed/cancelled payments
+    if (stkCallback.ResultCode !== 0) {
+      console.log(
+        `Payment failed for order ${orderId}:`,
+        stkCallback.ResultDesc
+      );
+
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "failed",
+          status: "pending",
+          metadata: {
+            mpesa_failure: {
+              result_code: stkCallback.ResultCode,
+              result_desc: stkCallback.ResultDesc,
+              failed_at: new Date().toISOString(),
+            },
+          },
+        })
+        .eq("id", orderId);
+
+      return NextResponse.json(
+        { message: "Payment not successful - order status updated" },
+        { status: 200 }
+      );
+    }
+
+    // Get order details first
+    const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
-      .update({
-        status: "paid",
-      })
+      .select("*")
       .eq("id", orderId)
-      .select()
       .single();
 
-    if (!Order) {
+    if (orderError || !order) {
+      console.error("Order not found:", orderError);
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
     }
+
+    // Check if already processed (idempotency)
+    if (order.payment_status === "completed") {
+      console.log(`Order ${orderId} already processed`);
+      return NextResponse.json(
+        { message: "Order already processed" },
+        { status: 200 }
+      );
+    }
+
+    // Convert transaction date to timestamp if available
+    let paidAt = new Date();
+    if (transactionDate) {
+      try {
+        // M-Pesa transaction date format: YYYYMMDDHHMMSS
+        const year = transactionDate.substring(0, 4);
+        const month = transactionDate.substring(4, 6);
+        const day = transactionDate.substring(6, 8);
+        const hour = transactionDate.substring(8, 10);
+        const minute = transactionDate.substring(10, 12);
+        const second = transactionDate.substring(12, 14);
+        paidAt = new Date(
+          `${year}-${month}-${day}T${hour}:${minute}:${second}Z`
+        );
+      } catch (e) {
+        console.warn("Failed to parse transaction date:", e);
+      }
+    }
+
+    // Update order with new structure
+    const updateData: any = {
+      payment_status: "completed",
+      status: "processing", // Use 'processing' instead of 'paid' to match your workflow
+      paid_at: paidAt.toISOString(),
+      payment_reference: receipt,
+      metadata: {
+        ...order.metadata,
+        mpesa_success: {
+          receipt_number: receipt,
+          phone_number: phone,
+          amount_paid: amount,
+          transaction_date: transactionDate,
+          callback_data: stkCallback,
+        },
+        payment_completed_at: new Date().toISOString(),
+      },
+    };
+
+    const { error: updateError } = await supabaseAdmin
+      .from("orders")
+      .update(updateData)
+      .eq("id", orderId);
+
+    if (updateError) {
+      console.error("Error updating order:", updateError);
+      return NextResponse.json(
+        { error: "Failed to update order" },
+        { status: 500 }
+      );
+    }
+
+    // Save transaction record
     const { error: txErr } = await supabaseAdmin.from("transactions").insert({
-      order_id: Order.id,
+      order_id: orderId,
       gateway: "mpesa",
-      amount,
+      amount: amount,
       status: "completed",
       receipt_number: receipt,
       phone_number: phone,
-      gateway_tx_id: stkCallback.CheckoutRequestID,
+      gateway_tx_id:
+        stkCallback.CheckoutRequestID || stkCallback.MerchantRequestID,
+      transaction_date: paidAt.toISOString(),
+      currency: order.currency || "KES",
+      customer_email: order.customer_email,
+      customer_phone: order.customer_phone,
       payload: stkCallback,
     });
 
     if (txErr) {
       console.error("Error saving transaction:", txErr);
-      return NextResponse.json(
-        { error: "Failed to save transaction" },
-        { status: 500 }
-      );
+      // Don't fail the whole request if transaction logging fails
     }
 
+    // Here you could trigger additional actions:
+    // - Send confirmation email
+    // - Update inventory
+    // - Send notification to admin
+    // - etc.
+
+    console.log(`✅ Payment processed successfully for order ${orderId}`);
+
     return NextResponse.json(
-      { message: "Payment processed successfully" },
+      {
+        message: "Payment processed successfully",
+        orderId,
+        receiptNumber: receipt,
+        amount,
+      },
       { status: 200 }
     );
   } catch (error) {

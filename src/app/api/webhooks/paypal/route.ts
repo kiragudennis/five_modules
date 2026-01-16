@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
   const { access_token } = await tokenRes.json();
 
-  // Before trusting
+  // Verify webhook signature
   const verifyRes = await fetch(
     `${PAYPAL_BASE_URL}/v1/notifications/verify-webhook-signature`,
     {
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         transmission_id: req.headers.get("paypal-transmission-id"),
         transmission_sig: req.headers.get("paypal-transmission-sig"),
         transmission_time: req.headers.get("paypal-transmission-time"),
-        webhook_id: process.env.PAYPAL_WEBHOOK_ID, // you get this from their dashboard
+        webhook_id: process.env.PAYPAL_WEBHOOK_ID,
         webhook_event: body,
       }),
     }
@@ -74,24 +74,32 @@ export async function POST(req: Request) {
   const isBanned = await banIfInvalid(
     req,
     isInvalid,
-    "Missing Stripe signature"
+    "Invalid PayPal signature"
   );
 
   if (isBanned) {
-    return NextResponse.json({ message: "Success" }, { status: 201 }); // acting cool
+    return NextResponse.json({ message: "Success" }, { status: 201 });
   }
 
   const eventType = body.event_type;
   const resource = body.resource;
 
   try {
-    // --- Step 1: Handle APPROVED (auto-capture) ---
+    // --- Step 1: Handle ORDER APPROVED ---
     if (eventType === "CHECKOUT.ORDER.APPROVED") {
       const paypalOrderId = resource.id;
       const supabaseOrderId = resource?.purchase_units?.[0]?.custom_id;
 
-      console.log("⚡ Order approved, capturing...", supabaseOrderId);
+      if (!supabaseOrderId) {
+        throw new Error("No Supabase order ID found in PayPal resource");
+      }
 
+      console.log("⚡ PayPal order approved:", {
+        paypalOrderId,
+        supabaseOrderId,
+      });
+
+      // Auto-capture the payment
       const captureRes = await fetch(
         `${PAYPAL_BASE_URL}/v2/checkout/orders/${paypalOrderId}/capture`,
         {
@@ -105,46 +113,147 @@ export async function POST(req: Request) {
 
       const captureData = await captureRes.json();
 
-      // Don’t update DB yet, wait for PAYMENT.CAPTURE.COMPLETED
+      // Update order metadata with approval info
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          metadata: {
+            paypal_order_approved: true,
+            paypal_approval_time: new Date().toISOString(),
+            paypal_capture_attempted: true,
+            paypal_capture_response: captureData,
+          },
+        })
+        .eq("id", supabaseOrderId);
+
+      // Wait for PAYMENT.CAPTURE.COMPLETED for final status
     }
 
-    // --- Step 2: Handle COMPLETED payment ---
+    // --- Step 2: Handle COMPLETED PAYMENT ---
     if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
       const supabaseOrderId =
         resource?.custom_id ||
         resource?.supplementary_data?.related_ids?.order_id ||
-        resource?.purchase_units?.[0]?.reference_id;
+        resource?.purchase_units?.[0]?.reference_id ||
+        resource?.purchase_units?.[0]?.custom_id;
 
       if (!supabaseOrderId) {
         throw new Error("No Supabase order ID found in PayPal resource");
       }
 
+      // Get order details first
+      const { data: order, error: orderError } = await supabaseAdmin
+        .from("orders")
+        .select("*")
+        .eq("id", supabaseOrderId)
+        .single();
+
+      if (orderError || !order) {
+        console.error("Order not found:", orderError);
+        throw new Error(`Order ${supabaseOrderId} not found`);
+      }
+
+      // Check if already processed (idempotency)
+      if (order.payment_status === "completed") {
+        console.log(`Order ${supabaseOrderId} already processed`);
+        return NextResponse.json({ status: "already_processed" });
+      }
+
       const amount = resource.amount.value;
       const currency = resource.amount.currency_code;
+      const fees = resource.seller_receivable_breakdown?.paypal_fee?.value || 0;
+      const netAmount =
+        resource.seller_receivable_breakdown?.net_amount?.value || amount;
 
-      // ✅ Update order
+      // ✅ Update order with new structure
+      const updateData: any = {
+        payment_status: "completed",
+        status: "processing", // Update to match your workflow
+        paid_at: new Date().toISOString(),
+        payment_reference: resource.id,
+        metadata: {
+          ...order.metadata,
+          paypal_payment_completed: {
+            capture_id: resource.id,
+            amount_captured: amount,
+            currency: currency,
+            fees: fees,
+            net_amount: netAmount,
+            payer_email: resource.payer?.email_address,
+            payer_name:
+              resource.payer?.name?.given_name +
+              " " +
+              resource.payer?.name?.surname,
+            completed_at: new Date().toISOString(),
+          },
+        },
+      };
+
       await supabaseAdmin
         .from("orders")
-        .update({ status: "paid" })
+        .update(updateData)
         .eq("id", supabaseOrderId)
-        .neq("status", "paid"); // idempotency
+        .neq("payment_status", "completed"); // Idempotency check
 
       // ✅ Insert transaction
       await supabaseAdmin.from("transactions").insert({
         order_id: supabaseOrderId,
         gateway: "paypal",
-        amount,
-        fees: resource.seller_receivable_breakdown?.paypal_fee?.value || 0,
+        amount: amount,
+        currency: currency,
+        fees: fees,
+        net_amount: netAmount,
         receipt_number: resource.id,
-        phone_number:
-          resource.payer?.payer_info?.phone?.phone_number?.national_number ||
-          "N/A",
+        payer_email: resource.payer?.email_address,
+        payer_name:
+          resource.payer?.name?.given_name +
+          " " +
+          resource.payer?.name?.surname,
         gateway_tx_id: resource.id,
         status: "completed",
         payload: resource,
       });
 
-      console.log(`💰 Order ${supabaseOrderId} marked as paid`);
+      console.log(`💰 Order ${supabaseOrderId} marked as paid (PayPal)`);
+
+      // Here you could trigger additional actions:
+      // - Send confirmation email
+      // - Update inventory
+      // - Send notification to admin
+      // - etc.
+    }
+
+    // --- Step 3: Handle OTHER PAYMENT STATUSES ---
+    if (
+      eventType === "PAYMENT.CAPTURE.DENIED" ||
+      eventType === "PAYMENT.CAPTURE.FAILED" ||
+      eventType === "PAYMENT.CAPTURE.PENDING"
+    ) {
+      const supabaseOrderId =
+        resource?.custom_id ||
+        resource?.purchase_units?.[0]?.reference_id ||
+        resource?.purchase_units?.[0]?.custom_id;
+
+      if (supabaseOrderId) {
+        let paymentStatus = "failed";
+        if (eventType === "PAYMENT.CAPTURE.PENDING") {
+          paymentStatus = "pending";
+        }
+
+        await supabaseAdmin
+          .from("orders")
+          .update({
+            payment_status: paymentStatus,
+            metadata: {
+              paypal_payment_status: eventType,
+              paypal_failure_reason: resource.reason || eventType,
+              last_updated: new Date().toISOString(),
+            },
+          })
+          .eq("id", supabaseOrderId);
+
+        console.log(`🔄 Order ${supabaseOrderId} payment status: ${eventType}`);
+      }
     }
 
     return NextResponse.json({ status: "ok" });

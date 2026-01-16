@@ -26,6 +26,10 @@ import {
   MapPin,
   Mail,
   Phone,
+  Truck,
+  CreditCard as CreditCardIcon,
+  Calendar,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -41,13 +45,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function SuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ orderId?: string; transactionId?: string }>;
+  searchParams: Promise<{ orderId?: string; paymentMethod?: string }>;
 }) {
-  const { orderId, transactionId } = use(searchParams);
+  const { orderId, paymentMethod } = use(searchParams);
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const { dispatch } = useStore();
+  const router = useRouter();
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -55,15 +60,22 @@ export default function SuccessPage({
       try {
         // Fetch real order details
         const res = await fetch(`/api/orders/${orderId}`);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch order: ${res.status}`);
+        }
         const data = await res.json();
 
         setOrderDetails(data);
-        setPaymentComplete(
-          data.status === "paid" || data.status === "completed"
-        );
+
+        // Check if payment is completed based on new statuses
+        const isPaid =
+          data.payment_status === "completed" ||
+          data.status === "completed" ||
+          data.status === "processing";
+        setPaymentComplete(isPaid);
 
         // 🎉 Launch epic confetti on success
-        if (data.status === "paid" || data.status === "completed") {
+        if (isPaid) {
           confetti({
             particleCount: 150,
             spread: 100,
@@ -91,6 +103,7 @@ export default function SuccessPage({
         dispatch({ type: "CLEAR_CART" });
       } catch (error) {
         console.error("Error fetching order details:", error);
+        toast.error("Failed to load order details");
       } finally {
         setIsLoading(false);
       }
@@ -98,15 +111,18 @@ export default function SuccessPage({
 
     if (orderId) {
       fetchOrderDetails();
+    } else {
+      // If no orderId, redirect to home
+      router.push("/");
     }
-  }, [orderId, dispatch]);
+  }, [orderId, dispatch, router]);
 
   // Celebration animation for paid orders
   useEffect(() => {
     if (paymentComplete) {
       const timer = setTimeout(() => {
-        toast.success("💰 Payment landed in your account!", {
-          description: "Now you're ready to ship the order",
+        toast.success("💰 Payment successful!", {
+          description: "Your order has been confirmed",
           duration: 5000,
         });
       }, 1000);
@@ -120,9 +136,9 @@ export default function SuccessPage({
       <div className="container mx-auto py-20 text-center">
         <div className="max-w-md mx-auto">
           <div className="animate-spin h-12 w-12 border-2 border-primary border-t-transparent rounded-full mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold mb-3">Finalizing Your Order</h2>
+          <h2 className="text-2xl font-bold mb-3">Loading Your Order</h2>
           <p className="text-muted-foreground">
-            We're completing the journey... just a moment!
+            We're retrieving your order details... just a moment!
           </p>
         </div>
       </div>
@@ -136,55 +152,180 @@ export default function SuccessPage({
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-3">Order Not Found</h2>
           <p className="text-muted-foreground mb-6">
-            We couldn't find your order details. Please contact support.
+            We couldn't find your order details. Please check your email for
+            confirmation or contact support.
           </p>
-          <Button asChild>
-            <Link href="/contact">Contact Support</Link>
-          </Button>
+          <div className="space-y-3">
+            <Button asChild>
+              <Link href="/contact">Contact Support</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/">Return to Home</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  const isOrderPaid =
-    orderDetails.status === "paid" || orderDetails.status === "completed";
+  const isOrderPaid = paymentComplete;
+  const isPending = orderDetails.payment_status === "pending";
+  const isFailed = orderDetails.payment_status === "failed";
+
+  // Format status for display
+  const getStatusBadge = () => {
+    switch (orderDetails.status) {
+      case "completed":
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200">
+            ✓ Delivered
+          </Badge>
+        );
+      case "shipped":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+            🚚 Shipped
+          </Badge>
+        );
+      case "processing":
+        return (
+          <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+            ⚙️ Processing
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+            ⏳ Pending
+          </Badge>
+        );
+      case "cancelled":
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200">
+            ✗ Cancelled
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{orderDetails.status}</Badge>;
+    }
+  };
+
+  // Format payment status for display
+  const getPaymentBadge = () => {
+    switch (orderDetails.payment_status) {
+      case "completed":
+        return (
+          <Badge className="bg-green-100 text-green-800 border-green-200">
+            💰 Paid
+          </Badge>
+        );
+      case "processing":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+            ⏳ Processing
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+            ⏳ Pending
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge className="bg-red-100 text-red-800 border-red-200">
+            ✗ Failed
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{orderDetails.payment_status}</Badge>;
+    }
+  };
+
+  // Calculate estimated delivery date
+  const getEstimatedDelivery = () => {
+    if (orderDetails.estimated_delivery) {
+      return orderDetails.estimated_delivery;
+    }
+    if (orderDetails.created_at) {
+      const orderDate = new Date(orderDetails.created_at);
+      const estimatedDate = new Date(orderDate);
+      estimatedDate.setDate(
+        estimatedDate.getDate() +
+          (orderDetails.shipping_method === "express" ? 2 : 7)
+      );
+      return estimatedDate.toLocaleDateString("en-KE", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    }
+    return "Within 7 business days";
+  };
 
   return (
-    <div className="container mx-auto py-8 px-2 sm:px-4">
+    <div className="container mx-auto py-8 px-2 sm:px-4 max-w-7xl">
       {/* 🎉 Celebration Header */}
       <div className="text-center mb-12">
         <div className="relative inline-block mb-6">
-          <div className="h-20 w-20 bg-gradient-to-br from-green-500 to-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+          <div
+            className={`h-20 w-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg ${
+              isOrderPaid
+                ? "bg-gradient-to-br from-green-500 to-emerald-400"
+                : isPending
+                ? "bg-gradient-to-br from-amber-500 to-orange-400"
+                : "bg-gradient-to-br from-red-500 to-pink-400"
+            }`}
+          >
             {isOrderPaid ? (
               <Trophy className="h-10 w-10 text-white" />
-            ) : (
+            ) : isPending ? (
               <Clock className="h-10 w-10 text-white" />
+            ) : (
+              <XCircle className="h-10 w-10 text-white" />
             )}
           </div>
-          <div className="absolute -top-2 -right-2">
+          <div className="absolute -top-2 -right-4">
             <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
           </div>
         </div>
 
-        <Badge className="mb-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white border-0">
-          {isOrderPaid ? "🎯 Mission Complete!" : "⏳ Awaiting Payment"}
+        <Badge
+          className={`mb-4 text-white border-0 ${
+            isOrderPaid
+              ? "bg-gradient-to-r from-green-500 to-emerald-500"
+              : isPending
+              ? "bg-gradient-to-r from-amber-500 to-orange-500"
+              : "bg-gradient-to-r from-red-500 to-pink-500"
+          }`}
+        >
+          {isOrderPaid
+            ? "🎯 Order Confirmed!"
+            : isPending
+            ? "⏳ Awaiting Payment"
+            : "❌ Payment Failed"}
         </Badge>
 
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">
+        <h1 className="text-xl sm:text-4xl md:text-5xl font-bold mb-4">
           {isOrderPaid ? (
             <>
-              Payment Successfully{" "}
-              <span className="text-green-600">Landed!</span>
+              Order #{orderDetails.order_number}{" "}
+              <span className="text-green-600">Confirmed!</span>
             </>
-          ) : (
+          ) : isPending ? (
             "Order Received - Payment Pending"
+          ) : (
+            "Payment Failed - Please Try Again"
           )}
         </h1>
 
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <p className="sm:text-xl text-muted-foreground max-w-2xl mx-auto">
           {isOrderPaid
-            ? "The money is in your account! This demo shows exactly what your customers will experience."
-            : "Complete the payment to see the full order fulfillment process."}
+            ? `Thank you for your order! A confirmation has been sent to ${orderDetails.customer_email}.`
+            : isPending
+            ? "Please complete your payment to confirm your order. Check your email for payment instructions."
+            : "We encountered an issue processing your payment. Please try again or contact support."}
         </p>
       </div>
 
@@ -195,15 +336,15 @@ export default function SuccessPage({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Order Details & Journey
+                Order Details
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="details" className="w-full">
                 <TabsList className="grid grid-cols-3">
-                  <TabsTrigger value="details">Order Details</TabsTrigger>
-                  <TabsTrigger value="journey">Customer Journey</TabsTrigger>
-                  <TabsTrigger value="admin">Admin View</TabsTrigger>
+                  <TabsTrigger value="details">Order Summary</TabsTrigger>
+                  <TabsTrigger value="shipping">Shipping</TabsTrigger>
+                  <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="details" className="space-y-6 pt-4">
@@ -214,48 +355,53 @@ export default function SuccessPage({
                         <h3 className="font-medium mb-3">Order Information</h3>
                         <div className="space-y-2">
                           <InfoItem
-                            icon="📦"
-                            label="Order ID"
-                            value={orderDetails.id}
+                            icon={<Hash className="h-4 w-4" />}
+                            label="Order Number"
+                            value={orderDetails.order_number}
                           />
                           <InfoItem
-                            icon="📅"
+                            icon={<Calendar className="h-4 w-4" />}
                             label="Order Date"
                             value={new Date(
                               orderDetails.created_at
-                            ).toLocaleDateString()}
+                            ).toLocaleDateString("en-KE", {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           />
                           <InfoItem
-                            icon="💰"
+                            icon={<CreditCardIcon className="h-4 w-4" />}
                             label="Payment Method"
-                            value={orderDetails.shipping_info?.paymentMethod?.toUpperCase()}
+                            value={
+                              orderDetails.payment_method?.toUpperCase() ||
+                              "N/A"
+                            }
                           />
                           <InfoItem
                             icon="🎯"
-                            label="Status"
-                            value={
-                              <Badge
-                                className={
-                                  isOrderPaid
-                                    ? "bg-green-100 text-green-800 border-green-200"
-                                    : "bg-amber-100 text-amber-800 border-amber-200"
-                                }
-                              >
-                                {isOrderPaid ? "💰 PAID" : "⏳ PENDING"}
-                              </Badge>
-                            }
+                            label="Order Status"
+                            value={getStatusBadge()}
+                          />
+                          <InfoItem
+                            icon="💰"
+                            label="Payment Status"
+                            value={getPaymentBadge()}
                           />
                         </div>
                       </div>
 
-                      {transactionId && (
+                      {orderDetails.payment_reference && (
                         <div>
                           <h3 className="font-medium mb-3">
                             Payment Reference
                           </h3>
                           <div className="bg-muted rounded-lg p-3">
                             <p className="text-sm font-mono break-all">
-                              {transactionId}
+                              {orderDetails.payment_reference}
                             </p>
                           </div>
                         </div>
@@ -263,36 +409,47 @@ export default function SuccessPage({
                     </div>
 
                     <div>
-                      <h3 className="font-medium mb-3">Shipping Information</h3>
+                      <h3 className="font-medium mb-3">Customer Information</h3>
                       <div className="space-y-2">
                         <InfoItem
                           icon="👤"
                           label="Customer"
-                          value={`${orderDetails.shipping_info?.firstName} ${orderDetails.shipping_info?.lastName}`}
+                          value={orderDetails.customer_name}
                         />
                         <InfoItem
-                          icon="📱"
+                          icon={<Phone className="h-4 w-4" />}
                           label="Phone"
-                          value={orderDetails.shipping_info?.phone}
+                          value={orderDetails.customer_phone}
                         />
                         <InfoItem
-                          icon="📧"
+                          icon={<Mail className="h-4 w-4" />}
                           label="Email"
-                          value={orderDetails.shipping_info?.email}
-                        />
-                        <InfoItem
-                          icon="📍"
-                          label="Location"
-                          value={
-                            <>
-                              {orderDetails.shipping_info?.address}
-                              <br />
-                              {orderDetails.shipping_info?.city},{" "}
-                              {orderDetails.shipping_info?.postalCode}
-                            </>
-                          }
+                          value={orderDetails.customer_email}
                         />
                       </div>
+
+                      {orderDetails.coupon_code && (
+                        <div className="mt-4">
+                          <h3 className="font-medium mb-2">Coupon Applied</h3>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-200"
+                            >
+                              {orderDetails.coupon_code}
+                            </Badge>
+                            {orderDetails.coupon_discount > 0 && (
+                              <span className="text-sm text-green-600">
+                                -
+                                {formatCurrency(
+                                  orderDetails.coupon_discount,
+                                  orderDetails.currency
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -302,146 +459,299 @@ export default function SuccessPage({
                   <div>
                     <h3 className="font-medium mb-4">Order Items</h3>
                     <div className="space-y-3">
-                      {orderDetails.order_items?.map((item: any) => (
+                      {orderDetails.items?.map((item: any) => (
                         <div
                           key={item.id}
                           className="flex justify-between items-center p-3 border rounded-lg hover:bg-muted/50"
                         >
                           <div className="flex-1">
-                            <p className="font-medium">{item.products.name}</p>
+                            <p className="font-medium">
+                              {item.product_title || item.product_name}
+                            </p>
                             <div className="flex items-center gap-4 mt-1">
                               <Badge variant="outline" className="text-xs">
-                                Qty: {item.qty}
+                                Qty: {item.quantity}
                               </Badge>
+                              {item.has_wholesale &&
+                                item.applied_price === item.wholesale_price && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                                  >
+                                    Wholesale Price
+                                  </Badge>
+                                )}
                               <span className="text-sm text-muted-foreground">
-                                @ {formatCurrency(item.unit_price, "KES")}
+                                @{" "}
+                                {formatCurrency(
+                                  item.applied_price,
+                                  orderDetails.currency
+                                )}
                               </span>
                             </div>
                           </div>
                           <p className="font-bold">
-                            {formatCurrency(item.unit_price * item.qty, "KES")}
+                            {formatCurrency(
+                              item.total_price ||
+                                item.applied_price * item.quantity,
+                              orderDetails.currency
+                            )}
                           </p>
                         </div>
                       ))}
                     </div>
 
-                    <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 rounded-lg">
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Total Amount</span>
-                        <span className="text-2xl text-green-600">
-                          {formatCurrency(orderDetails.total, "KES")}
+                    <div className="mt-6 space-y-3">
+                      <div className="flex justify-between">
+                        <span>Subtotal</span>
+                        <span>
+                          {formatCurrency(
+                            orderDetails.subtotal,
+                            orderDetails.currency
+                          )}
                         </span>
                       </div>
+
+                      {orderDetails.wholesale_savings > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Wholesale Savings</span>
+                          <span>
+                            -
+                            {formatCurrency(
+                              orderDetails.wholesale_savings,
+                              orderDetails.currency
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {orderDetails.coupon_discount > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Coupon Discount</span>
+                          <span>
+                            -
+                            {formatCurrency(
+                              orderDetails.coupon_discount,
+                              orderDetails.currency
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between">
+                        <span>Shipping</span>
+                        <span>
+                          {formatCurrency(
+                            orderDetails.shipping_total,
+                            orderDetails.currency
+                          )}
+                        </span>
+                      </div>
+
+                      {orderDetails.installation_cost > 0 && (
+                        <div className="flex justify-between">
+                          <span>Installation Service</span>
+                          <span>
+                            {formatCurrency(
+                              orderDetails.installation_cost,
+                              orderDetails.currency
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      <Separator />
+
+                      <div className="flex justify-between text-lg font-bold pt-2">
+                        <span>Total Amount</span>
+                        <span className="text-2xl text-green-600">
+                          {formatCurrency(
+                            orderDetails.total_amount,
+                            orderDetails.currency
+                          )}
+                        </span>
+                      </div>
+
                       {isOrderPaid && (
-                        <p className="text-sm text-green-600 mt-2">
-                          ✅ This amount has been deposited to your account
+                        <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4" />✅ This amount has
+                          been successfully processed
                         </p>
                       )}
                     </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="journey" className="pt-4">
+                <TabsContent value="shipping" className="pt-4">
                   <div className="space-y-4">
-                    <div className="flex items-start gap-4 p-4 border rounded-lg">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-blue-600">
-                          1
-                        </span>
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Shipping Address
+                      </h4>
+                      <div className="space-y-1">
+                        <p className="font-medium">
+                          {orderDetails.customer_name}
+                        </p>
+                        <p>{orderDetails.shipping_address}</p>
+                        <p>
+                          {orderDetails.shipping_city},{" "}
+                          {orderDetails.shipping_county}
+                        </p>
+                        <p>
+                          {orderDetails.shipping_country}{" "}
+                          {orderDetails.shipping_postal_code}
+                        </p>
+                        <p className="pt-2">📱 {orderDetails.customer_phone}</p>
                       </div>
-                      <div>
-                        <h4 className="font-medium mb-1">
-                          Customer Browse & Select
+                    </div>
+
+                    <div className="p-4 border rounded-lg">
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <Truck className="h-4 w-4" />
+                        Shipping Details
+                      </h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Method:</span>
+                          <span className="font-medium capitalize">
+                            {orderDetails.shipping_method}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cost:</span>
+                          <span>
+                            {formatCurrency(
+                              orderDetails.shipping_total,
+                              orderDetails.currency
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Estimated Delivery:
+                          </span>
+                          <span className="font-medium">
+                            {getEstimatedDelivery()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {orderDetails.installation_required && (
+                      <div className="p-4 border rounded-lg bg-blue-50">
+                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                          <Settings className="h-4 w-4" />
+                          Installation Service
                         </h4>
-                        <p className="text-sm text-muted-foreground">
-                          Customer browses products, adds to cart, and proceeds
-                          to checkout
-                        </p>
+                        <div className="space-y-2">
+                          <p className="font-medium">
+                            {orderDetails.installation_service?.name ||
+                              "Installation Service"}
+                          </p>
+                          {orderDetails.installation_date && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Scheduled Date:
+                              </span>
+                              <span>
+                                {new Date(
+                                  orderDetails.installation_date
+                                ).toLocaleDateString()}
+                              </span>
+                            </div>
+                          )}
+                          {orderDetails.installation_time && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">
+                                Time:
+                              </span>
+                              <span className="capitalize">
+                                {orderDetails.installation_time}
+                              </span>
+                            </div>
+                          )}
+                          {orderDetails.special_instructions && (
+                            <div className="mt-2">
+                              <p className="text-sm text-muted-foreground mb-1">
+                                Special Instructions:
+                              </p>
+                              <p className="text-sm">
+                                {orderDetails.special_instructions}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="flex items-start gap-4 p-4 border rounded-lg">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-blue-600">
-                          2
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-1">Checkout & Payment</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Customer enters shipping details and completes payment
-                          via M-Pesa/PayPal
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-4 p-4 border rounded-lg bg-green-50">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-green-600">
-                          3
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-1">
-                          💰 Money Lands in Your Account
+                    {orderDetails.tracking_number && (
+                      <div className="p-4 border rounded-lg bg-green-50">
+                        <h4 className="font-medium mb-3 flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Tracking Information
                         </h4>
-                        <p className="text-sm text-green-700">
-                          Payment is instantly deposited to your business
-                          account
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <Badge className="bg-green-100 text-green-800 border-green-200">
+                            Tracking #: {orderDetails.tracking_number}
+                          </Badge>
+                          <Button size="sm" variant="outline">
+                            Track Shipment
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="flex items-start gap-4 p-4 border rounded-lg">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-bold text-blue-600">
-                          4
-                        </span>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-1">Order Fulfillment</h4>
-                        <p className="text-sm text-muted-foreground">
-                          You receive the order notification and prepare for
-                          shipping
-                        </p>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </TabsContent>
 
-                <TabsContent value="admin" className="pt-4">
-                  <div className="p-4 border rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-                    <h3 className="font-bold mb-4">
-                      What You See in Your Admin Dashboard
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                        <BarChart3 className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-                        <p className="text-sm font-medium">
-                          Real-time Analytics
-                        </p>
-                      </div>
-                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                        <Users className="h-6 w-6 mx-auto mb-2 text-green-600" />
-                        <p className="text-sm font-medium">Customer Database</p>
-                      </div>
-                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                        <ShoppingBag className="h-6 w-6 mx-auto mb-2 text-purple-600" />
-                        <p className="text-sm font-medium">Order Management</p>
-                      </div>
-                      <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                        <Settings className="h-6 w-6 mx-auto mb-2 text-amber-600" />
-                        <p className="text-sm font-medium">
-                          Product Management
-                        </p>
-                      </div>
-                    </div>
-                    <Button asChild variant="outline" className="w-full">
-                      <Link href="/contact">
-                        <Eye className="h-4 w-4 mr-2" />
-                        Request Full Dashboard Demo
-                      </Link>
-                    </Button>
+                <TabsContent value="timeline" className="pt-4">
+                  <div className="space-y-4">
+                    <TimelineStep
+                      number={1}
+                      title="Order Placed"
+                      description="Your order was received and confirmed"
+                      date={orderDetails.created_at}
+                      completed={true}
+                    />
+
+                    <TimelineStep
+                      number={2}
+                      title="Payment Processing"
+                      description={
+                        isOrderPaid
+                          ? "Payment was successfully processed"
+                          : "Awaiting payment completion"
+                      }
+                      date={orderDetails.paid_at}
+                      completed={isOrderPaid}
+                    />
+
+                    <TimelineStep
+                      number={3}
+                      title="Order Processing"
+                      description="Your items are being prepared for shipment"
+                      date={orderDetails.updated_at}
+                      completed={isOrderPaid}
+                    />
+
+                    <TimelineStep
+                      number={4}
+                      title="Shipped"
+                      description="Your order has been shipped"
+                      date={orderDetails.shipped_at}
+                      completed={
+                        orderDetails.status === "shipped" ||
+                        orderDetails.status === "delivered"
+                      }
+                    />
+
+                    <TimelineStep
+                      number={5}
+                      title="Delivered"
+                      description="Your order has been delivered"
+                      date={orderDetails.delivered_at}
+                      completed={orderDetails.status === "delivered"}
+                    />
                   </div>
                 </TabsContent>
               </Tabs>
@@ -449,46 +759,81 @@ export default function SuccessPage({
           </Card>
 
           {/* 🚀 What Happens Next */}
-          <Card className="border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-            <CardContent className="p-6">
+          <Card
+            className={`border-2 ${
+              isOrderPaid
+                ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50"
+                : "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50"
+            }`}
+          >
+            <CardContent>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-green-600" />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    isOrderPaid ? "bg-green-100" : "bg-amber-100"
+                  }`}
+                >
+                  {isOrderPaid ? (
+                    <TrendingUp className="h-6 w-6 text-green-600" />
+                  ) : (
+                    <Clock className="h-6 w-6 text-amber-600" />
+                  )}
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">
                     {isOrderPaid
-                      ? "💰 Money Received! Now What?"
-                      : "Complete Payment to Continue"}
+                      ? "What Happens Next?"
+                      : "Complete Payment to Confirm Order"}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    This is where your business journey continues
+                    {isOrderPaid
+                      ? "Here's what to expect with your order"
+                      : "Your order will be processed once payment is confirmed"}
                   </p>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4 mt-4">
-                <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="h-4 w-4 text-blue-600" />
-                    <h4 className="font-medium">Order Fulfillment</h4>
+              {isOrderPaid ? (
+                <div className="grid md:grid-cols-2 gap-4 mt-4">
+                  <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Package className="h-4 w-4 text-blue-600" />
+                      <h4 className="font-medium">Order Processing</h4>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      We'll prepare your items for shipment within 24-48 hours
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Package the items, generate shipping labels, and update
-                    tracking
-                  </p>
-                </div>
 
-                <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="h-4 w-4 text-green-600" />
-                    <h4 className="font-medium">Customer Communication</h4>
+                  <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Truck className="h-4 w-4 text-green-600" />
+                      <h4 className="font-medium">Shipping Updates</h4>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      You'll receive tracking information via email and SMS
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Send automated updates via email/SMS at every stage
-                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border">
+                  <p className="text-sm mb-3">
+                    To complete your order, please check your email for payment
+                    instructions or return to checkout to complete payment.
+                  </p>
+                  <Button asChild className="w-full">
+                    <Link
+                      href={`/checkout/payment/${
+                        orderDetails.payment_method === "paypal"
+                          ? "paypal"
+                          : "mpesa"
+                      }?orderId=${orderId}`}
+                    >
+                      Complete Payment Now
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -496,18 +841,18 @@ export default function SuccessPage({
         {/* 🎯 Completion & Next Steps */}
         <div className="space-y-6">
           {/* Payment Status & Actions */}
-          <Card className="sticky top-24">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {isOrderPaid ? (
                   <>
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                    Journey Complete!
+                    Order Confirmed
                   </>
                 ) : (
                   <>
                     <Clock className="h-5 w-5 text-amber-600" />
-                    Awaiting Payment
+                    Action Required
                   </>
                 )}
               </CardTitle>
@@ -518,26 +863,25 @@ export default function SuccessPage({
                   <div className="text-center py-4">
                     <div className="text-4xl mb-2">🎯</div>
                     <h3 className="font-bold text-lg mb-2">
-                      Complete Demo Experience
+                      Thank You for Your Order!
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      You've experienced the entire customer journey from start
-                      to finish
+                      Your order has been confirmed and is being processed
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     <Button asChild className="w-full">
-                      <Link href="/contact">
-                        <Shield className="h-4 w-4 mr-2" />
-                        Get Your Custom Admin Dashboard
+                      <Link href="/account/orders">
+                        <Eye className="h-4 w-4 mr-2" />
+                        View All Orders
                       </Link>
                     </Button>
 
                     <Button asChild variant="outline" className="w-full">
-                      <Link href={`/orders/${orderDetails.id}/invoice`}>
+                      <Link href={`/api/orders/${orderId}/invoice`}>
                         <FileDown className="h-4 w-4 mr-2" />
-                        Download Invoice PDF
+                        Download Invoice
                       </Link>
                     </Button>
                   </div>
@@ -546,32 +890,45 @@ export default function SuccessPage({
                 <>
                   <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
                     <p className="text-sm font-medium mb-2">
-                      Complete the payment to finish the journey
+                      Complete your payment to confirm order
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      See how the full flow works when customers pay
-                      successfully
+                      Your order will be reserved for 24 hours pending payment
                     </p>
                   </div>
 
-                  {orderDetails.shipping_info?.paymentMethod === "mpesa" && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">
-                          M-Pesa Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="254712345678"
-                          className="w-full border rounded-lg px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <Button className="w-full bg-gradient-to-r from-green-600 to-emerald-600">
-                        <Smartphone className="h-4 w-4 mr-2" />
-                        Complete Payment with M-Pesa
+                  <div className="space-y-3">
+                    {orderDetails.payment_method === "mpesa" && (
+                      <Button asChild className="w-full">
+                        <Link
+                          href={`/checkout/payment/mpesa?orderId=${orderId}`}
+                        >
+                          <Smartphone className="h-4 w-4 mr-2" />
+                          Complete M-Pesa Payment
+                        </Link>
                       </Button>
-                    </div>
-                  )}
+                    )}
+
+                    {orderDetails.payment_method === "paypal" && (
+                      <Button asChild className="w-full">
+                        <Link
+                          href={`/checkout/payment/paypal?orderId=${orderId}`}
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Complete PayPal Payment
+                        </Link>
+                      </Button>
+                    )}
+
+                    {orderDetails.payment_method === "cash_on_delivery" && (
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <p className="text-sm">
+                          Your order will be delivered and you'll pay upon
+                          receipt.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 
@@ -580,13 +937,6 @@ export default function SuccessPage({
               <div>
                 <h4 className="font-medium mb-3">Quick Actions</h4>
                 <div className="space-y-2">
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="w-full justify-start"
-                  >
-                    <Link href="/">← Return to Home</Link>
-                  </Button>
                   <Button
                     asChild
                     variant="ghost"
@@ -602,9 +952,19 @@ export default function SuccessPage({
                     variant="ghost"
                     className="w-full justify-start"
                   >
+                    <Link href="/account">
+                      <Settings className="h-4 w-4 mr-2" />
+                      My Account
+                    </Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    className="w-full justify-start"
+                  >
                     <Link href="/contact">
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      See Analytics Dashboard
+                      <Phone className="h-4 w-4 mr-2" />
+                      Contact Support
                     </Link>
                   </Button>
                 </div>
@@ -612,47 +972,30 @@ export default function SuccessPage({
             </CardContent>
           </Card>
 
-          {/* 🚀 Get Your Own Store */}
-          <Card className="bg-gradient-to-br from-blue-600 to-cyan-600 text-white border-0">
-            <CardContent className="p-6">
-              <div className="text-center mb-4">
-                <div className="text-4xl mb-2">🚀</div>
-                <h3 className="font-bold text-lg mb-2">
-                  Ready for Your Own Store?
-                </h3>
-                <p className="text-sm opacity-90">
-                  This demo shows what we can build for your business
-                </p>
+          {/* 📞 Need Help? */}
+          <Card>
+            <CardContent>
+              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Need Help?
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium mb-1">Order Questions</p>
+                  <p className="text-sm text-muted-foreground">
+                    Email: support@worldsamma.com
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Payment Issues</p>
+                  <p className="text-sm text-muted-foreground">
+                    Phone: +254 700 000 000
+                  </p>
+                </div>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/contact">Contact Support</Link>
+                </Button>
               </div>
-
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4" />
-                  Custom-branded store with your products
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4" />
-                  Full admin dashboard with analytics
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4" />
-                  M-Pesa & PayPal integration
-                </li>
-                <li className="flex items-center gap-2 text-sm">
-                  <CheckCircle className="h-4 w-4" />
-                  24/7 Kenyan support
-                </li>
-              </ul>
-
-              <Button
-                asChild
-                className="w-full bg-white text-blue-600 hover:bg-white/90"
-              >
-                <Link href="/contact">
-                  Get Your Custom Quote
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
             </CardContent>
           </Card>
         </div>
@@ -666,16 +1009,61 @@ function InfoItem({
   label,
   value,
 }: {
-  icon: string;
+  icon: any;
   label: string;
   value: any;
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="text-lg">{icon}</span>
+      <span className="text-muted-foreground mt-0.5">{icon}</span>
       <div className="flex-1">
         <p className="text-sm text-muted-foreground">{label}</p>
         <p className="font-medium">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function TimelineStep({
+  number,
+  title,
+  description,
+  date,
+  completed = false,
+}: {
+  number: number;
+  title: string;
+  description: string;
+  date?: string;
+  completed: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-4">
+      <div
+        className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+          completed ? "bg-green-100" : "bg-gray-100"
+        }`}
+      >
+        <span
+          className={`text-sm font-bold ${
+            completed ? "text-green-600" : "text-gray-400"
+          }`}
+        >
+          {number}
+        </span>
+      </div>
+      <div className="flex-1">
+        <div className="flex justify-between items-start">
+          <h4 className={`font-medium ${completed ? "text-green-700" : ""}`}>
+            {title}
+          </h4>
+          {date && (
+            <span className="text-sm text-muted-foreground">
+              {new Date(date).toLocaleDateString()}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">{description}</p>
       </div>
     </div>
   );
