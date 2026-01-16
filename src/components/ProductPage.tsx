@@ -34,7 +34,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useStore } from "@/lib/context/StoreContext";
+import { useCart, useStore } from "@/lib/context/StoreContext";
 import { Product } from "@/types/store";
 import { FloatingCartButton } from "@/components/cartButton";
 import {
@@ -90,6 +90,7 @@ export default function ProductDetailPage({
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [showVideo, setShowVideo] = useState(false);
+  const { cartItems, totalItems } = useCart();
 
   const url = typeof window !== "undefined" ? window.location.href : "";
 
@@ -452,6 +453,49 @@ export default function ProductDetailPage({
                     </div>
                   )}
 
+                  {/* Wholesale Pricing Display */}
+                  {product.has_wholesale && product.wholesale_price && (
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 dark:border-purple-800 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-2 sm:p-4 items-baseline gap-3 my-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-5 w-5 text-purple-600" />
+                        <p className="font-semibold text-purple-700 dark:text-purple-300">
+                          Wholesale Price Available
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Wholesale Price
+                          </p>
+                          <p className="text-2xl font-bold text-purple-600">
+                            {formatCurrency(
+                              product.wholesale_price,
+                              product.currency
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Min. Quantity
+                          </p>
+                          <p className="text-2xl font-bold text-purple-600">
+                            {product.wholesale_min_quantity}+ units
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-purple-600 dark:text-purple-400 mt-2">
+                        Save{" "}
+                        {Math.round(
+                          ((product.price - product.wholesale_price) /
+                            product.price) *
+                            100
+                        )}
+                        % per unit when you order{" "}
+                        {product.wholesale_min_quantity}+ units
+                      </p>
+                    </div>
+                  )}
+
                   {/* Share & Actions */}
                   <div className="flex items-center justify-between mt-6 pt-6 border-t border-amber-100">
                     <div className="flex items-center gap-2">
@@ -716,11 +760,85 @@ export default function ProductDetailPage({
                       +
                     </button>
                   </div>
+                  {/* Wholesale Quantity Alert */}
+                  {product.has_wholesale && product.wholesale_min_quantity && (
+                    <div
+                      className={`mt-2 p-2 rounded-md ${
+                        quantity >= product.wholesale_min_quantity
+                          ? "bg-green-100 text-green-800"
+                          : "bg-purple-100 text-purple-800"
+                      }`}
+                    >
+                      <p className="text-sm">
+                        {quantity >= product.wholesale_min_quantity ? (
+                          <>
+                            ✅ Wholesale price applied! You're saving{" "}
+                            {formatCurrency(
+                              (product.price - product.wholesale_price) *
+                                quantity,
+                              product.currency
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            📦 Add {product.wholesale_min_quantity - quantity}{" "}
+                            more to get wholesale price
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Low Stock Alert */}
                   {product.stock > 0 && product.stock <= 10 && (
                     <p className="text-sm text-amber-600 mt-1">
                       ⚡ Hurry! Only {product.stock} left in stock
                     </p>
                   )}
+                </div>
+
+                {/* Price Summary */}
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                  <div className="flex justify-between mb-1">
+                    <span>Unit Price:</span>
+                    <span className="font-medium">
+                      {product.has_wholesale &&
+                      quantity >= product.wholesale_min_quantity
+                        ? formatCurrency(
+                            product.wholesale_price,
+                            product.currency
+                          )
+                        : formatCurrency(product.price, product.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span className="text-lg font-bold text-amber-600">
+                      {product.has_wholesale &&
+                      quantity >= product.wholesale_min_quantity
+                        ? formatCurrency(
+                            product.wholesale_price * quantity,
+                            product.currency
+                          )
+                        : formatCurrency(
+                            product.price * quantity,
+                            product.currency
+                          )}
+                    </span>
+                  </div>
+                  {product.has_wholesale &&
+                    quantity >= product.wholesale_min_quantity && (
+                      <div className="flex justify-between text-green-600 mt-1">
+                        <span>You Save:</span>
+                        <span className="font-medium">
+                          {formatCurrency(
+                            (product.price - product.wholesale_price) *
+                              quantity,
+                            product.currency
+                          )}
+                        </span>
+                      </div>
+                    )}
                 </div>
 
                 <Button
@@ -744,11 +862,18 @@ export default function ProductDetailPage({
                 {/* Buy Now Button */}
                 <Button
                   variant="outline"
-                  disabled={product.stock === 0}
+                  onClick={() => {
+                    if (product.stock === 0) {
+                      toast.error("There isn't enough stock left");
+                    } else if (totalItems === 0) {
+                      toast.error("Please add items to cart");
+                    } else {
+                      window.location.href = "/checkout";
+                    }
+                  }}
                   className="w-full h-12 text-lg border-amber-300 text-amber-600 hover:bg-amber-50"
-                  asChild
                 >
-                  <Link href="/checkout">Buy Now & Pay with M-Pesa</Link>
+                  Buy Now & Pay with M-Pesa
                 </Button>
 
                 {/* Coupon Alert */}
@@ -867,16 +992,34 @@ export default function ProductDetailPage({
       {/* Product Details Tabs */}
       <div className="mb-12">
         <Tabs defaultValue="description" className="w-full">
-          <TabsList className="flex flex-wrap gap-4 mb-6 bg-amber-50 dark:bg-amber-950/20">
-            <TabsTrigger value="description">Description</TabsTrigger>
-            <TabsTrigger value="specifications">Specifications</TabsTrigger>
-            <TabsTrigger value="video">Video Demo</TabsTrigger>
-            <TabsTrigger value="warranty">Warranty & Support</TabsTrigger>
-          </TabsList>
+          {/* Container with horizontal scroll */}
+          <div className="relative mb-6">
+            <div className="overflow-x-auto pb-2 scrollbar-hide">
+              <TabsList className="inline-flex min-w-max bg-amber-50 dark:bg-amber-950/20 px-1">
+                <TabsTrigger value="description" className="whitespace-nowrap">
+                  Description
+                </TabsTrigger>
+                <TabsTrigger
+                  value="specifications"
+                  className="whitespace-nowrap"
+                >
+                  Specifications
+                </TabsTrigger>
+                <TabsTrigger value="video" className="whitespace-nowrap">
+                  Video Demo
+                </TabsTrigger>
+                <TabsTrigger value="warranty" className="whitespace-nowrap">
+                  Warranty & Support
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            {/* Gradient fade on mobile for scroll indication */}
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent dark:from-gray-900 pointer-events-none sm:hidden" />
+          </div>
 
           <TabsContent value="description" className="space-y-4">
             <Card className="border-amber-100">
-              <CardContent className="p-6">
+              <CardContent>
                 <div className="prose prose-sm dark:prose-invert max-w-none space-y-4">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
@@ -931,7 +1074,7 @@ export default function ProductDetailPage({
 
           <TabsContent value="specifications">
             <Card className="border-amber-100">
-              <CardContent className="p-6">
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Technical Specifications */}
                   <div>
@@ -1121,7 +1264,7 @@ export default function ProductDetailPage({
 
           <TabsContent value="video">
             <Card className="border-amber-100">
-              <CardContent className="p-6">
+              <CardContent>
                 {product.videoUrl ? (
                   <div className="space-y-6">
                     <div className="aspect-video bg-black rounded-lg overflow-hidden">
@@ -1194,7 +1337,7 @@ export default function ProductDetailPage({
 
           <TabsContent value="warranty">
             <Card className="border-amber-100">
-              <CardContent className="p-6">
+              <CardContent>
                 <div className="space-y-6">
                   {/* Header Banner */}
                   <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800">
@@ -1420,7 +1563,7 @@ export default function ProductDetailPage({
 
       {/* Related Products */}
       <div>
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-6 sm:space-y-0">
           <div>
             <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white">
               Related Lighting Products
@@ -1429,6 +1572,7 @@ export default function ProductDetailPage({
               Complete your lighting setup with these recommended products
             </p>
           </div>
+
           <Button
             asChild
             variant="outline"
@@ -1532,7 +1676,7 @@ export default function ProductDetailPage({
 
       {/* Store CTA */}
       <Card className="mt-12 bg-gradient-to-r from-amber-600 to-yellow-600 text-white overflow-hidden">
-        <CardContent className="p-8 relative">
+        <CardContent className="relative">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
           <div className="relative z-10">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -1575,7 +1719,7 @@ export default function ProductDetailPage({
                 <Button
                   asChild
                   variant="outline"
-                  className="border-white text-white hover:bg-white/20"
+                  className="border-white text-black hover:bg-white/20"
                 >
                   <a href="tel:0727833691">Call Now</a>
                 </Button>

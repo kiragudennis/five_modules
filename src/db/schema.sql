@@ -98,6 +98,12 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_city ON users(city);
 
+-- Update products with new wholesale fields
+-- Add wholesale pricing columns to products table
+ALTER TABLE products ADD COLUMN wholesale_price numeric(10, 2);
+ALTER TABLE products ADD COLUMN wholesale_min_quantity integer DEFAULT 10;
+ALTER TABLE products ADD COLUMN has_wholesale boolean DEFAULT false;
+
 -- Update trigger to handle new fields
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger

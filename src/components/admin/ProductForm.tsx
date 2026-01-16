@@ -14,6 +14,8 @@ import {
   Sun,
   Shield,
   Ruler,
+  Users,
+  Package,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +40,6 @@ import { ImageUpload } from "./ImageUpload";
 import { VideoUpload } from "./VideoUpload";
 import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "sonner";
-import { getCurrencyOptions } from "@/lib/utils";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { lightingCategories, lightingTags } from "@/lib/constants";
@@ -96,6 +97,9 @@ export default function ProductForm({
       energySaving: false,
       weight: 0,
       installationType: "DIY",
+      has_wholesale: false,
+      wholesale_price: 0,
+      wholesale_min_quantity: 10,
     },
   });
 
@@ -414,6 +418,142 @@ export default function ProductForm({
                     )}
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Wholesale Pricing Card */}
+          <Card>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Wholesale Pricing
+                  </h3>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="has_wholesale"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            // Reset wholesale fields when unchecked
+                            if (!checked) {
+                              form.setValue("wholesale_price", null);
+                              form.setValue("wholesale_min_quantity", 10);
+                            }
+                          }}
+                          className="rounded border-gray-300 text-purple-600 focus:ring-2 focus:ring-purple-500"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Enable Wholesale Pricing</FormLabel>
+                        <FormDescription>
+                          Offer special prices for bulk purchases
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {form.watch("has_wholesale") && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg bg-purple-50 dark:bg-purple-900/10">
+                    <FormField
+                      control={form.control}
+                      name="wholesale_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Wholesale Price (KES) *</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2.5 text-muted-foreground">
+                                <Package size={16} />
+                              </span>
+                              <Input
+                                className="pl-10"
+                                placeholder="1999"
+                                {...field}
+                                type="number"
+                                value={field.value || ""}
+                                onChange={(e) => {
+                                  const value =
+                                    e.target.value === ""
+                                      ? null
+                                      : Number(e.target.value);
+                                  field.onChange(value);
+                                }}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>
+                            Price per unit for wholesale orders
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="wholesale_min_quantity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Minimum Quantity *</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-2.5 text-muted-foreground">
+                                <Users size={16} />
+                              </span>
+                              <Input
+                                className="pl-10"
+                                placeholder="10"
+                                {...field}
+                                type="number"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormDescription>
+                            Minimum units required for wholesale price
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="col-span-full">
+                      <div className="text-sm text-purple-700 dark:text-purple-300 p-3 bg-purple-100 dark:bg-purple-900/30 rounded-md">
+                        <p className="font-medium">
+                          Wholesale pricing summary:
+                        </p>
+                        <p>
+                          Customers who order{" "}
+                          {form.watch("wholesale_min_quantity") || 10}+ units
+                          will get each unit at KES{" "}
+                          {form.watch("wholesale_price") || 0}
+                          {form.watch("price") &&
+                          form.watch("wholesale_price") ? (
+                            <span className="ml-2">
+                              (Save{" "}
+                              {Math.round(
+                                (((form.watch("price") ?? 0) -
+                                  (form.watch("wholesale_price") ?? 0)) /
+                                  (form.watch("price") ?? 1)) *
+                                  100
+                              )}
+                              %)
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

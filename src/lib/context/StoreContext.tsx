@@ -146,9 +146,10 @@ export function useCart() {
   const { state, dispatch } = useStore();
 
   const cartItems = state.cart;
+  const totalItems = state.total;
   const clearCart = () => dispatch({ type: "CLEAR_CART" });
 
-  return { cartItems, clearCart };
+  return { cartItems, clearCart, totalItems };
 }
 
 export function buildOrderData(state: StoreState, shipping: any) {

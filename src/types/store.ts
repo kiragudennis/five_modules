@@ -25,6 +25,9 @@ export interface Product {
   rating: number;
   reviewsCount: number;
   isDealOfTheDay: boolean;
+  has_wholesale: boolean;
+  wholesale_min_quantity: number;
+  wholesale_price: number;
   created_at: string;
 }
 
@@ -233,4 +236,7 @@ export const productSchema = z.object({
     .optional()
     .default(0),
   installationType: z.string().optional().default("DIY"),
+  has_wholesale: z.boolean().default(false),
+  wholesale_price: z.number().min(0).optional(),
+  wholesale_min_quantity: z.number().min(1).optional(),
 });
