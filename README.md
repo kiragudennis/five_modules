@@ -1,4 +1,4 @@
-# WorldSamma Shop - Martial Arts E-Commerce Platform
+# Blessed Two Electronics - E-Commerce
 
 A full-featured e-commerce platform for WorldSamma martial arts academy, built with modern web technologies.
 
