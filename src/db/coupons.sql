@@ -14,6 +14,7 @@ CREATE TABLE coupons (
     applicable_categories text[] DEFAULT '{}',
     excluded_products text[] DEFAULT '{}',
     single_use_per_customer boolean DEFAULT false,
+    description text,
     created_at timestamptz DEFAULT now()
 );
 
@@ -209,3 +210,54 @@ BEGIN
 END;
 $$;
 
+CREATE POLICY "Admin full access to coupons"
+ON coupons
+FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM users
+    WHERE users.id = auth.uid()
+      AND users.role IN ('admin', 'superadmin')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM users
+    WHERE users.id = auth.uid()
+      AND users.role IN ('admin', 'superadmin')
+  )
+);
+
+CREATE POLICY "Public can view active coupons"
+ON coupons
+FOR SELECT
+TO anon, authenticated
+USING (
+  is_active = true
+  AND valid_from <= now()
+  AND (valid_until IS NULL OR valid_until >= now())
+);
+
+CREATE POLICY "Admin full access to coupon redemptions"
+ON coupon_redemptions
+FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM users
+    WHERE users.id = auth.uid()
+      AND users.role IN ('admin', 'superadmin')
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM users
+    WHERE users.id = auth.uid()
+      AND users.role IN ('admin', 'superadmin')
+  )
+);

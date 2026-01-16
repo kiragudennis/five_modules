@@ -31,6 +31,7 @@ import {
   Power,
   Globe,
   Users,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useStore } from "@/lib/context/StoreContext";
@@ -179,11 +180,11 @@ export default function ProductDetailPage({
             Home
           </Link>
           <span>/</span>
-          <Link href="/products" className="hover:text-foreground">
+          <Link href="/products" className="hover:text-foreground truncate">
             Lighting Products
           </Link>
           <span>/</span>
-          <span className="font-medium">
+          <span className="font-medium truncate">
             {categoryDetails?.name || product.category}
           </span>
           <span>/</span>
@@ -193,7 +194,7 @@ export default function ProductDetailPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 mb-12">
         {/* Product Images & Gallery */}
         <div className="lg:col-span-2">
           <Card className="border-amber-100 dark:border-amber-800/30">
@@ -203,9 +204,8 @@ export default function ProductDetailPage({
                   {/* Deal of the Day Banner */}
                   {product.dealOfTheDay && (
                     <div className="mb-4">
-                      <div className="bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 text-white p-3 rounded-lg flex items-center justify-between animate-pulse">
+                      <div className="flex flex-col sm:flex-row bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 text-white p-3 rounded-lg flex items-center justify-between animate-pulse">
                         <div className="flex items-center gap-2">
-                          <Bolt className="h-5 w-5" />
                           <span className="font-bold">⚡ DEAL OF THE DAY!</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -437,7 +437,7 @@ export default function ProductDetailPage({
                       <span className="font-bold">
                         {product.rating.toFixed(1)}
                       </span>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm text-muted-foreground truncate">
                         ({product.reviewsCount || 0} reviews)
                       </span>
                       <Separator orientation="vertical" className="h-4" />
@@ -493,7 +493,7 @@ export default function ProductDetailPage({
 
         {/* Product Details & Actions */}
         <div className="space-y-6">
-          <Card className="sticky top-24 border-amber-100 dark:border-amber-800/30">
+          <Card className="border-amber-100 dark:border-amber-800/30">
             <CardContent>
               {/* Product Header */}
               <div className="mb-6">
@@ -558,7 +558,7 @@ export default function ProductDetailPage({
                   </span>
 
                   {product.originalPrice && (
-                    <>
+                    <div className="flex items-center justify-between flex-wrap w-full">
                       <span className="text-lg text-gray-500 line-through">
                         {formatCurrency(
                           product.originalPrice,
@@ -568,7 +568,7 @@ export default function ProductDetailPage({
                       <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
                         Save {discountPercentage}%
                       </Badge>
-                    </>
+                    </div>
                   )}
                 </div>
 
@@ -767,7 +767,7 @@ export default function ProductDetailPage({
 
           {/* Quick Specs Card */}
           <Card className="border-amber-100">
-            <CardContent className="p-6">
+            <CardContent>
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <Zap className="h-5 w-5 text-amber-600" />
                 Quick Specifications
@@ -861,69 +861,13 @@ export default function ProductDetailPage({
               )}
             </CardContent>
           </Card>
-
-          {/* Store Benefits Card */}
-          <Card className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border-amber-200">
-            <CardContent className="p-6">
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <Award className="h-5 w-5 text-amber-600" />
-                Why Shop With Blessed Two?
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">
-                    Nairobi&apos;s Largest Lighting Selection
-                  </span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Same-Day Delivery in Nairobi</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">
-                    {product.warrantyMonths || 24}-Month Warranty
-                  </span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">
-                    Free Expert Installation Available
-                  </span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">24/7 Customer Support</span>
-                </div>
-              </div>
-
-              <Separator className="my-4 border-amber-200" />
-
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Visit our store in Duruma Road, Nairobi
-                </p>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full border-amber-300 text-amber-600 hover:bg-amber-50"
-                >
-                  <a href="tel:0727833691">
-                    <Phone className="h-4 w-4 mr-2" />
-                    Call: 0727 833 691
-                  </a>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
       {/* Product Details Tabs */}
       <div className="mb-12">
         <Tabs defaultValue="description" className="w-full">
-          <TabsList className="grid grid-cols-4 mb-6 bg-amber-50 dark:bg-amber-950/20">
+          <TabsList className="flex flex-wrap gap-4 mb-6 bg-amber-50 dark:bg-amber-950/20">
             <TabsTrigger value="description">Description</TabsTrigger>
             <TabsTrigger value="specifications">Specifications</TabsTrigger>
             <TabsTrigger value="video">Video Demo</TabsTrigger>
@@ -1252,14 +1196,15 @@ export default function ProductDetailPage({
             <Card className="border-amber-100">
               <CardContent className="p-6">
                 <div className="space-y-6">
-                  <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg">
-                    <ShieldCheck className="h-8 w-8 text-green-600 flex-shrink-0" />
+                  {/* Header Banner */}
+                  <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <ShieldCheck className="h-8 w-8 text-green-600 dark:text-green-400 flex-shrink-0" />
                     <div>
-                      <h4 className="font-bold text-lg mb-2">
+                      <h4 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">
                         {product.warrantyMonths || 24}-Month Comprehensive
                         Warranty
                       </h4>
-                      <p className="text-gray-700">
+                      <p className="text-gray-700 dark:text-gray-300">
                         All Blessed Two Electronics products come with a
                         comprehensive {product.warrantyMonths || 24}-month
                         warranty covering manufacturing defects and premature
@@ -1268,9 +1213,13 @@ export default function ProductDetailPage({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Coverage & Services Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Warranty Coverage */}
                     <div className="space-y-4">
-                      <h5 className="font-medium text-lg">Warranty Coverage</h5>
+                      <h5 className="font-medium text-lg text-gray-900 dark:text-white">
+                        Warranty Coverage
+                      </h5>
                       <ul className="space-y-3">
                         {[
                           "Manufacturing defects in materials and workmanship",
@@ -1281,71 +1230,184 @@ export default function ProductDetailPage({
                         ].map((coverage, idx) => (
                           <li
                             key={idx}
-                            className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg"
+                            className="flex items-start gap-3 p-3 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-800"
                           >
-                            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                            <span>{coverage}</span>
+                            <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {coverage}
+                            </span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
+                    {/* Support Services */}
                     <div className="space-y-4">
-                      <h5 className="font-medium text-lg">Support Services</h5>
+                      <h5 className="font-medium text-lg text-gray-900 dark:text-white">
+                        Support Services
+                      </h5>
                       <ul className="space-y-3">
                         {[
                           {
                             icon: Phone,
                             text: "24/7 technical support hotline",
+                            border: "border-blue-100 dark:border-blue-800",
                           },
                           {
                             icon: Users,
                             text: "Free installation consultation",
+                            border: "border-purple-100 dark:border-purple-800",
                           },
                           {
                             icon: Truck,
                             text: "On-site repair service in Nairobi",
+                            border: "border-cyan-100 dark:border-cyan-800",
                           },
                           {
                             icon: Mail,
                             text: "Email support with 4-hour response",
+                            border: "border-indigo-100 dark:border-indigo-800",
                           },
                           {
                             icon: Globe,
                             text: "Online troubleshooting guides",
+                            border: "border-teal-100 dark:border-teal-800",
                           },
                         ].map((service, idx) => (
                           <li
                             key={idx}
-                            className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg"
+                            className={`flex items-start gap-3 p-3 rounded-lg border ${service.border}`}
                           >
-                            <service.icon className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                            <span>{service.text}</span>
+                            <service.icon
+                              className={`h-5 w-5 flex-shrink-0 mt-0.5`}
+                            />
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {service.text}
+                            </span>
                           </li>
                         ))}
                       </ul>
                     </div>
                   </div>
 
+                  {/* Quick Support Section */}
                   <div className="bg-gradient-to-r from-amber-600 to-yellow-600 text-white rounded-lg p-6">
                     <h5 className="font-bold text-lg mb-3">
                       Need Immediate Assistance?
                     </h5>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div className="text-center">
-                        <Phone className="h-6 w-6 mx-auto mb-2" />
-                        <p className="font-bold">0727 833 691</p>
-                        <p className="text-sm opacity-90">Call Now</p>
+                        <div className="w-12 h-12 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center">
+                          <Phone className="h-6 w-6" />
+                        </div>
+                        <p className="font-bold text-lg">0727 833 691</p>
+                        <p className="text-sm opacity-90 mt-1">Call Now</p>
+                        <Button
+                          asChild
+                          size="sm"
+                          className="mt-2 bg-white text-amber-700 hover:bg-white/90"
+                        >
+                          <a href="tel:0727833691">Dial Now</a>
+                        </Button>
                       </div>
                       <div className="text-center">
-                        <Mail className="h-6 w-6 mx-auto mb-2" />
-                        <p className="font-bold">support@blessedtwo.co.ke</p>
-                        <p className="text-sm opacity-90">Email Support</p>
+                        <div className="w-12 h-12 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center">
+                          <Mail className="h-6 w-6" />
+                        </div>
+                        <p className="font-bold text-lg">support@</p>
+                        <p className="text-sm opacity-90 mt-1">Email Support</p>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 border-white text-white hover:bg-white/20"
+                        >
+                          <a href="mailto:support@blessedtwo.co.ke">
+                            Email Now
+                          </a>
+                        </Button>
                       </div>
                       <div className="text-center">
-                        <MapPin className="h-6 w-6 mx-auto mb-2" />
-                        <p className="font-bold">Duruma Road, Nairobi</p>
-                        <p className="text-sm opacity-90">Visit Store</p>
+                        <div className="w-12 h-12 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center">
+                          <MapPin className="h-6 w-6" />
+                        </div>
+                        <p className="font-bold text-lg">Duruma Road</p>
+                        <p className="text-sm opacity-90 mt-1">Visit Store</p>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 border-white text-white hover:bg-white/20"
+                        >
+                          <a
+                            href="https://maps.google.com/?q=Duruma+Road+Nairobi"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Get Directions
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Store Benefits Section */}
+                  <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
+                      <Award className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      Why Shop With Blessed Two?
+                    </h3>
+                    <div className="space-y-3">
+                      {[
+                        "Nairobi's Largest Lighting Selection",
+                        "Same-Day Delivery in Nairobi",
+                        `${product.warrantyMonths || 24}-Month Warranty`,
+                        "Free Expert Installation Available",
+                        "24/7 Customer Support",
+                        "Energy Saving Solutions",
+                        "Professional Consultation",
+                        "Bulk Order Discounts",
+                      ].map((benefit, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {benefit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Separator className="my-4 border-amber-200 dark:border-amber-800" />
+
+                    <div className="text-center">
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        Visit our store in Duruma Road, Nairobi
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                        <Button
+                          asChild
+                          variant="outline"
+                          className="border-amber-300 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        >
+                          <a href="tel:0727833691">
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call: 0727 833 691
+                          </a>
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          className="border-amber-300 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        >
+                          <a
+                            href="https://wa.me/254727833691"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <MessageCircle className="h-4 w-4 mr-2" />
+                            WhatsApp
+                          </a>
+                        </Button>
                       </div>
                     </div>
                   </div>

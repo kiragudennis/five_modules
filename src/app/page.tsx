@@ -16,12 +16,8 @@ import {
   Quote,
   Headphones,
   CreditCard,
-  Sun,
   Lightbulb,
-  Zap,
-  BatteryCharging,
   Home as HomeIcon,
-  Shield,
   Award,
   Clock,
   MapPin,
@@ -29,8 +25,6 @@ import {
   Mail,
   Sparkles,
   Bolt,
-  Moon,
-  ThermometerSun,
   CheckCircle,
   Badge,
 } from "lucide-react";
@@ -383,7 +377,7 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
           once
           className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 p-1 shadow-2xl"
         >
-          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 sm:p-8">
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-4 sm:p-8">
             <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-4">
@@ -408,7 +402,7 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
                   {formattedCoupons.slice(0, 2).map((coupon, index) => (
                     <div
                       key={coupon.id}
-                      className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 p-5 rounded-xl border border-amber-200 dark:border-amber-800/30 hover:shadow-lg transition-shadow duration-300"
+                      className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-800/30 sm:p-5 p-2 rounded-xl border border-amber-200 dark:border-amber-800/30 hover:shadow-lg transition-shadow duration-300"
                     >
                       {/* Limited Stock Badge */}
                       {coupon.usageLeft && coupon.usageLeft <= 10 && (
@@ -428,7 +422,7 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
                             {coupon.description || coupon.displayDiscount}
                           </p>
                         </div>
-                        <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-4 py-2 rounded-lg">
+                        <div className="bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold px-2 sm:px-4 py-2 rounded-lg">
                           {coupon.displayDiscount}
                         </div>
                       </div>
@@ -452,9 +446,10 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
                               {coupon.daysLeft} days left
                             </span>
                           </div>
-                          <div className="text-gray-500">
-                            Min: {coupon.displayMinAmount}
-                          </div>
+                          <CopyCouponBar
+                            code={coupon.code}
+                            minAmount={coupon.displayMinAmount}
+                          />
                         </div>
                       </div>
                     </div>
@@ -505,7 +500,7 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
                   size="lg"
                   className="w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white font-bold py-6 text-lg shadow-lg hover:shadow-2xl hover:scale-105 transition-all duration-300"
                 >
-                  <Link href="/signup">
+                  <Link href="/login">
                     <Users className="h-5 w-5 mr-2" />
                     Join Now & Save More!
                   </Link>
