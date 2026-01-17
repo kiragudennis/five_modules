@@ -9,6 +9,7 @@ import {
   Package,
   TrendingUp,
   Eye,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -17,15 +18,20 @@ import { format } from "date-fns";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
-    totalSales: 0,
+    totalSales: 0, // Actual sales from completed orders
+    totalRevenue: 0, // All order amounts
+    todaySales: 0,
     totalOrders: 0,
+    todayOrders: 0,
+    paidOrders: 0,
+    completedOrders: 0,
+    pendingOrders: 0,
     totalCustomers: 0,
     totalProducts: 0,
     pageViews: 0,
-    conversionRate: 0,
-    paidOrders: 0,
-    pendingOrders: 0,
+    avgOrderValue: 0,
   });
+
   const { supabase } = useAuth();
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
 
@@ -55,7 +61,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Total Sales (Actual completed sales) */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
@@ -65,6 +73,9 @@ export default function AdminDashboard() {
               <h3 className="text-2xl font-bold mt-1">
                 KES{stats.totalSales.toLocaleString()}
               </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Completed orders only
+              </p>
             </div>
             <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
               <DollarSign className="h-6 w-6 text-primary" />
@@ -72,20 +83,84 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Total Revenue (All orders) */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">
-                Total Orders
+                Total Revenue
               </p>
-              <h3 className="text-2xl font-bold mt-1">{stats.totalOrders}</h3>
+              <h3 className="text-2xl font-bold mt-1">
+                KES{stats.totalRevenue.toLocaleString()}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">All orders</p>
             </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <ShoppingBag className="h-6 w-6 text-primary" />
+            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+              <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
 
+        {/* Today's Sales */}
+        <div className="bg-background rounded-lg shadow-sm p-6 border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Today's Sales
+              </p>
+              <h3 className="text-2xl font-bold mt-1">
+                KES{stats.todaySales.toLocaleString()}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.todayOrders} orders
+              </p>
+            </div>
+            <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Calendar className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Order Status Summary */}
+        <div className="bg-background rounded-lg shadow-sm p-6 border">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Completed:</span>
+              <span className="font-medium">{stats.completedOrders}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Paid:</span>
+              <span className="font-medium">{stats.paidOrders}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Pending:</span>
+              <span className="font-medium">{stats.pendingOrders}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2">
+              <span className="text-sm font-medium">Total Orders:</span>
+              <span className="font-bold">{stats.totalOrders}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Average Order Value */}
+        <div className="bg-background rounded-lg shadow-sm p-6 border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Avg Order Value
+              </p>
+              <h3 className="text-2xl font-bold mt-1">
+                KES{stats.avgOrderValue.toLocaleString()}
+              </h3>
+            </div>
+            <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
+              <Package className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Customers */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
@@ -98,50 +173,6 @@ export default function AdminDashboard() {
             </div>
             <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
               <Users className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-background rounded-lg shadow-sm p-6 border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Total Products
-              </p>
-              <h3 className="text-2xl font-bold mt-1">{stats.totalProducts}</h3>
-            </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <Package className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-background rounded-lg shadow-sm p-6 border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Page Views
-              </p>
-              <h3 className="text-2xl font-bold mt-1">{stats.pageViews}</h3>
-            </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <Eye className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-background rounded-lg shadow-sm p-6 border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Conversion Rate
-              </p>
-              <h3 className="text-2xl font-bold mt-1">
-                {stats.conversionRate}%
-              </h3>
-            </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-primary" />
             </div>
           </div>
         </div>
@@ -226,12 +257,12 @@ export default function AdminDashboard() {
                             order.status === "delivered"
                               ? "bg-green-100 text-green-800"
                               : order.status === "shipped"
-                              ? "bg-blue-100 text-blue-800"
-                              : order.status === "paid"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : order.status === "pending"
-                              ? "bg-gray-100 text-gray-800"
-                              : "bg-red-100 text-red-800"
+                                ? "bg-blue-100 text-blue-800"
+                                : order.status === "paid"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : order.status === "pending"
+                                    ? "bg-gray-100 text-gray-800"
+                                    : "bg-red-100 text-red-800"
                           }`}
                         >
                           {order.status}

@@ -56,6 +56,7 @@ export interface ApiResponse {
   coupons: Coupon[];
 }
 
+// Add this to your types file
 export interface TrackingOrder {
   id: string;
   order_number: string;
@@ -65,17 +66,38 @@ export interface TrackingOrder {
     phone: string;
   };
   shipping_address: {
+    address: string;
     city: string;
-    state: string;
+    county: string;
+    postal_code?: string;
     country: string;
   };
   total: number;
-  status: "pending" | "paid" | "shipped" | "delivered" | "cancelled";
+  currency: string;
+  status:
+    | "pending"
+    | "processing"
+    | "shipped"
+    | "delivered"
+    | "cancelled"
+    | "completed";
+  payment_status:
+    | "pending"
+    | "processing"
+    | "completed"
+    | "failed"
+    | "refunded";
+  payment_method: string;
   tracking_number: string | null;
   estimated_delivery: string | null;
   shipping_method: string;
+  shipping_cost: number;
   created_at: string;
   items_count: number;
+  items_quantity: number;
+  wholesale_applied: boolean;
+  installation_required: boolean;
+  coupon_applied: boolean;
 }
 
 export interface ProductFormData {
@@ -249,11 +271,14 @@ export const productSchema = z.object({
   bestSeller: z.boolean().optional().default(false),
   energySaving: z.boolean().optional().default(false),
   weight: z
-    .preprocess((val) => {
-      if (val === "" || val === null) return undefined;
-      const num = Number(val);
-      return isNaN(num) ? undefined : Number(num.toFixed(2));
-    }, z.number().min(0, "Weight must be a non-negative number."))
+    .preprocess(
+      (val) => {
+        if (val === "" || val === null) return undefined;
+        const num = Number(val);
+        return isNaN(num) ? undefined : Number(num.toFixed(2));
+      },
+      z.number().min(0, "Weight must be a non-negative number.")
+    )
     .optional()
     .default(0),
   installationType: z.string().optional().default("DIY"),

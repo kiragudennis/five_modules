@@ -79,7 +79,7 @@ CREATE TABLE orders (
     
     -- Check constraints (Matches pendingOrder calculation)
     CONSTRAINT valid_total CHECK (
-        total_amount = subtotal - wholesale_savings - coupon_discount + shipping_total + installation_cost
+    total_amount = ((subtotal - coupon_discount) + shipping_total + installation_cost)
     )
 );
 

@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
             <div class="footer">
               <p>Blessed Two Electronics<br>
               Duruma Road, Nairobi<br>
-              Phone: 0700 000 000<br>
+              Phone: +254 727 833691<br>
               Email: info@blessedtwo.com</p>
               <p>This is an automated message, please do not reply to this email.</p>
             </div>
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     // Send email via Resend
     const { data, error } = await resend.emails.send({
-      from: "Blessed Two Electronics <orders@blessedtwo.com>",
+      from: "Blessed Two Electronics <orders@noreply.worldsamma.org>",
       to: [customerEmail],
       subject: subject,
       html: html,

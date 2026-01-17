@@ -42,37 +42,90 @@ const timePeriods = [
 export default function AnalyticsPage() {
   const { supabase } = useAuth();
   const [timePeriod, setTimePeriod] = useState("30d");
-
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [salesData, setSalesData] = useState<any[]>([]);
   const [visitsData, setVisitsData] = useState<any[]>([]);
   const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalSales: 0,
+    totalSales: 0, // Actual sales from completed orders
+    totalRevenue: 0, // All order amounts
     totalOrders: 0,
+    completedOrders: 0,
     totalCustomers: 0,
     totalProducts: 0,
     pageViews: 0,
     conversionRate: 0,
+    avgOrderValue: 0,
   });
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+      setIsLoading(true);
+
       const { data, error } = await supabase.rpc("get_analytics", {
-        time_period: "30d",
+        time_period: timePeriod === "all" ? "all" : timePeriod,
       });
 
       if (error) {
         toast.error(error.message);
+        setIsLoading(false);
       } else {
-        setSalesData(data.salesData);
-        setVisitsData(data.visitsData);
-        setCategoryData(data.categoryData);
-        setStats(data.stats);
+        setSalesData(data.salesData || []);
+        setVisitsData(data.visitsData || []);
+        setCategoryData(data.categoryData || []);
+        setTopProducts(data.topProducts || []);
+        setRecentActivity(data.recentActivity || []);
+
+        // Update to handle new stats structure
+        setStats(
+          data.stats || {
+            totalSales: 0,
+            totalRevenue: 0,
+            totalOrders: 0,
+            completedOrders: 0,
+            totalCustomers: 0,
+            totalProducts: 0,
+            pageViews: 0,
+            conversionRate: 0,
+            avgOrderValue: 0,
+          }
+        );
+        setIsLoading(false);
       }
     };
 
     fetchAnalytics();
-  }, [supabase]);
+  }, [supabase, timePeriod]);
+
+  // In render
+  if (isLoading) {
+    return (
+      <div className="px-2 pt-4">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  const ActivityIcon = ({ type }: { type: string }) => {
+    switch (type) {
+      case "ShoppingBag":
+        return <ShoppingBag className="h-4 w-4" />;
+      case "Users":
+        return <Users className="h-4 w-4" />;
+      case "TrendingUp":
+        return <TrendingUp className="h-4 w-4" />;
+      case "DollarSign":
+        return <DollarSign className="h-4 w-4" />;
+      case "Eye":
+        return <Eye className="h-4 w-4" />;
+      default:
+        return <Eye className="h-4 w-4" />;
+    }
+  };
 
   return (
     <div className="px-2 pt-4">
@@ -95,7 +148,9 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Stats Cards */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Total Sales (Completed Orders) */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
@@ -105,6 +160,9 @@ export default function AnalyticsPage() {
               <h3 className="text-2xl font-bold mt-1">
                 KES{stats.totalSales.toLocaleString()}
               </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.completedOrders} completed orders
+              </p>
             </div>
             <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
               <DollarSign className="h-6 w-6 text-primary" />
@@ -112,36 +170,76 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Total Revenue (All Orders) */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">
-                Total Orders
-              </p>
-              <h3 className="text-2xl font-bold mt-1">{stats.totalOrders}</h3>
-            </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <ShoppingBag className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-background rounded-lg shadow-sm p-6 border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Total Customers
+                Total Revenue
               </p>
               <h3 className="text-2xl font-bold mt-1">
-                {stats.totalCustomers}
+                KES{stats.totalRevenue.toLocaleString()}
               </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.totalOrders} total orders
+              </p>
             </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <Users className="h-6 w-6 text-primary" />
+            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
+              <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
 
+        {/* Average Order Value */}
+        <div className="bg-background rounded-lg shadow-sm p-6 border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Avg Order Value
+              </p>
+              <h3 className="text-2xl font-bold mt-1">
+                KES{stats.avgOrderValue.toLocaleString()}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Per completed order
+              </p>
+            </div>
+            <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
+              <ShoppingBag className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Order Summary */}
+        <div className="bg-background rounded-lg shadow-sm p-6 border">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">
+                Total Orders:
+              </span>
+              <span className="font-medium">{stats.totalOrders}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">Completed:</span>
+              <span className="font-medium">{stats.completedOrders}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-muted-foreground">
+                Completion Rate:
+              </span>
+              <span className="font-medium">
+                {stats.totalOrders > 0
+                  ? Math.round(
+                      (stats.completedOrders / stats.totalOrders) * 100
+                    )
+                  : 0}
+                %
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Page Views & Conversion */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
@@ -151,29 +249,17 @@ export default function AnalyticsPage() {
               <h3 className="text-2xl font-bold mt-1">
                 {stats.pageViews.toLocaleString()}
               </h3>
-            </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <Eye className="h-6 w-6 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-background rounded-lg shadow-sm p-6 border">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">
-                Conversion Rate
+              <p className="text-xs text-muted-foreground mt-1">
+                Conversion: {stats.conversionRate}%
               </p>
-              <h3 className="text-2xl font-bold mt-1">
-                {stats.conversionRate}%
-              </h3>
             </div>
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-primary" />
+            <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Eye className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
+        {/* Time Period */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <div className="flex items-center justify-between">
             <div>
@@ -183,6 +269,9 @@ export default function AnalyticsPage() {
               <h3 className="text-2xl font-bold mt-1">
                 {timePeriods.find((p) => p.value === timePeriod)?.label}
               </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Data filtered by period
+              </p>
             </div>
             <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
               <Calendar className="h-6 w-6 text-primary" />
@@ -193,6 +282,7 @@ export default function AnalyticsPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Sales Chart */}
         {/* Sales Chart */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <h2 className="text-xl font-semibold mb-4">Sales Overview</h2>
@@ -213,13 +303,27 @@ export default function AnalyticsPage() {
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip
-                  formatter={(value) => [`KES${value}`, "Sales"]}
+                  formatter={(value, name) => [
+                    `KES${value}`,
+                    name === "sales" ? "Actual Sales" : "Total Revenue",
+                  ]}
                   labelFormatter={(label) => `Month: ${label}`}
                 />
                 <Legend />
-                <Bar dataKey="sales" fill="#8884d8" name="Sales (KES)" />
+                <Bar dataKey="sales" fill="#8884d8" name="Actual Sales" />
+                <Bar dataKey="revenue" fill="#82ca9d" name="Total Revenue" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#8884d8]"></div>
+              <span>Actual Sales: Completed & paid orders</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#82ca9d]"></div>
+              <span>Total Revenue: All orders including pending</span>
+            </div>
           </div>
         </div>
 
@@ -291,100 +395,65 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Top Products */}
+        {/* Top Products */}
         <div className="bg-background rounded-lg shadow-sm p-6 border">
           <h2 className="text-xl font-semibold mb-4">Top Products</h2>
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Premium Karate Gi</p>
-                <p className="text-sm text-muted-foreground">42 units sold</p>
+            {topProducts.map((product: any, index: number) => (
+              <div key={index} className="flex justify-between items-center">
+                <div>
+                  <p className="font-medium">{product.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {product.units} units sold
+                  </p>
+                </div>
+                <p className="font-semibold">
+                  KES {product.revenue.toLocaleString()}
+                </p>
               </div>
-              <p className="font-semibold">KES 3,779</p>
-            </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Competition Sparring Gear Set</p>
-                <p className="text-sm text-muted-foreground">38 units sold</p>
-              </div>
-              <p className="font-semibold">KES 4,939</p>
-            </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Black Belt - Premium Cotton</p>
-                <p className="text-sm text-muted-foreground">35 units sold</p>
-              </div>
-              <p className="font-semibold">KES 1,224</p>
-            </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Training Gloves</p>
-                <p className="text-sm text-muted-foreground">30 units sold</p>
-              </div>
-              <p className="font-semibold">KES 1,499</p>
-            </div>
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">Focus Pads</p>
-                <p className="text-sm text-muted-foreground">28 units sold</p>
-              </div>
-              <p className="font-semibold">KES 839</p>
-            </div>
+            ))}
+            {topProducts.length === 0 && (
+              <p className="text-muted-foreground text-center py-4">
+                No products sold in this period
+              </p>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Recent Activity */}
-      <div className="bg-background rounded-lg shadow-sm p-6 border">
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          <div className="flex items-start">
-            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center mr-3 mt-1">
-              <ShoppingBag className="h-4 w-4 text-green-600" />
-            </div>
-            <div>
-              <p className="font-medium">New order #ORD-001 from John Doe</p>
-              <p className="text-sm text-muted-foreground">2 hours ago</p>
-            </div>
-          </div>
-          <div className="flex items-start">
-            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 mt-1">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <p className="font-medium">New customer registered: Jane Smith</p>
-              <p className="text-sm text-muted-foreground">4 hours ago</p>
-            </div>
-          </div>
-          <div className="flex items-start">
-            <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center mr-3 mt-1">
-              <TrendingUp className="h-4 w-4 text-purple-600" />
-            </div>
-            <div>
-              <p className="font-medium">
-                Order #ORD-002 status updated to "shipped"
+        <div className="bg-background rounded-lg shadow-sm p-6 border">
+          <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+          <div className="space-y-4">
+            {recentActivity.map((activity: any, index: number) => (
+              <div key={index} className="flex items-start">
+                <div
+                  className={`h-8 w-8 rounded-full ${
+                    activity.type === "order"
+                      ? "bg-green-100"
+                      : activity.type === "user"
+                        ? "bg-blue-100"
+                        : activity.type === "status"
+                          ? "bg-purple-100"
+                          : activity.type === "payment"
+                            ? "bg-yellow-100"
+                            : "bg-red-100"
+                  } flex items-center justify-center mr-3 mt-1`}
+                >
+                  {/* You'll need to import the icons */}
+                  <ActivityIcon type={activity.icon} />
+                </div>
+                <div>
+                  <p className="font-medium">{activity.description}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(activity.timestamp).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {recentActivity.length === 0 && (
+              <p className="text-muted-foreground text-center py-4">
+                No recent activity
               </p>
-              <p className="text-sm text-muted-foreground">6 hours ago</p>
-            </div>
-          </div>
-          <div className="flex items-start">
-            <div className="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center mr-3 mt-1">
-              <DollarSign className="h-4 w-4 text-yellow-600" />
-            </div>
-            <div>
-              <p className="font-medium">Payment received for order #ORD-003</p>
-              <p className="text-sm text-muted-foreground">8 hours ago</p>
-            </div>
-          </div>
-          <div className="flex items-start">
-            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center mr-3 mt-1">
-              <Eye className="h-4 w-4 text-red-600" />
-            </div>
-            <div>
-              <p className="font-medium">
-                Product "Premium Karate Gi" viewed 25 times
-              </p>
-              <p className="text-sm text-muted-foreground">12 hours ago</p>
-            </div>
+            )}
           </div>
         </div>
       </div>

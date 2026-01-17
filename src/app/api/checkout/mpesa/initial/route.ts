@@ -185,6 +185,8 @@ export async function POST(req: Request) {
       },
     };
 
+    console.log("Order data received in the backend:", orderPayload);
+
     const { data: orderData, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert(orderPayload)
@@ -243,7 +245,7 @@ export async function POST(req: Request) {
           await supabaseAdmin.rpc("apply_coupon_to_order", {
             order_uuid: orderData.id,
             coupon_code: coupon.code,
-            customer_email: customer.email,
+            customer_email_param: customer.email,
           });
 
         if (couponError) {

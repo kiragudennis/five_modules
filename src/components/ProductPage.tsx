@@ -57,6 +57,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { lightingCategories } from "@/lib/constants";
+import { useRouter } from "next/navigation";
 
 // Enhanced Product Type
 interface EnhancedProduct extends Product {
@@ -91,6 +92,9 @@ export default function ProductDetailPage({
   const [quantity, setQuantity] = useState(1);
   const [showVideo, setShowVideo] = useState(false);
   const { cartItems, totalItems } = useCart();
+  const router = useRouter();
+
+  console.log("CartItems:", cartItems, "Total Items:", totalItems);
 
   const url = typeof window !== "undefined" ? window.location.href : "";
 
@@ -447,8 +451,8 @@ export default function ProductDetailPage({
                         {product.rating >= 4.5
                           ? "Excellent"
                           : product.rating >= 4
-                          ? "Great"
-                          : "Good"}
+                            ? "Great"
+                            : "Good"}
                       </Badge>
                     </div>
                   )}
@@ -651,8 +655,8 @@ export default function ProductDetailPage({
                     product.stock > 10
                       ? "bg-green-100 text-green-800"
                       : product.stock > 0
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-red-100 text-red-800"
                   )}
                 >
                   <div
@@ -661,15 +665,15 @@ export default function ProductDetailPage({
                       product.stock > 10
                         ? "bg-green-500"
                         : product.stock > 0
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
+                          ? "bg-yellow-500"
+                          : "bg-red-500"
                     )}
                   />
                   {product.stock > 10
                     ? `In Stock (${product.stock} units)`
                     : product.stock > 0
-                    ? `Low Stock (Only ${product.stock} left)`
-                    : "Out of Stock"}
+                      ? `Low Stock (Only ${product.stock} left)`
+                      : "Out of Stock"}
                 </div>
               </div>
 
@@ -716,8 +720,8 @@ export default function ProductDetailPage({
                       {product.installationType === "Professional Required"
                         ? "Expert installation available"
                         : product.installationType === "Plug & Play"
-                        ? "Easy plug and play setup"
-                        : "Easy do-it-yourself installation"}
+                          ? "Easy plug and play setup"
+                          : "Easy do-it-yourself installation"}
                     </p>
                   </div>
                 </div>
@@ -868,7 +872,7 @@ export default function ProductDetailPage({
                     } else if (totalItems === 0) {
                       toast.error("Please add items to cart");
                     } else {
-                      window.location.href = "/checkout";
+                      router.push("/checkout");
                     }
                   }}
                   className="w-full h-12 text-lg border-amber-300 text-amber-600 hover:bg-amber-50"

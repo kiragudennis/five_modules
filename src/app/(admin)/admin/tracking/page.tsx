@@ -15,6 +15,15 @@ import {
   Copy,
   Eye,
   Tag,
+  Filter,
+  RefreshCw,
+  DollarSign,
+  Percent,
+  Wrench,
+  Calendar,
+  MapPin,
+  Phone,
+  ShoppingBag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,12 +58,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { TrackingOrder } from "@/types/store";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminTrackingPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("pending-shipping");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [shippingFilter, setShippingFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
   const [isTrackingBulkOpen, setIsTrackingBulkOpen] = useState(false);
@@ -63,11 +75,12 @@ export default function AdminTrackingPage() {
   const { supabase } = useAuth();
   const [orders, setOrders] = useState<TrackingOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
 
   // Bulk update state
   const [bulkTracking, setBulkTracking] = useState("");
   const [bulkStatus, setBulkStatus] = useState("shipped");
-  const [bulkShippingMethod, setBulkShippingMethod] = useState("Standard");
+  const [bulkShippingMethod, setBulkShippingMethod] = useState("standard");
   const [bulkEstimatedDelivery, setBulkEstimatedDelivery] = useState(
     format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "yyyy-MM-dd") // 3 days from now
   );
@@ -80,13 +93,13 @@ export default function AdminTrackingPage() {
     `
 Hi {customer_name},
 
-Great news! Your order #{order_id} has been shipped.
+Great news! Your order {order_number} has been shipped.
 
 Tracking Number: {tracking_number}
 Shipping Method: {shipping_method}
 Estimated Delivery: {estimated_delivery}
 
-You can track your shipment here: https://tracking.example.com/{tracking_number}
+You can track your shipment here: {tracking_url}
 
 Thank you for shopping with Blessed Two Electronics!
 
@@ -96,47 +109,79 @@ The Blessed Two Team
   );
 
   // Fetch orders
-  useEffect(() => {
-    fetchTrackingOrders();
-  }, []);
-
   const fetchTrackingOrders = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc("get_tracking_orders");
 
-      if (error) throw error;
-      setOrders(data || []);
+      const res = await fetch("/api/orders/tracking");
+
+      const body = await res.json();
+
+      if (!res.ok) {
+        throw new Error(body?.message || "Failed to fetch orders");
+      }
+
+      setOrders(body || []);
+      toast.success("Orders refreshed");
     } catch (error: any) {
       console.error("Error fetching orders:", error);
-      toast.error("Failed to load orders");
+      toast.error(error.message || "Failed to load orders");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchTrackingOrders();
+  }, []);
+
   // Filter orders
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
-      order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.order_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (order.tracking_number &&
         order.tracking_number
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())) ||
+      (order.shipping_address.city &&
+        order.shipping_address.city
           .toLowerCase()
           .includes(searchQuery.toLowerCase()));
 
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "pending-shipping" &&
-        (order.status === "paid" || order.status === "pending")) ||
+      (statusFilter === "pending" && order.status === "pending") ||
+      (statusFilter === "processing" && order.status === "processing") ||
       (statusFilter === "shipped" && order.status === "shipped") ||
       (statusFilter === "delivered" && order.status === "delivered") ||
-      (statusFilter === "needs-tracking" &&
-        order.status === "shipped" &&
-        !order.tracking_number);
+      (statusFilter === "completed" && order.status === "completed") ||
+      (statusFilter === "cancelled" && order.status === "cancelled");
 
-    return matchesSearch && matchesStatus;
+    const matchesPayment =
+      paymentFilter === "all" || order.payment_status === paymentFilter;
+
+    const matchesShipping =
+      shippingFilter === "all" || order.shipping_method === shippingFilter;
+
+    const matchesTab =
+      activeTab === "all" ||
+      (activeTab === "needs-shipping" &&
+        order.status === "processing" &&
+        !order.tracking_number) ||
+      (activeTab === "shipped" && order.status === "shipped") ||
+      (activeTab === "delivered" && order.status === "delivered") ||
+      (activeTab === "with-installation" && order.installation_required);
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPayment &&
+      matchesShipping &&
+      matchesTab
+    );
   });
 
   // Pagination
@@ -171,8 +216,13 @@ The Blessed Two Team
       return;
     }
 
+    if (!bulkTracking) {
+      toast.error("Please enter a tracking number");
+      return;
+    }
+
     try {
-      const { error } = await supabase.rpc("bulk_update_tracking", {
+      const { data, error } = await supabase.rpc("bulk_update_tracking", {
         order_ids: selectedOrders,
         tracking_number: bulkTracking,
         status: bulkStatus,
@@ -185,6 +235,7 @@ The Blessed Two Team
       toast.success(`Updated ${selectedOrders.length} orders`);
       setIsTrackingBulkOpen(false);
       setSelectedOrders([]);
+      setBulkTracking("");
       fetchTrackingOrders();
     } catch (error: any) {
       console.error("Error bulk updating:", error);
@@ -200,7 +251,7 @@ The Blessed Two Team
     }
 
     try {
-      const { error } = await supabase.rpc("bulk_update_order_status", {
+      const { data, error } = await supabase.rpc("bulk_update_order_status", {
         order_ids: selectedOrders,
         new_status: bulkStatus,
       });
@@ -239,6 +290,12 @@ The Blessed Two Team
 
       const data = await response.json();
 
+      // Update notification sent status
+      await supabase.rpc("update_notification_sent", {
+        order_ids: selectedOrders,
+        notification_type: "shipping_update",
+      });
+
       toast.success(`Sent ${data.sent} email notifications`);
       setIsEmailBulkOpen(false);
       setSelectedOrders([]);
@@ -271,6 +328,8 @@ The Blessed Two Team
     if (trackingNumbers) {
       navigator.clipboard.writeText(trackingNumbers);
       toast.success("Copied tracking numbers to clipboard");
+    } else {
+      toast.error("No tracking numbers to copy");
     }
   };
 
@@ -278,14 +337,28 @@ The Blessed Two Team
   const downloadTrackingCSV = () => {
     const selected = orders.filter((o) => selectedOrders.includes(o.id));
     const headers = [
-      "Order ID",
+      "Order Number",
       "Customer Name",
       "Email",
       "Phone",
-      "Tracking Number",
+      "Total",
+      "Currency",
       "Status",
+      "Payment Status",
+      "Payment Method",
+      "Tracking Number",
       "Shipping Method",
+      "Shipping Cost",
       "Estimated Delivery",
+      "City",
+      "County",
+      "Country",
+      "Items Count",
+      "Items Quantity",
+      "Wholesale Applied",
+      "Installation Required",
+      "Coupon Applied",
+      "Order Date",
     ];
 
     const csvContent = [
@@ -296,10 +369,24 @@ The Blessed Two Team
           `"${order.customer.name}"`,
           order.customer.email,
           order.customer.phone,
-          order.tracking_number || "",
+          order.total,
+          order.currency,
           order.status,
+          order.payment_status,
+          order.payment_method,
+          order.tracking_number || "",
           order.shipping_method,
+          order.shipping_cost,
           order.estimated_delivery || "",
+          order.shipping_address.city,
+          order.shipping_address.county,
+          order.shipping_address.country,
+          order.items_count,
+          order.items_quantity,
+          order.wholesale_applied ? "Yes" : "No",
+          order.installation_required ? "Yes" : "No",
+          order.coupon_applied ? "Yes" : "No",
+          format(new Date(order.created_at), "yyyy-MM-dd HH:mm:ss"),
         ].join(",")
       ),
     ].join("\n");
@@ -314,45 +401,121 @@ The Blessed Two Team
   };
 
   // Status badge
-  const getStatusBadge = (status: string, tracking?: string | null) => {
+  const getStatusBadge = (order: TrackingOrder) => {
     const badges = {
       pending: { className: "bg-yellow-100 text-yellow-800", label: "Pending" },
-      paid: { className: "bg-blue-100 text-blue-800", label: "Paid" },
+      processing: {
+        className: "bg-blue-100 text-blue-800",
+        label: "Processing",
+      },
       shipped: {
         className: "bg-purple-100 text-purple-800",
-        label: tracking ? "Shipped" : "Needs Tracking",
+        label: order.tracking_number ? "Shipped" : "Needs Tracking",
       },
       delivered: {
         className: "bg-green-100 text-green-800",
         label: "Delivered",
       },
+      completed: {
+        className: "bg-green-100 text-green-800",
+        label: "Completed",
+      },
       cancelled: { className: "bg-red-100 text-red-800", label: "Cancelled" },
     };
 
-    const badge = badges[status as keyof typeof badges] || badges.pending;
+    const badge = badges[order.status as keyof typeof badges] || badges.pending;
     return <Badge className={badge.className}>{badge.label}</Badge>;
+  };
+
+  // Payment status badge
+  const getPaymentBadge = (status: string) => {
+    const badges = {
+      pending: { className: "bg-yellow-100 text-yellow-800", label: "Pending" },
+      processing: {
+        className: "bg-blue-100 text-blue-800",
+        label: "Processing",
+      },
+      completed: { className: "bg-green-100 text-green-800", label: "Paid" },
+      failed: { className: "bg-red-100 text-red-800", label: "Failed" },
+      refunded: { className: "bg-gray-100 text-gray-800", label: "Refunded" },
+    };
+
+    const badge = badges[status as keyof typeof badges] || badges.pending;
+    return (
+      <Badge className={`text-xs ${badge.className}`}>{badge.label}</Badge>
+    );
+  };
+
+  // Calculate statistics
+  const stats = {
+    total: orders.length,
+    processing: orders.filter((o) => o.status === "processing").length,
+    shipped: orders.filter((o) => o.status === "shipped").length,
+    delivered: orders.filter((o) => o.status === "delivered").length,
+    needsTracking: orders.filter(
+      (o) => o.status === "processing" && !o.tracking_number
+    ).length,
+    completed: orders.filter((o) => o.status === "completed").length,
+    withInstallation: orders.filter((o) => o.installation_required).length,
+    wholesaleOrders: orders.filter((o) => o.wholesale_applied).length,
+    totalRevenue: orders.reduce((sum, order) => sum + order.total, 0),
   };
 
   return (
     <div className="py-6 px-2">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-4">
         <div>
-          <h1 className="text-3xl font-bold">Shipping & Tracking</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-white mt-2">
+            Shipping & Tracking
+          </h1>
+          <p className="text-gray-600 dark:text-gray-300 mt-2">
             Manage order shipments, tracking numbers, and customer notifications
           </p>
         </div>
+        <Button onClick={fetchTrackingOrders} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh Orders
+        </Button>
       </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        {/* Container with horizontal scroll */}
+        <div className="relative mb-6">
+          <div className="overflow-x-auto pb-2 scrollbar-hide">
+            <TabsList className="inline-flex min-w-max bg-amber-50 dark:bg-amber-950/20 px-1">
+              <TabsTrigger value="all" className="whitespace-nowrap">
+                All Orders
+              </TabsTrigger>
+              <TabsTrigger value="needs-shipping" className="whitespace-nowrap">
+                Needs Shipping
+              </TabsTrigger>
+              <TabsTrigger value="shipped" className="whitespace-nowrap">
+                Shipped
+              </TabsTrigger>
+              <TabsTrigger value="delivered" className="whitespace-nowrap">
+                Delivered
+              </TabsTrigger>
+              <TabsTrigger
+                value="with-installation"
+                className="whitespace-nowrap"
+              >
+                With Installation
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          {/* Gradient fade on mobile for scroll indication */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent dark:from-gray-900 pointer-events-none sm:hidden" />
+        </div>
+      </Tabs>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-card rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Ready to Ship</p>
-              <h3 className="text-2xl font-bold">
-                {orders.filter((o) => o.status === "paid").length}
-              </h3>
+              <p className="text-sm text-muted-foreground">Processing</p>
+              <h3 className="text-2xl font-bold">{stats.processing}</h3>
             </div>
             <Package className="h-8 w-8 text-blue-500" />
           </div>
@@ -363,7 +526,7 @@ The Blessed Two Team
             <div>
               <p className="text-sm text-muted-foreground">In Transit</p>
               <h3 className="text-2xl font-bold text-purple-600">
-                {orders.filter((o) => o.status === "shipped").length}
+                {stats.shipped}
               </h3>
             </div>
             <Truck className="h-8 w-8 text-purple-500" />
@@ -373,35 +536,24 @@ The Blessed Two Team
         <div className="bg-card rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Delivered Today</p>
-              <h3 className="text-2xl font-bold text-green-600">
-                {
-                  orders.filter(
-                    (o) =>
-                      o.status === "delivered" &&
-                      format(new Date(o.created_at), "yyyy-MM-dd") ===
-                        format(new Date(), "yyyy-MM-dd")
-                  ).length
-                }
+              <p className="text-sm text-muted-foreground">Needs Tracking</p>
+              <h3 className="text-2xl font-bold text-orange-600">
+                {stats.needsTracking}
               </h3>
             </div>
-            <CheckCircle className="h-8 w-8 text-green-500" />
+            <Clock className="h-8 w-8 text-orange-500" />
           </div>
         </div>
 
         <div className="bg-card rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Needs Tracking</p>
-              <h3 className="text-2xl font-bold text-orange-600">
-                {
-                  orders.filter(
-                    (o) => o.status === "shipped" && !o.tracking_number
-                  ).length
-                }
+              <p className="text-sm text-muted-foreground">With Installation</p>
+              <h3 className="text-2xl font-bold text-green-600">
+                {stats.withInstallation}
               </h3>
             </div>
-            <Clock className="h-8 w-8 text-orange-500" />
+            <Wrench className="h-8 w-8 text-green-500" />
           </div>
         </div>
       </div>
@@ -471,37 +623,79 @@ The Blessed Two Team
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search by order ID, customer name, email, or tracking number..."
+            placeholder="Search by order number, customer name, email, phone, or city..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
+            <SelectTrigger className="w-[150px]">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <SelectValue placeholder="Status" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Orders</SelectItem>
-              <SelectItem value="pending-shipping">Ready to Ship</SelectItem>
-              <SelectItem value="shipped">In Transit</SelectItem>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="processing">Processing</SelectItem>
+              <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="needs-tracking">Needs Tracking</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
 
-          {(statusFilter !== "all" || searchQuery) && (
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="w-[150px]">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <SelectValue placeholder="Payment" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Payments</SelectItem>
+              <SelectItem value="pending">Payment Pending</SelectItem>
+              <SelectItem value="processing">Payment Processing</SelectItem>
+              <SelectItem value="completed">Payment Completed</SelectItem>
+              <SelectItem value="failed">Payment Failed</SelectItem>
+              <SelectItem value="refunded">Refunded</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={shippingFilter} onValueChange={setShippingFilter}>
+            <SelectTrigger className="w-[150px]">
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                <SelectValue placeholder="Shipping" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Methods</SelectItem>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="express">Express</SelectItem>
+              <SelectItem value="pickup">Pickup</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {(statusFilter !== "all" ||
+            paymentFilter !== "all" ||
+            shippingFilter !== "all" ||
+            searchQuery) && (
             <Button
               variant="ghost"
               onClick={() => {
                 setStatusFilter("all");
+                setPaymentFilter("all");
+                setShippingFilter("all");
                 setSearchQuery("");
               }}
               className="text-muted-foreground"
             >
-              Clear
+              Clear All
             </Button>
           )}
         </div>
@@ -522,19 +716,17 @@ The Blessed Two Team
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Tracking Number</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Estimated Delivery</TableHead>
+                <TableHead>Order Details</TableHead>
+                <TableHead>Customer & Shipping</TableHead>
+                <TableHead>Payment & Status</TableHead>
+                <TableHead>Tracking</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     <div className="flex items-center justify-center">
                       <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                     </div>
@@ -542,17 +734,20 @@ The Blessed Two Team
                 </TableRow>
               ) : paginatedOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     <p className="text-muted-foreground">No orders found</p>
                     <Button
                       variant="link"
                       onClick={() => {
                         setStatusFilter("all");
+                        setPaymentFilter("all");
+                        setShippingFilter("all");
                         setSearchQuery("");
+                        setActiveTab("all");
                       }}
                       className="mt-2"
                     >
-                      Clear filters
+                      Clear all filters
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -565,99 +760,164 @@ The Blessed Two Team
                         onCheckedChange={() => toggleOrderSelection(order.id)}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {order.order_number}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() =>
-                            navigator.clipboard.writeText(order.order_number)
-                          }
-                        >
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(order.created_at), "MMM dd, yyyy")}
-                      </p>
-                    </TableCell>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{order.customer.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {order.customer.email}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {order.customer.phone}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">
-                          {order.shipping_address.city}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {order.shipping_address.state},{" "}
-                          {order.shipping_address.country}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {order.tracking_number ? (
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                            {order.tracking_number}
-                          </code>
+                          <p className="font-medium">{order.order_number}</p>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
                             onClick={() =>
-                              navigator.clipboard.writeText(
-                                order.tracking_number!
-                              )
+                              navigator.clipboard.writeText(order.order_number)
                             }
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground italic text-sm">
-                          Not assigned
-                        </span>
-                      )}
+                        <p className="text-xs text-muted-foreground">
+                          {format(
+                            new Date(order.created_at),
+                            "MMM dd, yyyy HH:mm"
+                          )}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <ShoppingBag className="h-3 w-3" />
+                          <span className="text-xs">
+                            {order.items_count} items
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            •
+                          </span>
+                          <span className="text-xs">
+                            {order.items_quantity} units
+                          </span>
+                        </div>
+                        <div className="font-bold">
+                          {formatCurrency(order.total, order.currency)}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {order.wholesale_applied && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-blue-50 text-blue-700"
+                            >
+                              <Percent className="h-2 w-2 mr-1" /> Wholesale
+                            </Badge>
+                          )}
+                          {order.installation_required && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-green-50 text-green-700"
+                            >
+                              <Wrench className="h-2 w-2 mr-1" /> Installation
+                            </Badge>
+                          )}
+                          {order.coupon_applied && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs bg-purple-50 text-purple-700"
+                            >
+                              <Tag className="h-2 w-2 mr-1" /> Coupon
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(order.status, order.tracking_number)}
-                    </TableCell>
-                    <TableCell>
-                      {order.estimated_delivery ? (
+                      <div className="space-y-1">
                         <div>
-                          <p className="font-medium">
-                            {format(
-                              new Date(order.estimated_delivery),
-                              "MMM dd"
-                            )}
+                          <p className="font-medium">{order.customer.name}</p>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Mail className="h-3 w-3" />
+                            <span>{order.customer.email}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            <span>{order.customer.phone}</span>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t">
+                          <div className="flex items-center gap-1 text-sm">
+                            <MapPin className="h-3 w-3" />
+                            <span className="font-medium">
+                              {order.shipping_address.city}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {order.shipping_address.county},{" "}
+                            {order.shipping_address.country}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {order.shipping_method}
+                            {order.shipping_method} •{" "}
+                            {formatCurrency(
+                              order.shipping_cost,
+                              order.currency
+                            )}
                           </p>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          Not set
-                        </span>
-                      )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-2">
+                        {getStatusBadge(order)}
+                        {getPaymentBadge(order.payment_status)}
+                        <div className="text-xs">
+                          <span className="text-muted-foreground">Method:</span>{" "}
+                          <span className="font-medium capitalize">
+                            {order.payment_method}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-2">
+                        {order.tracking_number ? (
+                          <div className="flex items-center gap-2">
+                            <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                              {order.tracking_number}
+                            </code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() =>
+                                navigator.clipboard.writeText(
+                                  order.tracking_number!
+                                )
+                              }
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic text-sm">
+                            Not assigned
+                          </span>
+                        )}
+                        {order.estimated_delivery && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Calendar className="h-3 w-3" />
+                            <span>Est: {order.estimated_delivery}</span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" asChild>
-                        <a href={`/admin/orders/${order.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </a>
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" asChild>
+                          <a href={`/admin/orders/${order.id}`} target="_blank">
+                            <Eye className="h-4 w-4" />
+                          </a>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                          <a
+                            href={`mailto:${order.customer.email}?subject=Order ${order.order_number} Update`}
+                          >
+                            <Mail className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -738,6 +998,7 @@ The Blessed Two Team
                   value={bulkTracking}
                   onChange={(e) => setBulkTracking(e.target.value)}
                   placeholder="Enter tracking number"
+                  required
                 />
                 <Button
                   type="button"
@@ -759,10 +1020,9 @@ The Blessed Two Team
                   <SelectValue placeholder="Select method" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Standard">Standard (3-5 days)</SelectItem>
-                  <SelectItem value="Express">Express (1-2 days)</SelectItem>
-                  <SelectItem value="Same Day">Same Day Delivery</SelectItem>
-                  <SelectItem value="Pickup">Store Pickup</SelectItem>
+                  <SelectItem value="standard">Standard (3-5 days)</SelectItem>
+                  <SelectItem value="express">Express (1-2 days)</SelectItem>
+                  <SelectItem value="pickup">Store Pickup</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -823,9 +1083,10 @@ The Blessed Two Team
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="paid">Mark as Paid</SelectItem>
+                  <SelectItem value="processing">Mark as Processing</SelectItem>
                   <SelectItem value="shipped">Mark as Shipped</SelectItem>
                   <SelectItem value="delivered">Mark as Delivered</SelectItem>
+                  <SelectItem value="completed">Mark as Completed</SelectItem>
                   <SelectItem value="cancelled">Mark as Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -906,7 +1167,7 @@ The Blessed Two Team
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <code className="bg-background px-2 py-1 rounded">{`{customer_name}`}</code>
                 <span>Customer's full name</span>
-                <code className="bg-background px-2 py-1 rounded">{`{order_id}`}</code>
+                <code className="bg-background px-2 py-1 rounded">{`{order_number}`}</code>
                 <span>Order number</span>
                 <code className="bg-background px-2 py-1 rounded">{`{tracking_number}`}</code>
                 <span>Tracking number</span>
@@ -918,8 +1179,10 @@ The Blessed Two Team
                 <span>Order date</span>
                 <code className="bg-background px-2 py-1 rounded">{`{order_total}`}</code>
                 <span>Order total amount</span>
-                <code className="bg-background px-2 py-1 rounded">{`{shipping_address}`}</code>
-                <span>Shipping address</span>
+                <code className="bg-background px-2 py-1 rounded">{`{currency}`}</code>
+                <span>Currency (KES)</span>
+                <code className="bg-background px-2 py-1 rounded">{`{tracking_url}`}</code>
+                <span>Tracking page URL</span>
               </div>
             </div>
 
@@ -930,13 +1193,17 @@ The Blessed Two Team
                 <pre className="text-sm whitespace-pre-wrap">
                   {emailTemplate
                     .replace(/{customer_name}/g, "John Doe")
-                    .replace(/{order_id}/g, "#12345")
+                    .replace(/{order_number}/g, "BTE-202401-000001")
                     .replace(/{tracking_number}/g, "BTE2401010001")
                     .replace(/{shipping_method}/g, "Standard")
                     .replace(/{estimated_delivery}/g, "Jan 5, 2024")
                     .replace(/{order_date}/g, "Jan 1, 2024")
                     .replace(/{order_total}/g, "KES 15,000")
-                    .replace(/{shipping_address}/g, "Nairobi, Kenya")}
+                    .replace(/{currency}/g, "KES")
+                    .replace(
+                      /{tracking_url}/g,
+                      "https://www.blessedtwo.com/tracking/BTE2401010001"
+                    )}
                 </pre>
               </div>
             </div>

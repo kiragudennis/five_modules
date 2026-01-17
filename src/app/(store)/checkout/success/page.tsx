@@ -274,8 +274,8 @@ export default function SuccessPage({
               isOrderPaid
                 ? "bg-gradient-to-br from-green-500 to-emerald-400"
                 : isPending
-                ? "bg-gradient-to-br from-amber-500 to-orange-400"
-                : "bg-gradient-to-br from-red-500 to-pink-400"
+                  ? "bg-gradient-to-br from-amber-500 to-orange-400"
+                  : "bg-gradient-to-br from-red-500 to-pink-400"
             }`}
           >
             {isOrderPaid ? (
@@ -296,15 +296,15 @@ export default function SuccessPage({
             isOrderPaid
               ? "bg-gradient-to-r from-green-500 to-emerald-500"
               : isPending
-              ? "bg-gradient-to-r from-amber-500 to-orange-500"
-              : "bg-gradient-to-r from-red-500 to-pink-500"
+                ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                : "bg-gradient-to-r from-red-500 to-pink-500"
           }`}
         >
           {isOrderPaid
             ? "🎯 Order Confirmed!"
             : isPending
-            ? "⏳ Awaiting Payment"
-            : "❌ Payment Failed"}
+              ? "⏳ Awaiting Payment"
+              : "❌ Payment Failed"}
         </Badge>
 
         <h1 className="text-xl sm:text-4xl md:text-5xl font-bold mb-4">
@@ -324,8 +324,8 @@ export default function SuccessPage({
           {isOrderPaid
             ? `Thank you for your order! A confirmation has been sent to ${orderDetails.customer_email}.`
             : isPending
-            ? "Please complete your payment to confirm your order. Check your email for payment instructions."
-            : "We encountered an issue processing your payment. Please try again or contact support."}
+              ? "Please complete your payment to confirm your order. Check your email for payment instructions."
+              : "We encountered an issue processing your payment. Please try again or contact support."}
         </p>
       </div>
 
@@ -481,22 +481,24 @@ export default function SuccessPage({
                                     Wholesale Price
                                   </Badge>
                                 )}
-                              <span className="text-sm text-muted-foreground">
-                                @{" "}
-                                {formatCurrency(
-                                  item.applied_price,
-                                  orderDetails.currency
-                                )}
-                              </span>
                             </div>
                           </div>
-                          <p className="font-bold">
-                            {formatCurrency(
-                              item.total_price ||
-                                item.applied_price * item.quantity,
-                              orderDetails.currency
-                            )}
-                          </p>
+                          <div>
+                            <p className="font-bold">
+                              {formatCurrency(
+                                item.total_price ||
+                                  item.applied_price * item.quantity,
+                                orderDetails.currency
+                              )}
+                            </p>
+                            <span className="text-sm text-muted-foreground">
+                              @{" "}
+                              {formatCurrency(
+                                item.applied_price,
+                                orderDetails.currency
+                              )}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -639,7 +641,7 @@ export default function SuccessPage({
                     </div>
 
                     {orderDetails.installation_required && (
-                      <div className="p-4 border rounded-lg bg-blue-50">
+                      <div className="p-4 border rounded-lg">
                         <h4 className="font-medium mb-3 flex items-center gap-2">
                           <Settings className="h-4 w-4" />
                           Installation Service
@@ -780,7 +782,7 @@ export default function SuccessPage({
                   )}
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">
+                  <h3 className="font-bold text-lg text-black">
                     {isOrderPaid
                       ? "What Happens Next?"
                       : "Complete Payment to Confirm Order"}
@@ -983,13 +985,13 @@ export default function SuccessPage({
                 <div>
                   <p className="text-sm font-medium mb-1">Order Questions</p>
                   <p className="text-sm text-muted-foreground">
-                    Email: support@worldsamma.com
+                    Email: info@blessedtwo.com
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-1">Payment Issues</p>
                   <p className="text-sm text-muted-foreground">
-                    Phone: +254 700 000 000
+                    Phone: +254 727 833 691
                   </p>
                 </div>
                 <Button asChild variant="outline" className="w-full">

@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabaseAdmin.rpc("validate_coupon", {
       coupon_code: couponCode,
       order_amount: orderAmount,
-      customer_email: customerEmail,
+      customer_email_param: customerEmail,
     });
 
     if (error) throw error;

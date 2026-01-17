@@ -144,7 +144,6 @@ export default function AdminOrderDetailPage({
   const [notes, setNotes] = useState("");
   const { supabase } = useAuth();
   const newDate = formatDate(new Date(), "yyyy/MM/dd");
-  console.log("Date:", newDate);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -154,7 +153,7 @@ export default function AdminOrderDetailPage({
     shipping_method: "",
     shipping_cost: 0,
     estimated_delivery: "",
-    installation_date: "",
+    installation_date: newDate,
     installation_time: "",
     special_instructions: "",
   });
@@ -228,8 +227,8 @@ export default function AdminOrderDetailPage({
           shipping_method: data.shipping_method,
           shipping_cost: data.shipping_cost || 0,
           estimated_delivery: data.estimated_delivery || "",
-          installation_date: data.installation_date || newDate,
-          installation_time: data.installation_time || newDate,
+          installation_date: data.installation_date,
+          installation_time: data.installation_time,
           special_instructions: data.special_instructions || "",
         });
       } catch (err: any) {

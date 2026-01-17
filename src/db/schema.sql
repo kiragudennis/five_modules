@@ -171,303 +171,385 @@ BEGIN
 END;
 $$;
 
-create or replace function public.get_dashboard_data()
-returns json
-language plpgsql
-set search_path = public
-security definer
-as $$
-declare
-  result json;
-  total_paid_orders bigint;
-  total_pending_orders bigint;
-  total_orders bigint;
-  total_sales numeric;
-  conversion_rate numeric;
-BEGIN
-   -- Check if user is admin
-    IF NOT public.verify_admin_access() THEN
-        RAISE EXCEPTION 'Access denied. Admin privileges required.';
-    END IF;
-
-  -- Get total paid orders (all successful statuses)
-  SELECT COUNT(*) INTO total_paid_orders
-  FROM orders 
-  WHERE status IN ('paid', 'completed', 'delivered', 'shipped');
-  
-  -- Get total pending orders
-  SELECT COUNT(*) INTO total_pending_orders
-  FROM orders 
-  WHERE status = 'pending';
-  
-  -- Get total orders count
-  SELECT COUNT(*) INTO total_orders FROM orders;
-  
-  -- Get total sales amount (only from paid orders)
-  SELECT COALESCE(SUM(total), 0) INTO total_sales
-  FROM orders 
-  WHERE status IN ('paid', 'completed', 'delivered', 'shipped');
-  
-  -- Calculate conversion rate: paid / (paid + pending)
-  -- This measures what percentage of "active" orders converted
-  IF (total_paid_orders + total_pending_orders) > 0 THEN
-    conversion_rate := ROUND(
-      (total_paid_orders::numeric / (total_paid_orders + total_pending_orders)::numeric) * 100, 
-      2
-    );
-  ELSE
-    conversion_rate := 0;
-  END IF;
-
-  -- Build the result JSON
-  select json_build_object(
-    'stats', json_build_object(
-      'totalSales', total_sales,
-      'totalOrders', total_orders,
-      'totalCustomers', (select count(*) from users),
-      'totalProducts', (select count(*) from products),
-      'pageViews', (select count(*) from page_views),
-      'conversionRate', conversion_rate,
-      'paidOrders', total_paid_orders,
-      'pendingOrders', total_pending_orders
-    ),
-    'recentOrders', COALESCE((
-  select json_agg(
-    json_build_object(
-      'id', o.id,
-      'customer', o.shipping_info->>'firstName' || ' ' || coalesce(o.shipping_info->>'lastName',''),
-      'date', o.created_at,
-      'total', o.total,
-      'status', o.status
-    )
-    order by o.created_at desc
-  )
-  from (
-    select *
-    from orders
-    order by created_at desc
-    limit 5
-  ) o
-), '[]'::json)
-  )
-  into result;
-
-  return result;
-END;
-$$;
-
-create or replace function public.get_all_orders()
-returns json
-language plpgsql
-set search_path = public
-security definer
-as $$
-declare
-  result json;
+CREATE OR REPLACE FUNCTION public.get_analytics(time_period text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    start_date timestamptz;
+    end_date timestamptz;
+    sales jsonb;
+    visits jsonb;
+    category jsonb;
+    top_products jsonb;
+    recent_activity jsonb;
+    stats jsonb;
+    total_orders bigint;
+    total_completed_orders bigint;
+    total_page_views bigint;
+    total_sales numeric; -- Actual sales from completed orders
+    total_all_orders_amount numeric; -- All order amounts (renamed from total_revenue)
+    conversion_rate numeric;
 BEGIN
     -- Check if user is admin
     IF NOT public.verify_admin_access() THEN
         RAISE EXCEPTION 'Access denied. Admin privileges required.';
     END IF;
 
-    select json_agg(order_data order by order_data->>'date' desc)
-    into result
-    from (
-      select json_build_object(
-        'id', o.id,
-        'customer', o.shipping_info->>'firstName' || ' ' || coalesce(o.shipping_info->>'lastName',''),
-        'email', o.shipping_info->>'email',
-        'date', o.created_at,
-        'total', o.total,
-        'status', o.status,
-        'items', count(oi.id)
-      ) as order_data
-      from orders o
-      left join order_items oi on o.id = oi.order_id
-      group by o.id, o.shipping_info, o.created_at, o.total, o.status
-    ) sub;
-
-    return result;
-end;
-$$;
-
-create or replace function public.get_order_details(order_uuid uuid)
-returns json
-language plpgsql
-set search_path = public
-security definer
-as $$
-declare
-  result json;
-begin
-  -- Check if user is admin
-  if not public.verify_admin_access() then
-    raise exception 'Access denied. Admin privileges required.';
-  end if;
-
-  select json_build_object(
-    'id', o.id,
-    'customer', json_build_object(
-      'name', o.shipping_info->>'firstName' || ' ' || coalesce(o.shipping_info->>'lastName',''),
-      'email', o.shipping_info->>'email',
-      'phone', o.shipping_info->>'phone'
-    ),
-    'date', o.created_at,
-    'total', o.total,
-    'status', o.status,
-    'tracking', o.tracking_number,
-    'shipping_address', json_build_object(
-      'street', o.shipping_info->>'address',
-      'city', o.shipping_info->>'city',
-      'state', o.shipping_info->>'state',
-      'postal_code', o.shipping_info->>'postalCode',
-      'country', o.shipping_info->>'country'
-    ),
-    'items', (
-      select json_agg(
-        json_build_object(
-          'id', oi.id,
-          'title', p.name,
-          'sku', p.sku,
-          'price', oi.unit_price,
-          'quantity', oi.qty
-        )
-      )
-      from order_items oi
-      join products p on oi.product_id = p.id
-      where oi.order_id = o.id
-    ),
-    'payment', (
-      select json_build_object(
-        'method', t.gateway,
-        'transaction_id', t.gateway_tx_id,
-        'status', t.status,
-        'amount', t.amount,
-        'phone', t.phone_number
-      )
-      from transactions t
-      where t.order_id = o.id
-      order by t.created_at desc
-      limit 1
-    )
-  )
-  into result
-  from orders o
-  where o.id = order_uuid;
-
-  return result;
-end;
-$$;
-
--- Function: get_analytics(time_period text)
-create or replace function public.get_analytics(time_period text)
-returns jsonb
-language plpgsql
-set search_path = public
-security definer
-as $$
-declare
-    start_date timestamptz;
-    sales jsonb;
-    visits jsonb;
-    category jsonb;
-    stats jsonb;
-    total_orders bigint;
-    total_page_views bigint;
-    total_sales numeric;
-begin
-   -- Check if user is admin
-    if not public.verify_admin_access() then
-        raise exception 'Access denied. Admin privileges required.';
-    end if;
-
     -- Determine the start date based on the time period
-    start_date := case time_period
-        when '7d' then now() - interval '7 days'
-        when '30d' then now() - interval '30 days'
-        when '90d' then now() - interval '90 days'
-        when '1y' then now() - interval '1 year'
-        else '1970-01-01'::timestamptz
-    end;
+    start_date := CASE time_period
+        WHEN '7d' THEN now() - interval '7 days'
+        WHEN '30d' THEN now() - interval '30 days'
+        WHEN '90d' THEN now() - interval '90 days'
+        WHEN '1y' THEN now() - interval '1 year'
+        ELSE '1970-01-01'::timestamptz
+    END;
+    
+    end_date := now();
 
-    -- Get totals
-    select count(*), coalesce(sum(total), 0) into total_orders, total_sales
-    from orders
-    where created_at >= start_date;
+    -- Get total orders and completed orders
+    SELECT 
+        COUNT(*),
+        COUNT(CASE WHEN status = 'completed' AND payment_status = 'paid' THEN 1 END),
+        COALESCE(SUM(total_amount), 0),
+        COALESCE(SUM(CASE WHEN status = 'completed' AND payment_status = 'paid' THEN total_amount ELSE 0 END), 0)
+    INTO total_orders, total_completed_orders, total_all_orders_amount, total_sales
+    FROM orders
+    WHERE created_at >= start_date AND created_at <= end_date;
 
-    select count(*) into total_page_views
-    from page_views
-    where created_at >= start_date;
+    SELECT COUNT(*) INTO total_page_views
+    FROM page_views
+    WHERE created_at >= start_date AND created_at <= end_date;
 
-    -- Sales by month
-    select coalesce(jsonb_agg(jsonb_build_object(
-        'name', month,
-        'sales', sales_value
-    )), '[]'::jsonb)
-    into sales
-    from (
-        select to_char(created_at, 'Mon') as month,
-               sum(total) as sales_value
-        from orders
-        where created_at >= start_date
-        group by to_char(created_at, 'Mon')
+    -- Calculate conversion rate (completed orders / page views)
+    IF total_page_views > 0 THEN
+        conversion_rate := ROUND((total_completed_orders::numeric / total_page_views::numeric) * 100, 1);
+    ELSE
+        conversion_rate := 0;
+    END IF;
+
+    -- Sales by month (actual sales from completed orders)
+    SELECT COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'name', month_name,
+                'sales', monthly_sales,
+                'revenue', monthly_all_orders
+            ) ORDER BY month_number
+        ), '[]'::jsonb
+    ) INTO sales
+    FROM (
+        SELECT 
+            TO_CHAR(created_at, 'Mon') as month_name,
+            EXTRACT(MONTH FROM created_at) as month_number,
+            SUM(CASE WHEN status = 'completed' AND payment_status = 'paid' THEN total_amount ELSE 0 END) as monthly_sales,
+            SUM(total_amount) as monthly_all_orders
+        FROM orders
+        WHERE created_at >= start_date AND created_at <= end_date
+        GROUP BY TO_CHAR(created_at, 'Mon'), EXTRACT(MONTH FROM created_at)
     ) t;
 
     -- Page views by month
-    select coalesce(jsonb_agg(jsonb_build_object(
-        'name', month,
-        'visits', visits_count
-    )), '[]'::jsonb)
-    into visits
-    from (
-        select to_char(created_at, 'Mon') as month,
-               count(*) as visits_count
-        from page_views
-        where created_at >= start_date
-        group by to_char(created_at, 'Mon')
+    SELECT COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'name', month_name,
+                'visits', visits_count
+            ) ORDER BY month_number
+        ), '[]'::jsonb
+    ) INTO visits
+    FROM (
+        SELECT 
+            TO_CHAR(created_at, 'Mon') as month_name,
+            EXTRACT(MONTH FROM created_at) as month_number,
+            COUNT(*) as visits_count
+        FROM page_views
+        WHERE created_at >= start_date AND created_at <= end_date
+        GROUP BY TO_CHAR(created_at, 'Mon'), EXTRACT(MONTH FROM created_at)
     ) t;
 
-    -- Product category distribution
-select coalesce(jsonb_agg(jsonb_build_object(
-    'name', category_name,
-    'value', qty_sum
-)), '[]'::jsonb)
-into category
-from (
-    select p.category as category_name,
-           sum(oi.qty) as qty_sum
-    from order_items oi
-    join products p on p.id = oi.product_id
-    join orders o on o.id = oi.order_id
-    where o.created_at >= start_date
-    group by p.category
-) t;
+    -- Product category distribution (from completed orders)
+    SELECT COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'name', category_name,
+                'value', sales_count
+            ) ORDER BY sales_count DESC
+        ), '[]'::jsonb
+    ) INTO category
+    FROM (
+        SELECT 
+            COALESCE(p.category, 'Uncategorized') as category_name,
+            SUM(oi.quantity) as sales_count
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        LEFT JOIN products p ON p.id = oi.product_id
+        WHERE o.created_at >= start_date AND o.created_at <= end_date
+            AND o.status = 'completed' 
+            AND o.payment_status = 'paid'
+        GROUP BY p.category
+        HAVING SUM(oi.quantity) > 0
+    ) t;
+
+    -- Top products (from completed orders)
+    SELECT COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'name', product_name,
+                'units', total_units,
+                'revenue', product_revenue
+            )
+        ), '[]'::jsonb
+    ) INTO top_products
+    FROM (
+        SELECT 
+            oi.product_name,
+            SUM(oi.quantity) as total_units,
+            SUM(oi.quantity * oi.unit_price) as product_revenue
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.created_at >= start_date AND o.created_at <= end_date
+            AND o.status = 'completed' 
+            AND o.payment_status = 'paid'
+        GROUP BY oi.product_name
+        HAVING SUM(oi.quantity) > 0
+        ORDER BY total_units DESC
+        LIMIT 5
+    ) t;
+
+    -- Recent activity
+    SELECT COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'type', activity_type,
+                'description', description,
+                'timestamp', timestamp,
+                'icon', icon
+            )
+        ), '[]'::jsonb
+    ) INTO recent_activity
+    FROM (
+        SELECT 
+            activity_type,
+            description,
+            timestamp,
+            icon
+        FROM (
+            -- New orders
+            SELECT 
+                'order' as activity_type,
+                'New order #' || order_number || ' from ' || customer_name as description,
+                created_at as timestamp,
+                'ShoppingBag' as icon
+            FROM orders
+            WHERE created_at >= start_date
+            UNION ALL
+            -- New users
+            SELECT 
+                'user' as activity_type,
+                'New customer registered: ' || COALESCE(full_name, email) as description,
+                created_at as timestamp,
+                'Users' as icon
+            FROM users
+            WHERE created_at >= start_date
+            UNION ALL
+            -- Status updates to completed
+            SELECT 
+                'status' as activity_type,
+                'Order #' || order_number || ' completed' as description,
+                updated_at as timestamp,
+                'TrendingUp' as icon
+            FROM orders
+            WHERE updated_at >= start_date 
+                AND status = 'completed'
+                AND updated_at != created_at
+            UNION ALL
+            -- Payments received
+            SELECT 
+                'payment' as activity_type,
+                'Payment received for order #' || order_number as description,
+                o.updated_at as timestamp,
+                'DollarSign' as icon
+            FROM orders o
+            WHERE o.payment_status = 'paid' 
+                AND o.updated_at >= start_date
+            UNION ALL
+            -- Page views
+            SELECT 
+                'view' as activity_type,
+                'Page viewed: ' || path as description,
+                created_at as timestamp,
+                'Eye' as icon
+            FROM page_views
+            WHERE created_at >= start_date
+        ) all_activity
+        ORDER BY timestamp DESC
+        LIMIT 5
+    ) limited_activity;
 
     -- Summary stats
-    select jsonb_build_object(
-        'totalSales', total_sales,
+    SELECT jsonb_build_object(
+        'totalSales', total_sales, -- Actual sales
+        'totalRevenue', total_all_orders_amount, -- All orders
         'totalOrders', total_orders,
-        'totalCustomers', coalesce(count(distinct user_id), 0),
-        'totalProducts', (select count(*) from products),
+        'completedOrders', total_completed_orders,
+        'totalCustomers', (SELECT COUNT(*) FROM users WHERE created_at >= start_date),
+        'totalProducts', (SELECT COUNT(*) FROM products),
         'pageViews', total_page_views,
-        'conversionRate', 
-            case 
-                when total_page_views > 0 
-                then round((total_orders::numeric / total_page_views::numeric) * 100, 1)
-                else 0
-            end
-    )
-    into stats
-    from orders
-    where created_at >= start_date;
+        'conversionRate', conversion_rate,
+        'avgOrderValue', CASE 
+            WHEN total_completed_orders > 0 THEN ROUND(total_sales / total_completed_orders, 2)
+            ELSE 0
+        END
+    ) INTO stats;
 
-    return jsonb_build_object(
+    RETURN jsonb_build_object(
         'salesData', sales,
         'visitsData', visits,
         'categoryData', category,
+        'topProducts', top_products,
+        'recentActivity', recent_activity,
         'stats', stats
     );
-end;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_dashboard_data()
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result json;
+    total_paid_orders bigint;
+    total_pending_orders bigint;
+    total_completed_orders bigint;
+    total_orders bigint;
+    total_sales numeric; -- Only from completed/paid orders
+    total_revenue numeric; -- All orders regardless of status
+    today_sales numeric;
+    today_orders bigint;
+    recent_orders_json json;
+    recent_customers_json json;
+    avg_order_value numeric;
+BEGIN
+    -- Check if user is admin
+    IF NOT public.verify_admin_access() THEN
+        RAISE EXCEPTION 'Access denied. Admin privileges required.';
+    END IF;
+
+    -- Get total paid orders (payment completed)
+    SELECT COUNT(*) INTO total_paid_orders
+    FROM orders 
+    WHERE payment_status = 'paid';
+    
+    -- Get total completed orders (fulfilled)
+    SELECT COUNT(*) INTO total_completed_orders
+    FROM orders 
+    WHERE status = 'completed';
+    
+    -- Get total pending orders
+    SELECT COUNT(*) INTO total_pending_orders
+    FROM orders 
+    WHERE status = 'pending' OR payment_status = 'pending';
+    
+    -- Get total orders count
+    SELECT COUNT(*) INTO total_orders FROM orders;
+    
+    -- Get total sales amount (only from paid AND completed orders)
+    SELECT COALESCE(SUM(total_amount), 0) INTO total_sales
+    FROM orders 
+    WHERE payment_status = 'paid' AND status = 'completed';
+    
+    -- Get total revenue (all orders regardless of status)
+    SELECT COALESCE(SUM(total_amount), 0) INTO total_revenue
+    FROM orders;
+    
+    -- Get today's sales (only from completed orders)
+    SELECT 
+        COALESCE(SUM(total_amount), 0),
+        COUNT(*)
+    INTO today_sales, today_orders
+    FROM orders 
+    WHERE DATE(created_at) = CURRENT_DATE
+        AND payment_status = 'paid' 
+        AND status = 'completed';
+    
+    -- Calculate average order value (from completed orders)
+    IF total_completed_orders > 0 THEN
+        avg_order_value := ROUND(total_sales / total_completed_orders, 2);
+    ELSE
+        avg_order_value := 0;
+    END IF;
+
+    -- Get recent orders
+    SELECT COALESCE(
+        json_agg(
+            json_build_object(
+                'id', o.id,
+                'orderNumber', o.order_number,
+                'customer', o.customer_name,
+                'date', o.created_at,
+                'total', o.total_amount,
+                'status', o.status,
+                'paymentStatus', o.payment_status
+            )
+        ), '[]'::json
+    ) INTO recent_orders_json
+    FROM (
+        SELECT *
+        FROM orders
+        ORDER BY created_at DESC
+        LIMIT 5
+    ) o;
+
+    -- Get recent customers
+    SELECT COALESCE(
+        json_agg(
+            json_build_object(
+                'id', u.id,
+                'name', COALESCE(u.full_name, 'Anonymous'),
+                'email', u.email,
+                'date', u.created_at,
+                'orderCount', (
+                    SELECT COUNT(*) 
+                    FROM orders 
+                    WHERE user_id = u.id
+                )
+            )
+        ), '[]'::json
+    ) INTO recent_customers_json
+    FROM (
+        SELECT *
+        FROM users
+        ORDER BY created_at DESC
+        LIMIT 5
+    ) u;
+
+    -- Build the result JSON
+    SELECT json_build_object(
+        'stats', json_build_object(
+            'totalSales', total_sales, -- Actual sales (completed)
+            'totalRevenue', total_revenue, -- All order amounts
+            'todaySales', today_sales,
+            'totalOrders', total_orders,
+            'todayOrders', today_orders,
+            'paidOrders', total_paid_orders,
+            'completedOrders', total_completed_orders,
+            'pendingOrders', total_pending_orders,
+            'totalCustomers', (SELECT COUNT(*) FROM users),
+            'totalProducts', (SELECT COUNT(*) FROM products),
+            'pageViews', (SELECT COUNT(*) FROM page_views),
+            'avgOrderValue', avg_order_value
+        ),
+        'recentOrders', recent_orders_json,
+        'recentCustomers', recent_customers_json
+    )
+    INTO result;
+
+    RETURN result;
+END;
 $$;
 
 -- Drop the trigger first
