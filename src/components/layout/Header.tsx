@@ -24,8 +24,8 @@ const navigation = [
   { name: "Categories", href: "/categories" },
   { name: "About", href: "/about" },
   { name: "Contact", href: "/contact" },
-  { name: "Pricing", href: "/pricing" },
-  { name: "Guide", href: "/demo-guide" },
+  { name: "Account", href: "/accounts" },
+  { name: "Loyalty", href: "/accounts/loyalty" },
 ];
 
 const adminNavigation = [
