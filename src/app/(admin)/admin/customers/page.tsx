@@ -34,6 +34,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface Customer {
   id: string;
@@ -55,6 +56,7 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const itemsPerPage = 10;
+  const router = useRouter();
 
   useEffect(() => {
     fetchCustomers();
@@ -71,13 +73,13 @@ export default function CustomersPage() {
 
       if (searchTerm) {
         query = query.or(
-          `email.ilike.%${searchTerm}%,metadata->>name.ilike.%${searchTerm}%`
+          `email.ilike.%${searchTerm}%,metadata->>name.ilike.%${searchTerm}%`,
         );
       }
 
       const { data, error, count } = await query.range(
         (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage - 1
+        currentPage * itemsPerPage - 1,
       );
 
       if (error) throw error;
@@ -265,7 +267,7 @@ export default function CustomersPage() {
                                   <span className="text-sm font-medium text-primary">
                                     {getInitials(
                                       customer.metadata?.name,
-                                      customer.email
+                                      customer.email,
                                     )}
                                   </span>
                                 </div>
@@ -343,8 +345,20 @@ export default function CustomersPage() {
                                 Send SMS
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>View Orders</DropdownMenuItem>
-                              <DropdownMenuItem>Edit Profile</DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(`/accounts/${customer.id}`)
+                                }
+                              >
+                                View Orders
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(`/accounts/${customer.id}`)
+                                }
+                              >
+                                Edit Profile
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>

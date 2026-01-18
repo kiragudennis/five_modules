@@ -44,6 +44,8 @@ CREATE TABLE orders (
     subtotal numeric(10,2) NOT NULL CHECK (subtotal >= 0),
     wholesale_savings numeric(10,2) DEFAULT 0 CHECK (wholesale_savings >= 0),
     coupon_discount numeric(10,2) DEFAULT 0 CHECK (coupon_discount >= 0),
+    loyalty_points_used integer DEFAULT 0 CHECK (loyalty_points_used >= 0),
+    loyalty_discount numeric(10,2) DEFAULT 0 CHECK (loyalty_discount >= 0),
     installation_cost numeric(10,2) DEFAULT 0 CHECK (installation_cost >= 0),
     shipping_total numeric(10,2) NOT NULL DEFAULT 0 CHECK (shipping_total >= 0),
     total_amount numeric(10,2) NOT NULL CHECK (total_amount >= 0),
@@ -79,8 +81,7 @@ CREATE TABLE orders (
     
     -- Check constraints (Matches pendingOrder calculation)
     CONSTRAINT valid_total CHECK (
-    total_amount = ((subtotal - coupon_discount) + shipping_total + installation_cost)
-    )
+    total_amount = GREATEST(0, ((subtotal - coupon_discount - loyalty_discount) + shipping_total + installation_cost)))
 );
 
 -- Create indexes for performance

@@ -107,11 +107,9 @@ export default function AccountPage() {
           *,
           order_items (
             product_id,
-            qty,
+            quantity ,
             unit_price,
-            products (
-              name
-            )
+            product_name
           )
         `,
         )
@@ -704,6 +702,18 @@ export default function AccountPage() {
                                   disabled={!order.tracking_number}
                                 >
                                   Track Order
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    router.push(
+                                      `/checkout/success?orderId=${order.tracking_number}`,
+                                    )
+                                  }
+                                  disabled={!order.id}
+                                >
+                                  View Order
                                 </Button>
                               </div>
                             </div>

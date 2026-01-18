@@ -207,6 +207,7 @@ export const formSchema = z.object({
     message: "Please select a payment method.",
   }),
   couponCode: z.string().optional(),
+  loyaltyRedemptionCode: z.string().optional(),
   installationRequired: z.boolean().default(false),
   specialInstructions: z.string().optional(),
 });
@@ -224,21 +225,21 @@ export const productSchema = z.object({
   videoUrl: z.string().optional(),
   price: z.preprocess(
     (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().min(0, "Price must be a positive number.")
+    z.number().min(0, "Price must be a positive number."),
   ),
   originalPrice: z.preprocess(
     (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().min(0, "Original price must be a positive number.")
+    z.number().min(0, "Original price must be a positive number."),
   ),
   stock: z.preprocess(
     (val) => (val === "" || val === null ? undefined : Number(val)),
-    z.number().int().min(0, "Stock must be a non-negative integer.")
+    z.number().int().min(0, "Stock must be a non-negative integer."),
   ),
   category: z.string().min(1, "Please select a category."),
   wattage: z
     .preprocess(
       (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().min(0, "Wattage must be a positive number.")
+      z.number().min(0, "Wattage must be a positive number."),
     )
     .optional(),
   voltage: z.string().optional().default("220-240V"),
@@ -246,20 +247,20 @@ export const productSchema = z.object({
   lumens: z
     .preprocess(
       (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().min(0, "Lumens must be a positive number.")
+      z.number().min(0, "Lumens must be a positive number."),
     )
     .optional(),
   warrantyMonths: z
     .preprocess(
       (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().int().min(0, "Warranty must be a positive number.")
+      z.number().int().min(0, "Warranty must be a positive number."),
     )
     .default(24),
   batteryCapacity: z.string().optional(),
   solarPanelWattage: z
     .preprocess(
       (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().min(0, "Solar panel wattage must be a positive number.")
+      z.number().min(0, "Solar panel wattage must be a positive number."),
     )
     .optional(),
   dimensions: z.string().optional(),
@@ -277,7 +278,7 @@ export const productSchema = z.object({
         const num = Number(val);
         return isNaN(num) ? undefined : Number(num.toFixed(2));
       },
-      z.number().min(0, "Weight must be a non-negative number.")
+      z.number().min(0, "Weight must be a non-negative number."),
     )
     .optional()
     .default(0),

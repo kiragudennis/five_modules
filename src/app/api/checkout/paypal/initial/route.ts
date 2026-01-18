@@ -23,6 +23,7 @@ export async function POST(req: Request) {
     payment,
     services,
     coupon,
+    loyaltyCode,
     totals,
     metadata,
   } = cart;
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   if (!items || !customer || !shipping || !totals) {
     return NextResponse.json(
       { error: "Missing required cart data" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: "Missing customer information" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
   if (authError || !user) {
     return NextResponse.json(
       { error: "Unauthorized", redirect: "/login" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -198,7 +199,7 @@ export async function POST(req: Request) {
         if (couponError) {
           console.warn(
             "Coupon application failed, continuing without coupon:",
-            couponError.message
+            couponError.message,
           );
           // Continue without coupon - order already created
         } else {
@@ -208,7 +209,7 @@ export async function POST(req: Request) {
       } catch (couponErr) {
         console.warn(
           "Coupon application error, continuing without coupon:",
-          couponErr
+          couponErr,
         );
         // Continue without coupon
       }
@@ -218,22 +219,48 @@ export async function POST(req: Request) {
     let finalAmount = totals.total;
     if (couponResult && couponResult.success) {
       finalAmount = couponResult.final_total;
+    }
 
-      // Update order metadata with coupon result
-      await supabaseAdmin
-        .from("orders")
-        .update({
-          metadata: {
-            ...orderData.metadata,
-            coupon_result: couponResult,
-          },
-        })
-        .eq("id", orderData.id);
+    // 📦 3. APPLY POINTS IF PROVIDED
+    let redeemResult = null;
+    if (loyaltyCode) {
+      try {
+        // Call the PostgreSQL function to apply coupon
+        const { data: redeemData, error: redeemError } =
+          await supabaseAdmin.rpc("apply_loyalty_redemption_to_order", {
+            p_order_id: orderData.id,
+            p_redemption_code: loyaltyCode,
+            p_user_id: orderData.user_id,
+          });
+
+        if (redeemError) {
+          console.warn(
+            "Redeem application failed, continuing without redeeming:",
+            redeemError.message,
+          );
+          // Continue without redeem - order already created
+        } else {
+          redeemResult = redeemData;
+          console.log("Redeem code applied successfully:", redeemData);
+        }
+      } catch (redeemErr) {
+        console.warn(
+          "Redeem application error, continuing without redeeming:",
+          redeemErr,
+        );
+        // Continue without redeem
+      }
+    }
+
+    if (redeemResult.success) {
+      // Update amountKES with loyalty discount
+      finalAmount = Math.max(1, finalAmount - redeemResult.discount_amount);
+      console.log("Loyalty discount applied:", redeemResult.discount_amount);
     }
 
     // 📦 5. Get PayPal access token
     const basicAuth = Buffer.from(
-      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`,
     ).toString("base64");
 
     const tokenRes = await fetch(`${PAYPAL_BASE_URL}/v1/oauth2/token`, {
@@ -269,7 +296,9 @@ export async function POST(req: Request) {
             discount: {
               currency_code: orderData.currency || "USD",
               value: (
-                (totals.couponDiscount || 0) + (totals.wholesaleSavings || 0)
+                (totals.couponDiscount || 0) +
+                (totals.wholesaleSavings || 0) +
+                (redeemResult.discount_amount || 0)
               ).toFixed(2),
             },
             shipping: {
@@ -382,13 +411,14 @@ export async function POST(req: Request) {
           paypal_create_time: paypalOrderData.create_time,
           coupon_attempted: !!coupon?.code,
           coupon_result: couponResult,
+          redeem_result: redeemResult,
         },
       })
       .eq("id", orderData.id);
 
     // Find approval URL
     const approveUrl = paypalOrderData.links?.find(
-      (link: any) => link.rel === "approve"
+      (link: any) => link.rel === "approve",
     )?.href;
 
     if (!approveUrl) {
@@ -418,7 +448,7 @@ export async function POST(req: Request) {
         details: err.message,
         ...(err.response?.data && { paypalError: err.response.data }),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

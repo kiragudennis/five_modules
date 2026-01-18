@@ -1,4 +1,4 @@
-// app/account/loyalty/page.tsx
+// app/account/loyalty/page.tsx (with fixes for TypeScript issues)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -17,9 +17,11 @@ import {
   Zap,
   Star,
   Ticket,
-  ShoppingBag,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useCart } from "@/lib/context/StoreContext";
+import { useRouter } from "next/navigation";
 
 const TIER_COLORS: Record<string, string> = {
   bronze: "bg-amber-100 text-amber-800 border-amber-300",
@@ -28,19 +30,52 @@ const TIER_COLORS: Record<string, string> = {
   platinum: "bg-purple-100 text-purple-800 border-purple-300",
 };
 
-const TIER_ICONS: Record<string, any> = {
+const TIER_ICONS: Record<string, React.ComponentType<any>> = {
   bronze: Award,
   silver: Star,
   gold: Crown,
   platinum: Zap,
 };
 
+interface LoyaltyTransaction {
+  date: string;
+  type: string;
+  points: number;
+  description: string;
+  order_number: string | null;
+}
+
+interface LoyaltyData {
+  points: number;
+  tier: string;
+  tierDetails: {
+    name: string;
+    pointsPerShilling: number;
+    discountPercentage: number;
+    freeShippingThreshold: number | null;
+    prioritySupport: boolean;
+    birthdayBonusPoints: number;
+  };
+  nextTier: {
+    name: string;
+    minPoints: number;
+    pointsNeeded: number;
+    discountPercentage: number;
+  } | null;
+  recentTransactions: LoyaltyTransaction[];
+  pointsValue: number;
+  totalEarned: number;
+  totalRedeemed: number;
+}
+
 export default function LoyaltyPage() {
   const { supabase, profile } = useAuth();
-  const [loyaltyData, setLoyaltyData] = useState<any>(null);
+  const { cartItems } = useCart();
+  const [loyaltyData, setLoyaltyData] = useState<LoyaltyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState(false);
   const user = profile;
+  const router = useRouter();
 
   useEffect(() => {
     if (user) {
@@ -65,6 +100,7 @@ export default function LoyaltyPage() {
     }
   };
 
+  // Update in app/account/loyalty/page.tsx
   const handleRedeemPoints = async () => {
     if (!loyaltyData || loyaltyData.points < 100) {
       toast.error("You need at least 100 points to redeem");
@@ -76,21 +112,46 @@ export default function LoyaltyPage() {
 
     try {
       setRedeeming(true);
-      const { data, error } = await supabase.rpc("redeem_loyalty_points", {
-        p_user_id: user?.id,
-        p_points_to_redeem: pointsToRedeem,
-        p_description: "Points redeemed for discount coupon",
-      });
+
+      // Call new function that creates redemption record
+      const { data, error } = await supabase.rpc(
+        "redeem_loyalty_points_for_checkout",
+        {
+          p_user_id: user?.id,
+          p_points_to_redeem: pointsToRedeem,
+          p_description: "Points redeemed for discount",
+        },
+      );
 
       if (error) throw error;
 
       if (data.success) {
+        // Store redemption code in localStorage for checkout
+        localStorage.setItem(
+          "loyalty_redemption",
+          JSON.stringify({
+            code: data.redemption_code,
+            points: data.points_redeemed,
+            discount: data.discount_amount,
+            validUntil: new Date(
+              Date.now() + 24 * 60 * 60 * 1000,
+            ).toISOString(), // 24 hours
+          }),
+        );
+
         toast.success(
           `Successfully redeemed ${pointsToRedeem} points for KES ${discountAmount.toFixed(2)} discount!`,
           {
+            description: `Use code: ${data.redemption_code} during checkout`,
             action: {
-              label: "Shop Now",
-              onClick: () => (window.location.href = "/products"),
+              label: "Go to Checkout",
+              onClick: () => {
+                if (cartItems.length > 0) {
+                  router.push("/checkout");
+                } else {
+                  router.push("/products");
+                }
+              },
             },
           },
         );
@@ -129,18 +190,18 @@ export default function LoyaltyPage() {
     );
   }
 
-  if (loading) {
+  if (loading || !loyaltyData) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
         </div>
       </div>
     );
   }
 
-  const TierIcon = TIER_ICONS[loyaltyData?.tier || "bronze"] || Award;
-  const progressPercentage = loyaltyData?.nextTier
+  const TierIcon = TIER_ICONS[loyaltyData.tier] || Award;
+  const progressPercentage = loyaltyData.nextTier
     ? (loyaltyData.points / loyaltyData.nextTier.minPoints) * 100
     : 100;
 
@@ -157,7 +218,7 @@ export default function LoyaltyPage() {
 
         {/* Current Tier Card */}
         <Card className="mb-8">
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               {/* Left: Tier Info */}
               <div className="flex-1">
@@ -260,8 +321,8 @@ export default function LoyaltyPage() {
         {/* Points Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
-            <CardContent>
-              <div className="flex items-center gap-3 mb-4">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <TrendingUp className="h-5 w-5 text-blue-600" />
                 </div>
@@ -276,8 +337,8 @@ export default function LoyaltyPage() {
           </Card>
 
           <Card>
-            <CardContent>
-              <div className="flex items-center gap-3 mb-4">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Gift className="h-5 w-5 text-green-600" />
                 </div>
@@ -294,8 +355,8 @@ export default function LoyaltyPage() {
           </Card>
 
           <Card>
-            <CardContent>
-              <div className="flex items-center gap-3 mb-4">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <Ticket className="h-5 w-5 text-purple-600" />
                 </div>
@@ -355,7 +416,14 @@ export default function LoyaltyPage() {
                     onClick={handleRedeemPoints}
                     disabled={loyaltyData.points < 100 || redeeming}
                   >
-                    {redeeming ? "Processing..." : "Redeem Now"}
+                    {redeeming ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Redeem Now"
+                    )}
                   </Button>
                 </div>
               </div>
@@ -380,7 +448,7 @@ export default function LoyaltyPage() {
             ) : (
               <div className="space-y-4">
                 {loyaltyData.recentTransactions.map(
-                  (transaction: any, index: number) => (
+                  (transaction: LoyaltyTransaction, index: number) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
@@ -434,47 +502,6 @@ export default function LoyaltyPage() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* How it Works */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>How Loyalty Points Work</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <ShoppingBag className="h-6 w-6 text-primary" />
-                </div>
-                <h4 className="font-semibold mb-2">Earn Points</h4>
-                <p className="text-sm text-muted-foreground">
-                  Earn points for every KES spent. Higher tiers earn points
-                  faster!
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Crown className="h-6 w-6 text-primary" />
-                </div>
-                <h4 className="font-semibold mb-2">Level Up</h4>
-                <p className="text-sm text-muted-foreground">
-                  Reach higher tiers for better rewards, discounts, and
-                  exclusive benefits.
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Gift className="h-6 w-6 text-primary" />
-                </div>
-                <h4 className="font-semibold mb-2">Redeem Rewards</h4>
-                <p className="text-sm text-muted-foreground">
-                  Use points for discounts, free shipping, or special offers.
-                  Points never expire!
-                </p>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

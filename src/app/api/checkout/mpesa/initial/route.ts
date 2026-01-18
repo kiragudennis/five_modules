@@ -19,6 +19,7 @@ export async function POST(req: Request) {
     payment,
     services,
     coupon,
+    loyaltyCode,
     totals,
     metadata,
   } = cart;
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
   if (!items || !customer || !shipping || !totals) {
     return NextResponse.json(
       { error: "Missing required cart data" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: "Invalid phone number" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: "Missing customer information" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
   if (authError || !user) {
     return NextResponse.json(
       { error: "Unauthorized", redirect: "/login" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
 
       const res = await fetch(
         `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=${currency}&to=KES&amount=${amountKES}`,
-        { next: { revalidate: 3600 * 12 } }
+        { next: { revalidate: 3600 * 12 } },
       );
       const json = await res.json();
       const rate = json.result;
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
     } catch (err) {
       console.error(
         "Exchange rate fetch failed, defaulting to hardcoded rate",
-        err
+        err,
       );
       amountKES = Math.round(totals.total * 131); // fallback
     }
@@ -114,7 +115,7 @@ export async function POST(req: Request) {
   const passKey = process.env.MPESA_PASSKEY!;
   const timestamp = `${year}${month}${day}${hours}${minutes}${seconds}`;
   const password = Buffer.from(shortCode + passKey + timestamp).toString(
-    "base64"
+    "base64",
   );
 
   try {
@@ -251,7 +252,7 @@ export async function POST(req: Request) {
         if (couponError) {
           console.warn(
             "Coupon application failed, continuing without coupon:",
-            couponError.message
+            couponError.message,
           );
           // Continue without coupon - order already created
         } else {
@@ -261,7 +262,7 @@ export async function POST(req: Request) {
       } catch (couponErr) {
         console.warn(
           "Coupon application error, continuing without coupon:",
-          couponErr
+          couponErr,
         );
         // Continue without coupon
       }
@@ -270,6 +271,43 @@ export async function POST(req: Request) {
     // Update amountKES with final total after coupon
     if (couponResult && couponResult.discount_amount) {
       amountKES = Math.max(1, amountKES - couponResult.discount_amount); // Ensure positive amount
+    }
+
+    // 📦 3. APPLY POINTS IF PROVIDED
+    let redeemResult = null;
+    if (loyaltyCode) {
+      try {
+        // Call the PostgreSQL function to apply coupon
+        const { data: redeemData, error: redeemError } =
+          await supabaseAdmin.rpc("apply_loyalty_redemption_to_order", {
+            p_order_id: orderData.id,
+            p_redemption_code: loyaltyCode,
+            p_user_id: orderData.user_id,
+          });
+
+        if (redeemError) {
+          console.warn(
+            "Redeem application failed, continuing without redeeming:",
+            redeemError.message,
+          );
+          // Continue without redeem - order already created
+        } else {
+          redeemResult = redeemData;
+          console.log("Redeem code applied successfully:", redeemData);
+        }
+      } catch (redeemErr) {
+        console.warn(
+          "Redeem application error, continuing without redeeming:",
+          redeemErr,
+        );
+        // Continue without redeem
+      }
+    }
+
+    if (redeemResult.success) {
+      // Update amountKES with loyalty discount
+      amountKES = Math.max(1, amountKES - redeemResult.discount_amount);
+      console.log("Loyalty discount applied:", redeemResult.discount_amount);
     }
 
     // 📦 3. Initiate M-Pesa payment
@@ -301,7 +339,7 @@ export async function POST(req: Request) {
           "Content-type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
 
     if (mpesaData.ResponseCode !== "0") {
@@ -330,7 +368,7 @@ export async function POST(req: Request) {
         mpesa: mpesaData,
         message: "Order created successfully. Please complete payment.",
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error: any) {
     console.error("Checkout error:", error);
@@ -349,7 +387,7 @@ export async function POST(req: Request) {
         details: error.message,
         ...(error.response?.data && { mpesaError: error.response.data }),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
