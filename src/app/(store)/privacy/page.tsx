@@ -1,5 +1,4 @@
 // app/privacy/page.js
-import Link from "next/link";
 import {
   Shield,
   Lock,
@@ -11,204 +10,290 @@ import {
   Bell,
   Users,
   Calendar,
-  Baby,
+  Zap,
+  Lightbulb,
 } from "lucide-react";
 
 export default function PrivacyPolicy() {
+  const currentDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div className="container mx-auto px-2 py-12 max-w-4xl">
       <div className="text-center mb-12">
         <div className="flex justify-center mb-4">
-          <Shield className="h-12 w-12" />
+          <Shield className="h-12 w-12 text-blue-600" />
         </div>
         <h1 className="text-4xl font-bold mb-4">Privacy Policy</h1>
         <p className="text-lg text-muted-foreground">
-          Last Updated: {new Date().toLocaleDateString()}
+          Blessed Two Electronics - Last Updated: {currentDate}
         </p>
       </div>
 
       <div className="space-y-8">
-        <div className="bg-muted/30 p-6 rounded-lg">
-          <h1 className="text-3xl font-bold mb-4">
-            Professional Terms of Service Framework
+        {/* Introduction */}
+        <div className="bg-blue-50 dark:bg-blue-950/20 p-6 rounded-lg border border-blue-200">
+          <h1 className="text-3xl font-bold mb-4 text-blue-900 dark:text-blue-100">
+            Your Privacy Matters at Blessed Two Electronics
           </h1>
           <p className="text-lg font-medium mb-4">
-            This demonstrates the type of professional legal frameworks we build
-            into custom e-commerce platforms. Your store will include terms
-            specifically tailored to your business type, products, and
-            operational requirements.
+            We are committed to protecting your privacy and ensuring the
+            security of your personal information as you shop for quality
+            lighting solutions.
           </p>
-          <p className="text-sm text-muted-foreground">
-            All our custom builds include legal documentation compliant with
-            Kenyan commercial law and international e-commerce standards.
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-3 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
+              <ShieldCheck className="w-3 h-3 mr-1" />
+              Kenya Data Protection Act Compliant
+            </span>
+            <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-800 dark:text-green-300">
+              <Lock className="w-3 h-3 mr-1" />
+              Secure Payment Processing
+            </span>
+            <span className="inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-900/30 px-3 py-1 text-xs font-medium text-purple-800 dark:text-purple-300">
+              <Zap className="w-3 h-3 mr-1" />
+              Lighting Specialist Since 2010
+            </span>
+          </div>
         </div>
 
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Database className="h-5 w-5" /> 1. Information We Collect
+            <Database className="h-5 w-5 text-blue-600" /> 1. Information We
+            Collect
           </h2>
           <p className="text-base leading-relaxed">
-            We may collect the following types of information:
+            To provide you with the best lighting solutions and service, we
+            collect:
           </p>
           <ul className="list-disc pl-6 space-y-3">
             <li className="text-base leading-relaxed">
-              <strong>Personal Data:</strong> Name, email address, phone number,
-              shipping address, and payment information that you voluntarily
-              provide when making a purchase or creating an account.
+              <strong>Contact Information:</strong> Name, email, phone number,
+              and delivery address for order processing
             </li>
             <li className="text-base leading-relaxed">
-              <strong>Derivative Data:</strong> Information our servers
-              automatically collect when you access the site, such as your IP
-              address, browser type, and access times.
+              <strong>Installation Details:</strong> Location information for
+              professional installation services
             </li>
             <li className="text-base leading-relaxed">
-              <strong>Financial Data:</strong> Payment details necessary to
-              process your orders, though all payments are processed through
-              secure third-party payment processors.
+              <strong>Business Information:</strong> For trade customers, we
+              collect business registration details for credit accounts
+            </li>
+            <li className="text-base leading-relaxed">
+              <strong>Technical Information:</strong> Browser type, IP address,
+              and device information for website optimization
             </li>
           </ul>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Bell className="h-5 w-5" /> 2. Use of Your Information
+            <Bell className="h-5 w-5 text-blue-600" /> 2. How We Use Your
+            Information
           </h2>
-          <p className="text-base leading-relaxed">
-            We use the information we collect to:
-          </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li className="text-base leading-relaxed">
-              Process your purchases and returns
-            </li>
-            <li className="text-base leading-relaxed">
-              Communicate with you about orders, products, services, and
-              promotional offers
-            </li>
-            <li className="text-base leading-relaxed">
-              Improve our website and customer service
-            </li>
-            <li className="text-base leading-relaxed">
-              Comply with legal obligations under Kenyan law
-            </li>
-          </ul>
+          <div className="bg-blue-50/50 rounded-lg p-4">
+            <p className="text-base leading-relaxed">
+              We use your information specifically to:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li className="text-base leading-relaxed">
+                Process your lighting product orders and arrange delivery
+              </li>
+              <li className="text-base leading-relaxed">
+                Schedule professional installation services
+              </li>
+              <li className="text-base leading-relaxed">
+                Send warranty registration and product updates
+              </li>
+              <li className="text-base leading-relaxed">
+                Provide customer support for your lighting solutions
+              </li>
+              <li className="text-base leading-relaxed">
+                Send relevant offers on lighting products (only with your
+                consent)
+              </li>
+              <li className="text-base leading-relaxed">
+                Comply with Kenyan tax and business regulations
+              </li>
+            </ul>
+          </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Users className="h-5 w-5" /> 3. Disclosure of Your Information
+            <Users className="h-5 w-5 text-blue-600" /> 3. Information Sharing
           </h2>
           <p className="text-base leading-relaxed">
-            We may share information we have collected about you in certain
-            situations, including:
+            We respect your privacy and only share information when necessary:
           </p>
           <ul className="list-disc pl-6 space-y-3">
             <li className="text-base leading-relaxed">
-              <strong>Third-Party Service Providers:</strong> We may share your
-              information with third parties that perform services for us, such
-              as payment processing, order fulfillment, and marketing
-              assistance.
+              <strong>Delivery Partners:</strong> We share delivery addresses
+              with our trusted logistics partners to ensure timely delivery of
+              your lighting products
             </li>
             <li className="text-base leading-relaxed">
-              <strong>Legal Requirements:</strong> We may disclose your
-              information where required to do so by law or in response to valid
-              requests by public authorities in Kenya.
+              <strong>Installation Technicians:</strong> Location details are
+              shared with our certified electricians for installation services
+            </li>
+            <li className="text-base leading-relaxed">
+              <strong>Payment Processors:</strong> We use secure payment
+              gateways that comply with PCI DSS standards
+            </li>
+            <li className="text-base leading-relaxed">
+              <strong>Legal Requirements:</strong> We may disclose information
+              when required by Kenyan law or to protect our rights
             </li>
           </ul>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Lock className="h-5 w-5" /> 4. Data Security
+            <Lock className="h-5 w-5 text-blue-600" /> 4. Data Security
           </h2>
-          <p className="text-base leading-relaxed">
-            We implement appropriate technical and organizational measures to
-            protect your personal information against unauthorized access,
-            alteration, disclosure, or destruction. However, no internet
-            transmission is ever completely secure or error-free.
-          </p>
+          <div className="bg-green-50/50 rounded-lg p-4">
+            <p className="text-base leading-relaxed">
+              As specialists in electrical solutions, we understand the
+              importance of security:
+            </p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li className="text-base leading-relaxed">
+                SSL encryption for all data transmissions
+              </li>
+              <li className="text-base leading-relaxed">
+                Secure payment processing with M-Pesa and card payments
+              </li>
+              <li className="text-base leading-relaxed">
+                Regular security audits of our systems
+              </li>
+              <li className="text-base leading-relaxed">
+                Limited employee access to customer data
+              </li>
+            </ul>
+          </div>
         </section>
 
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5" /> 5. Your Rights Under Kenyan Law
+            <ShieldCheck className="h-5 w-5 text-blue-600" /> 5. Your Rights
+            Under Kenyan Law
           </h2>
           <p className="text-base leading-relaxed">
-            Under the Data Protection Act, 2019 of Kenya, you have certain
-            rights regarding your personal data, including:
+            Under the Data Protection Act, 2019, you have the right to:
           </p>
-          <ul className="list-disc pl-6 space-y-2">
-            <li className="text-base leading-relaxed">
-              The right to access and obtain a copy of your personal data
-            </li>
-            <li className="text-base leading-relaxed">
-              The right to request correction of inaccurate or incomplete data
-            </li>
-            <li className="text-base leading-relaxed">
-              The right to object to processing of your personal data
-            </li>
-            <li className="text-base leading-relaxed">
-              The right to request deletion of your personal data
-            </li>
-          </ul>
-          <p className="text-base leading-relaxed mt-4">
-            To exercise these rights, please contact us using the information
-            provided below.
-          </p>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Baby className="h-5 w-5" /> 6. Children's Privacy
-          </h2>
-          <p className="text-base leading-relaxed">
-            Our website is not intended for children under 13 years of age. We
-            do not knowingly collect personal information from children under
-            13.
-          </p>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Calendar className="h-5 w-5" /> 7. Changes to This Privacy Policy
-          </h2>
-          <p className="text-base leading-relaxed">
-            We may update our Privacy Policy from time to time. We will notify
-            you of any changes by posting the new Privacy Policy on this page
-            and updating the "Last Updated" date.
-          </p>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-2xl font-semibold flex items-center gap-2">
-            <Mail className="h-5 w-5" /> 8. Contact Us
-          </h2>
-          <p className="text-base leading-relaxed">
-            If you have questions or comments about this Privacy Policy, please
-            contact us at:
-          </p>
-          <div className="bg-muted/30 p-6 rounded-lg space-y-3">
-            <div className="flex items-start gap-3">
-              <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0" />
-              <span>
-                Our Shop
-                <br />
-                Some Rd
-                <br />
-                Location, Kenya
-              </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-2">Access & Correction</h4>
+              <p className="text-sm text-gray-600">
+                Request access to your data or correct any inaccuracies
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 flex-shrink-0" />
-              <span>privacy@domain.com</span>
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-2">Data Portability</h4>
+              <p className="text-sm text-gray-600">
+                Request your data in a machine-readable format
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Phone className="h-5 w-5 flex-shrink-0" />
-              <span>
-                +254 XXX XXX XXX, +254 XXX XXX XXX or +254 XXX XXX XXX
-              </span>
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-2">Withdraw Consent</h4>
+              <p className="text-sm text-gray-600">
+                Opt-out of marketing communications at any time
+              </p>
+            </div>
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-2">Deletion Rights</h4>
+              <p className="text-sm text-gray-600">
+                Request deletion of your personal data
+              </p>
             </div>
           </div>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Lightbulb className="h-5 w-5 text-blue-600" /> 6. Cookies &
+            Tracking
+          </h2>
+          <p className="text-base leading-relaxed">
+            We use cookies to improve your shopping experience:
+          </p>
+          <ul className="list-disc pl-6 space-y-2 mt-2">
+            <li className="text-base leading-relaxed">
+              <strong>Essential Cookies:</strong> Required for the website to
+              function
+            </li>
+            <li className="text-base leading-relaxed">
+              <strong>Analytics Cookies:</strong> Help us understand how
+              customers use our site
+            </li>
+            <li className="text-base leading-relaxed">
+              <strong>Preference Cookies:</strong> Remember your lighting
+              preferences and cart items
+            </li>
+          </ul>
+          <p className="text-sm text-gray-600 mt-2">
+            You can control cookies through your browser settings. However,
+            disabling some cookies may affect your shopping experience.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-blue-600" /> 7. Policy Updates
+          </h2>
+          <p className="text-base leading-relaxed">
+            We may update this privacy policy to reflect changes in our
+            practices or legal requirements. We will notify you of significant
+            changes by posting a notice on our website and updating the
+            effective date.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Mail className="h-5 w-5 text-blue-600" /> 8. Contact Our Privacy
+            Team
+          </h2>
+          <p className="text-base leading-relaxed">
+            For privacy-related questions or to exercise your rights, contact
+            us:
+          </p>
+          <div className="bg-blue-50/50 p-6 rounded-lg space-y-3">
+            <div className="flex items-start gap-3">
+              <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
+              <div>
+                <p className="font-medium">Blessed Two Electronics</p>
+                <p className="text-sm text-gray-600">
+                  Duruma Road, Nairobi
+                  <br />
+                  Kenya
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 flex-shrink-0 text-blue-600" />
+              <div>
+                <p className="font-medium">Email</p>
+                <p className="text-sm text-gray-600">
+                  privacy@blessedtwo.co.ke
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Phone className="h-5 w-5 flex-shrink-0 text-blue-600" />
+              <div>
+                <p className="font-medium">Phone/WhatsApp</p>
+                <p className="text-sm text-gray-600">+254 727 833 691</p>
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 mt-2">
+            We typically respond to privacy inquiries within 48 hours during
+            business days.
+          </p>
         </section>
       </div>
     </div>
