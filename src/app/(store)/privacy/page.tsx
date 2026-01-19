@@ -13,6 +13,28 @@ import {
   Zap,
   Lightbulb,
 } from "lucide-react";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy | Blessed Two Electronics Nairobi",
+  description:
+    "Privacy policy for Blessed Two Electronics. Learn how we collect, use, and protect your personal information when you shop for lighting solutions in Kenya.",
+  keywords: [
+    "privacy policy",
+    "data protection Kenya",
+    "GDPR compliance",
+    "customer data privacy",
+    "electronics privacy",
+  ],
+  openGraph: {
+    title: "Privacy Policy | Blessed Two Electronics",
+    description:
+      "Our commitment to protecting your personal information and ensuring data security.",
+  },
+  alternates: {
+    canonical: "/privacy",
+  },
+};
 
 export default function PrivacyPolicy() {
   const currentDate = new Date().toLocaleDateString("en-US", {

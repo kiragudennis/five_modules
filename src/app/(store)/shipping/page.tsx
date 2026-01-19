@@ -13,6 +13,28 @@ import {
   Home,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Shipping & Delivery Nairobi | Blessed Two Electronics",
+  description:
+    "Fast shipping and delivery options for Blessed Two Electronics lighting products. Same-day Nairobi delivery, upcountry shipping, and professional installation services across Kenya.",
+  keywords: [
+    "shipping Nairobi",
+    "delivery Kenya",
+    "same-day delivery",
+    "lighting delivery",
+    "electronics shipping",
+  ],
+  openGraph: {
+    title: "Shipping & Delivery | Blessed Two Electronics",
+    description:
+      "Same-day delivery in Nairobi and nationwide shipping for quality lighting solutions.",
+  },
+  alternates: {
+    canonical: "/shipping",
+  },
+};
 
 export default function ShippingPage() {
   return (

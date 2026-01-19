@@ -2,15 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  ShoppingBag,
-  Users,
-  DollarSign,
-  Package,
-  TrendingUp,
-  Eye,
-  Calendar,
-} from "lucide-react";
+import { Users, DollarSign, Package, TrendingUp, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Order } from "./orders/page";

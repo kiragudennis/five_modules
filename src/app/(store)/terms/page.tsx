@@ -10,6 +10,28 @@ import {
   Shield,
   Lightbulb,
 } from "lucide-react";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service | Blessed Two Electronics Nairobi",
+  description:
+    "Terms and conditions for purchasing lighting products from Blessed Two Electronics. Warranty information, installation services, and business customer terms.",
+  keywords: [
+    "terms of service",
+    "conditions of sale",
+    "warranty terms",
+    "installation services",
+    "business terms",
+  ],
+  openGraph: {
+    title: "Terms of Service | Blessed Two Electronics",
+    description:
+      "Terms and conditions for purchasing quality lighting solutions in Nairobi.",
+  },
+  alternates: {
+    canonical: "/terms",
+  },
+};
 
 export default function TermsOfService() {
   const currentDate = new Date().toLocaleDateString("en-US", {
