@@ -95,7 +95,7 @@ export default function AboutPageContent() {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-6xl">
+    <div className="container mx-auto px-2 py-12 max-w-6xl">
       {/* Structured Data */}
       <script
         type="application/ld+json"
@@ -202,7 +202,7 @@ export default function AboutPageContent() {
           Kenya.
         </p>
 
-        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
+        <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-2 max-w-3xl mx-auto">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -210,7 +210,7 @@ export default function AboutPageContent() {
                 key={index}
                 className="text-center p-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm"
               >
-                <div className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400 mb-1">
+                <div className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-1">
                   {stat.value}
                 </div>
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -227,7 +227,7 @@ export default function AboutPageContent() {
       <section className="mb-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="order-2 lg:order-1">
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-8 border border-blue-100 dark:border-gray-700">
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-4 sm:p-8 border border-blue-100 dark:border-gray-700">
               <h2 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
                 <span className="text-blue-600 dark:text-blue-400">
                   Lighting Nairobi
@@ -299,7 +299,7 @@ export default function AboutPageContent() {
                         />
                       </div>
                       <div>
-                        <h4 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">
+                        <h4 className="font-bold mb-2 text-gray-900 dark:text-white">
                           {value.title}
                         </h4>
                         <p className="text-gray-600 dark:text-gray-300">
@@ -331,7 +331,7 @@ export default function AboutPageContent() {
           {popularCategories.map((category) => (
             <div
               key={category.id}
-              className="group p-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-xl transition-all duration-300 hover:border-blue-300 dark:hover:border-blue-500 hover:scale-[1.02]"
+              className="group p-4 sm:p-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-xl transition-all duration-300 hover:border-blue-300 dark:hover:border-blue-500 hover:scale-[1.02]"
             >
               <div className="flex items-start gap-4">
                 <div
@@ -394,7 +394,7 @@ export default function AboutPageContent() {
 
       {/* Why Choose Us */}
       <section className="mb-20">
-        <h2 className="text-3xl font-bold text-center mb-12 text-gray-900 dark:text-white">
+        <h2 className="text-2xl font-bold text-center mb-12 text-gray-900 dark:text-white">
           Why Choose Blessed Two Electronics
         </h2>
 
@@ -420,7 +420,7 @@ export default function AboutPageContent() {
         </div>
 
         {/* Customer Promise */}
-        <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-8 md:p-12">
+        <div className="rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-4 md:p-8">
           <div className="max-w-4xl mx-auto text-center">
             <ShieldCheck className="h-16 w-16 mx-auto mb-6" />
             <h3 className="text-2xl md:text-3xl font-bold mb-6">
@@ -463,7 +463,7 @@ export default function AboutPageContent() {
 
       {/* Visit Our Store */}
       <section className="mb-16">
-        <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 p-8">
+        <div className="rounded-2xl border border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-gray-900 p-4 sm:p-8">
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div>
               <h3 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">
@@ -515,7 +515,7 @@ export default function AboutPageContent() {
               </div>
             </div>
             <div className="text-center">
-              <div className="inline-block p-8 rounded-2xl bg-white dark:bg-gray-800 shadow-lg">
+              <div className="inline-block p-4 sm:p-8 rounded-2xl bg-white dark:bg-gray-800 shadow-lg">
                 <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-green-500 to-emerald-600 flex items-center justify-center">
                   <MessageCircle className="w-10 h-10 text-white" />
                 </div>

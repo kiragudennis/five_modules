@@ -7,7 +7,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -22,7 +21,7 @@ export default function ConfirmSignupPage() {
   const { supabase, profile } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<"validating" | "success" | "error">(
-    "validating"
+    "validating",
   );
   const [errorMessage, setErrorMessage] = useState("");
   const processedRef = useRef(false);
@@ -72,45 +71,62 @@ export default function ConfirmSignupPage() {
 
         if (sessionError) throw sessionError;
 
-        // Wait for profile to load (with timeout)
-        await waitForProfile();
+        // IMPORTANT: Get the user after setting session
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          throw new Error("User not found");
+        }
+
+        // Update email_verified in the users table
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({
+            email_verified: true,
+            last_login: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id); // Use user.id from getUser()
+
+        if (updateError) throw updateError;
 
         processedRef.current = true;
         setStatus("success");
         toast.dismiss();
-        toast.success("Email confirmed successfully!");
+        toast.success(
+          "Email confirmed successfully! Welcome to Blessed Two Electronics!",
+        );
 
-        // Redirect with admission_no if available
-        if (profile?.role === "admin") {
-          router.push("/admin");
-        } else {
-          router.push("/products");
-        }
+        // Small delay to ensure everything is processed
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Redirect
+        const role = profile?.role === "admin" ? "/admin" : "/products";
+        router.push(role);
       } catch (err: any) {
         console.error("Magic link confirmation error:", err);
         setStatus("error");
         setErrorMessage(err.message || "Failed to confirm your email");
-        toast.error("Confirmation failed");
-        router.push("/auth/error"); // Redirect to error page
+        toast.dismiss();
+        toast.error(
+          "Confirmation failed. Please try again or contact support.",
+        );
+
+        // Option 1: Redirect to error page
+        router.push("/auth/error");
+
+        // Option 2: Show error on same page
+        // setErrorMessage(err.message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Helper function to wait for profile
-    const waitForProfile = async () => {
-      const maxAttempts = 10;
-      const delay = 500;
-
-      for (let i = 0; i < maxAttempts; i++) {
-        if (profile) return;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-      throw new Error("Profile loading timeout");
-    };
-
     handleMagicLink();
-  }, [supabase.auth, profile, router]); // ADD router to dependencies
+  }, [supabase, profile]); // Use supabase, not supabase.auth
 
   // Loading state
   if (isLoading || status === "validating") {

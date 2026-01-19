@@ -30,11 +30,19 @@ export async function GET(request: Request) {
     const user = session?.user;
     if (!user) return NextResponse.redirect(new URL("/login", request.url));
 
+    await supabase
+      .from("users")
+      .update({
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.user.id);
+
     return NextResponse.redirect(new URL("/admin", request.url));
   } catch (err) {
     console.error("Error in auth callback:", err);
     return NextResponse.redirect(
-      new URL("/login?error=auth_failed", request.url)
+      new URL("/login?error=auth_failed", request.url),
     );
   }
 }

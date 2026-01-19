@@ -23,7 +23,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (
     email: string,
-    password: string
+    password: string,
   ) => Promise<{ error: AuthError | null }>;
   signInWithMagicLink: (email: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -32,7 +32,7 @@ interface AuthContextType {
   supabase: ReturnType<typeof getSupabaseClient>;
   deleteFileFromSupabase: (
     fileUrl: string,
-    bucketName: string
+    bucketName: string,
   ) => Promise<boolean>; // ✅ Also needed!
 }
 
@@ -107,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [supabase]
+    [supabase],
   );
 
   useEffect(() => {
@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (
     email: string,
-    password: string
+    password: string,
   ): Promise<{ error: AuthError | null }> => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -169,12 +169,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error) throw error;
 
-    const { access_token, refresh_token } = data.session!;
-    await supabase.auth.setSession({ access_token, refresh_token });
+    await supabase
+      .from("users")
+      .update({
+        last_login: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.user.id);
 
     return { error };
   };
-
   // Login with magic link
   const signInWithMagicLink = async (email: string) => {
     const res = await fetch("/api/auth/magic-link", {
@@ -218,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const deleteFileFromSupabase = async (
     fileUrl: string | null,
-    bucketName: string | null
+    bucketName: string | null,
   ): Promise<boolean> => {
     if (!fileUrl || !bucketName) {
       console.warn("Missing URL or bucket name.");

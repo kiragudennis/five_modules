@@ -38,6 +38,10 @@ import {
   Shield,
   Bell,
   Globe,
+  Tag,
+  Crown,
+  Wrench,
+  LogOut,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -61,7 +65,7 @@ interface Order {
 export default function AccountPage() {
   const { accountId } = useParams();
   const router = useRouter();
-  const { supabase, profile: currentUser } = useAuth();
+  const { supabase, profile: currentUser, signOut } = useAuth();
 
   const [profile, setProfile] = useState<any>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -75,43 +79,47 @@ export default function AccountPage() {
     currentUser?.id === accountId || currentUser?.role === "admin";
 
   useEffect(() => {
-    if (accountId) {
-      fetchAccountData();
-    }
-  }, [accountId, supabase]);
-
-  const fetchAccountData = async () => {
-    if (currentUser?.id === accountId) {
-      setProfile(currentUser);
+    if (!currentUser || !accountId) {
+      router.push("/login");
       return;
     }
+
+    fetchAccountData();
+  }, [accountId, supabase, currentUser]);
+
+  const fetchAccountData = async () => {
     try {
       setLoading(true);
 
-      // Fetch user profile
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", accountId)
-        .single();
+      if (currentUser?.id === accountId) {
+        setProfile(currentUser);
+        setFormData(currentUser);
+      } else {
+        // Fetch user profile for other users (admin view)
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", accountId)
+          .single();
 
-      if (userError) throw userError;
-      setProfile(userData);
-      setFormData(userData);
+        if (userError) throw userError;
+        setProfile(userData);
+        setFormData(userData);
+      }
 
-      // Fetch user orders
+      // ALWAYS fetch orders and stats regardless of who's viewing
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(
           `
-          *,
-          order_items (
-            product_id,
-            quantity ,
-            unit_price,
-            product_name
-          )
-        `,
+        *,
+        order_items (
+          product_id,
+          quantity,
+          unit_price,
+          product_name
+        )
+      `,
         )
         .eq("user_id", accountId)
         .order("created_at", { ascending: false });
@@ -227,9 +235,10 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
         </div>
       </div>
     );
@@ -237,7 +246,7 @@ export default function AccountPage() {
 
   if (!profile) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 py-8">
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
@@ -256,11 +265,11 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-2 py-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-          <div>
+        <div className="flex flex-col sm:flex-row justify-between items-center md:items-center gap-4 mb-8">
+          <div className="flex items-center w-full gap-4">
             <h1 className="text-3xl font-bold mb-2">Customer Profile</h1>
             <div className="flex items-center gap-2">
               <Badge
@@ -277,12 +286,24 @@ export default function AccountPage() {
             </div>
           </div>
 
-          {isOwnProfile && !editing && (
-            <Button onClick={() => setEditing(true)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Profile
+          <div className="flex justify-between sm:justify-end w-full gap-4">
+            {isOwnProfile && !editing && (
+              <Button onClick={() => setEditing(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
+            )}
+            <Button
+              variant={"destructive"}
+              onClick={() => {
+                signOut();
+                router.push("/");
+              }}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
             </Button>
-          )}
+          </div>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
@@ -610,7 +631,7 @@ export default function AccountPage() {
           </TabsContent>
 
           {/* Orders Tab */}
-          <TabsContent value="orders" className="space-y-6">
+          <TabsContent value="orders">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -633,10 +654,17 @@ export default function AccountPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {orders.map((order: any) => (
-                      <Card key={order.id} className="overflow-hidden">
-                        <CardContent className="p-0">
-                          <div className="p-6">
+                    {orders.map((order: any) => {
+                      const orderItems = order.order_items || [];
+                      const itemsCount = orderItems.length; // Number of distinct products
+                      const unitsCount = orderItems.reduce(
+                        (sum: number, item: any) => sum + (item.quantity || 0),
+                        0,
+                      ); // Total quantity of all items
+
+                      return (
+                        <Card key={order.id} className="overflow-hidden">
+                          <CardContent>
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                               <div>
                                 <div className="flex items-center gap-2 mb-1">
@@ -663,6 +691,51 @@ export default function AccountPage() {
 
                             <Separator className="mb-4" />
 
+                            {/* Order Items Preview */}
+                            {orderItems.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-sm font-medium mb-2">
+                                  Order Items:
+                                </p>
+                                <div className="space-y-2">
+                                  {orderItems
+                                    .slice(0, 2)
+                                    .map((item: any, index: number) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-center gap-3 p-2 bg-muted/50 rounded"
+                                      >
+                                        <div className="h-8 w-8 bg-gray-100 rounded flex items-center justify-center">
+                                          <Package className="h-4 w-4 text-gray-500" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-medium truncate">
+                                            {item.product_name}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            Qty: {item.quantity} × KES{" "}
+                                            {item.unit_price?.toLocaleString()}
+                                          </p>
+                                        </div>
+                                        <div className="font-semibold">
+                                          KES{" "}
+                                          {(
+                                            item.quantity * item.unit_price
+                                          )?.toLocaleString()}
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                  {orderItems.length > 2 && (
+                                    <p className="text-sm text-muted-foreground text-center pt-2">
+                                      + {orderItems.length - 2} more item
+                                      {orderItems.length - 2 > 1 ? "s" : ""}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <p className="text-muted-foreground">
@@ -681,23 +754,26 @@ export default function AccountPage() {
                                 </p>
                               </div>
                               <div>
-                                <p className="text-muted-foreground">Items</p>
-                                <p className="font-medium">
-                                  {order.order_items?.reduce(
-                                    (sum: number, item: any) => sum + item.qty,
-                                    0,
-                                  ) || 0}{" "}
-                                  items
+                                <p className="text-muted-foreground">
+                                  Products
                                 </p>
+                                <div className="space-y-1">
+                                  <p className="font-medium">
+                                    {itemsCount} item
+                                    {itemsCount !== 1 ? "s" : ""}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {unitsCount} unit
+                                    {unitsCount !== 1 ? "s" : ""} total
+                                  </p>
+                                </div>
                               </div>
-                              <div className="text-right md:text-left">
+                              <div className="text-right md:text-left space-x-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() =>
-                                    router.push(
-                                      `/tracking/${order.tracking_number}`,
-                                    )
+                                    router.push(`/tracking/${order.id}`)
                                   }
                                   disabled={!order.tracking_number}
                                 >
@@ -708,19 +784,102 @@ export default function AccountPage() {
                                   size="sm"
                                   onClick={() =>
                                     router.push(
-                                      `/checkout/success?orderId=${order.tracking_number}`,
+                                      `/checkout/success?orderId=${order.id}`,
                                     )
                                   }
-                                  disabled={!order.id}
                                 >
-                                  View Order
+                                  View Details
                                 </Button>
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+
+                            {/* Installation Service (if applicable) */}
+                            {order.installation_required &&
+                              order.installation_service && (
+                                <div className="mt-4 pt-4 border-t">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Wrench className="h-4 w-4 text-blue-600" />
+                                    <p className="text-sm font-medium text-blue-700">
+                                      Includes Installation:
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">
+                                      {order.installation_service.name}
+                                    </span>
+                                    <span className="font-semibold">
+                                      KES{" "}
+                                      {order.installation_cost?.toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                            {/* Loyalty Points (if applicable) */}
+                            {(order.loyalty_points_earned > 0 ||
+                              order.loyalty_discount > 0) && (
+                              <div className="mt-4 pt-4 border-t">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Crown className="h-4 w-4 text-amber-600" />
+                                  <p className="text-sm font-medium text-amber-700">
+                                    Loyalty Points:
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                  {order.loyalty_points_earned > 0 && (
+                                    <div>
+                                      <span className="text-muted-foreground">
+                                        Earned
+                                      </span>
+                                      <span className="ml-2 font-semibold text-green-600">
+                                        +{order.loyalty_points_earned} pts
+                                      </span>
+                                    </div>
+                                  )}
+                                  {order.loyalty_discount > 0 && (
+                                    <div>
+                                      <span className="text-muted-foreground">
+                                        Discount Applied
+                                      </span>
+                                      <span className="ml-2 font-semibold text-green-600">
+                                        -KES{" "}
+                                        {order.loyalty_discount.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Coupon Applied (if applicable) */}
+                            {order.coupon_discount > 0 && order.coupon_code && (
+                              <div className="mt-4 pt-4 border-t">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Tag className="h-4 w-4 text-green-600" />
+                                  <p className="text-sm font-medium text-green-700">
+                                    Coupon Applied:
+                                  </p>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">
+                                      Code:
+                                    </span>
+                                    <code className="ml-2 font-mono bg-green-100 px-2 py-1 rounded text-green-800">
+                                      {order.coupon_code}
+                                    </code>
+                                  </div>
+                                  <span className="font-semibold text-green-600">
+                                    -KES{" "}
+                                    {order.coupon_discount.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
