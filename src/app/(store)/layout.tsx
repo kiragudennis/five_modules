@@ -84,89 +84,87 @@ export default function StoreLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en-KE" className={inter.className}>
-      <head>
-        {/* Structured Data for Local Business */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "LocalBusiness",
-              name: "Blessed Two Electronics",
-              image: "https://www.blessedtwo.com/logo.jpg",
-              "@id": "https://www.blessedtwo.com",
-              url: "https://www.blessedtwo.com",
-              telephone: "+254727833691",
-              address: {
-                "@type": "PostalAddress",
-                streetAddress: "Duruma Road",
-                addressLocality: "Nairobi",
-                addressRegion: "Nairobi",
-                addressCountry: "KE",
+    <main>
+      {/* Structured Data for Local Business */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            name: "Blessed Two Electronics",
+            image: "https://www.blessedtwo.com/logo.jpg",
+            "@id": "https://www.blessedtwo.com",
+            url: "https://www.blessedtwo.com",
+            telephone: "+254727833691",
+            address: {
+              "@type": "PostalAddress",
+              streetAddress: "Duruma Road",
+              addressLocality: "Nairobi",
+              addressRegion: "Nairobi",
+              addressCountry: "KE",
+            },
+            geo: {
+              "@type": "GeoCoordinates",
+              latitude: -1.286389,
+              longitude: 36.817223,
+            },
+            openingHoursSpecification: [
+              {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: [
+                  "Monday",
+                  "Tuesday",
+                  "Wednesday",
+                  "Thursday",
+                  "Friday",
+                  "Saturday",
+                ],
+                opens: "08:00",
+                closes: "18:00",
               },
-              geo: {
-                "@type": "GeoCoordinates",
-                latitude: -1.286389,
-                longitude: 36.817223,
+              {
+                "@type": "OpeningHoursSpecification",
+                dayOfWeek: "Sunday",
+                opens: "10:00",
+                closes: "16:00",
               },
-              openingHoursSpecification: [
-                {
-                  "@type": "OpeningHoursSpecification",
-                  dayOfWeek: [
-                    "Monday",
-                    "Tuesday",
-                    "Wednesday",
-                    "Thursday",
-                    "Friday",
-                    "Saturday",
-                  ],
-                  opens: "08:00",
-                  closes: "18:00",
-                },
-                {
-                  "@type": "OpeningHoursSpecification",
-                  dayOfWeek: "Sunday",
-                  opens: "10:00",
-                  closes: "16:00",
-                },
-              ],
-              priceRange: "KES 200 - KES 500,000",
-              description:
-                "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
-              sameAs: [
-                "https://www.tiktok.com/@blessed_2_electricals",
-                "https://www.facebook.com/blessedtwoelectronics",
-                "https://www.instagram.com/blessedtwoelectronics",
-                "https://twitter.com/blessedtwoelectronics",
-              ],
-            }),
-          }}
-        />
+            ],
+            priceRange: "KES 200 - KES 500,000",
+            description:
+              "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
+            sameAs: [
+              "https://www.tiktok.com/@blessed_2_electricals",
+              "https://www.facebook.com/blessedtwoelectronics",
+              "https://www.instagram.com/blessedtwoelectronics",
+              "https://twitter.com/blessedtwoelectronics",
+            ],
+          }),
+        }}
+      />
 
-        {/* Structured Data for Website */}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebSite",
-              name: "Blessed Two Electronics",
-              url: "https://blessedtwo.com",
-              potentialAction: {
-                "@type": "SearchAction",
-                target: {
-                  "@type": "EntryPoint",
-                  urlTemplate:
-                    "https://blessedtwo.com/search?q={search_term_string}",
-                },
-                "query-input": "required name=search_term_string",
+      {/* Structured Data for Website */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Blessed Two Electronics",
+            url: "https://blessedtwo.com",
+            potentialAction: {
+              "@type": "SearchAction",
+              target: {
+                "@type": "EntryPoint",
+                urlTemplate:
+                  "https://blessedtwo.com/search?q={search_term_string}",
               },
-            }),
-          }}
-        />
-      </head>
-      <body className="min-h-screen bg-white text-gray-900">{children}</body>
-    </html>
+              "query-input": "required name=search_term_string",
+            },
+          }),
+        }}
+      />
+      {children}
+    </main>
   );
 }
