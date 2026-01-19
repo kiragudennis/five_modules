@@ -21,24 +21,96 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Finest Shop | Premium Apparel Demo",
-    template: "%s | Finest Shop Demo",
+    default: "Blessed Two Electronics | Quality Lighting Solutions Nairobi",
+    template: "%s | Blessed Two Electronics Nairobi",
   },
   description:
-    "An example e-commerce store showcasing modern shopping features. This demo includes product catalog, cart functionality, and checkout process.",
+    "Nairobi's premier lighting solutions provider. Shop premium LED bulbs, solar lighting, security lights, smart lighting systems, and commercial lighting with 2-year warranty, same-day delivery, and professional installation.",
   keywords: [
-    "e-commerce demo",
-    "online shop example",
-    "apparel store",
-    "shopping cart",
+    "LED bulbs Nairobi",
+    "solar lighting Kenya",
+    "security lights installation",
+    "smart lighting systems",
+    "commercial lighting solutions",
+    "lighting store Duruma Road",
+    "energy saving lights",
+    "professional lighting installation",
+    "2-year warranty lighting",
+    "Nairobi lighting solutions",
+    "electric lighting products",
+    "lighting fixtures Kenya",
   ],
-
-  // Social media example
+  authors: [
+    {
+      name: "Blessed Two Electronics",
+      url: "https://www.blessedtwo.com",
+    },
+  ],
+  creator: "Blessed Two Electronics",
+  publisher: "Blessed Two Electronics",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: true,
+  },
+  metadataBase: new URL("https://www.blessedtwo.com"),
+  alternates: {
+    canonical: "/",
+    languages: {
+      "en-KE": "/",
+      "sw-KE": "/",
+    },
+  },
   openGraph: {
-    title: "Finest Shop | An Online Store Example",
-    description: "A modern e-commerce shop demonstration",
     type: "website",
-    images: ["/images/demo-store-preview.jpg"],
+    locale: "en_KE",
+    url: "https://www.blessedtwo.com",
+    siteName: "Blessed Two Electronics",
+    title: "Blessed Two Electronics | Premium Lighting Solutions Nairobi",
+    description:
+      "Nairobi's trusted lighting solutions provider offering quality LED bulbs, solar lighting, security systems, and professional installation services.",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Blessed Two Electronics - Quality Lighting Solutions in Nairobi",
+      },
+      {
+        url: "/og-image-products.jpg",
+        width: 1200,
+        height: 630,
+        alt: "LED Bulbs, Solar Lighting & Security Lights in Nairobi",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Blessed Two Electronics | Lighting Solutions Nairobi",
+    description:
+      "Quality lighting solutions with 2-year warranty, same-day delivery, and professional installation in Nairobi.",
+    creator: "@blessedtwo",
+    site: "@blessedtwo",
+    images: ["/twitter-image.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  category: "Electronics & Lighting",
+  other: {
+    "theme-color": "#1e40af",
+    "msapplication-TileColor": "#1e40af",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "apple-mobile-web-app-title": "Blessed Two Electronics",
   },
 };
 
