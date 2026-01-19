@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { lightingCategories, shopFeatures } from "@/lib/constants";
 
-export function AboutPageContent() {
+export default function AboutPageContent() {
   // Get top 6 popular categories for display
   const popularCategories = lightingCategories
     .filter((cat) => cat.popular)
@@ -106,7 +106,7 @@ export function AboutPageContent() {
             name: "About Blessed Two Electronics",
             description:
               "Nairobi's premier lighting solutions provider since 2018",
-            url: "https://blessedtwo.co.ke/about",
+            url: "https://blessedtwo.com/about",
             breadcrumb: {
               "@type": "BreadcrumbList",
               itemListElement: [
@@ -114,13 +114,13 @@ export function AboutPageContent() {
                   "@type": "ListItem",
                   position: 1,
                   name: "Home",
-                  item: "https://blessedtwo.co.ke",
+                  item: "https://blessedtwo.com",
                 },
                 {
                   "@type": "ListItem",
                   position: 2,
                   name: "About",
-                  item: "https://blessedtwo.co.ke/about",
+                  item: "https://blessedtwo.com/about",
                 },
               ],
             },
@@ -137,8 +137,8 @@ export function AboutPageContent() {
             name: "Blessed Two Electronics",
             description:
               "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
-            url: "https://blessedtwo.co.ke",
-            logo: "https://blessedtwo.co.ke/logo.png",
+            url: "https://blessedtwo.com",
+            logo: "https://blessedtwo.com/logo.png",
             foundingDate: "2018",
             founders: [
               {
