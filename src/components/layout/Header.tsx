@@ -19,13 +19,13 @@ import { useStore } from "@/lib/context/StoreContext";
 import { Badge } from "../ui/badge";
 
 const navigation = [
-  { name: "Home", href: "/" },
+  { name: "Home", href: "/accounts" },
   { name: "Products", href: "/products" },
   { name: "Categories", href: "/categories" },
-  { name: "About", href: "/about" },
-  { name: "Contact", href: "/contact" },
   { name: "Account", href: "/accounts" },
   { name: "Loyalty", href: "/accounts/loyalty" },
+  { name: "About", href: "/about" },
+  { name: "Contact", href: "/contact" },
 ];
 
 const adminNavigation = [

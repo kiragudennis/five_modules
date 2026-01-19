@@ -7,7 +7,9 @@ export default function Footer() {
       <div className="container mx-auto py-8 md:py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-lg font-semibold mb-4">Shop Example</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Blessed Two Electronics
+            </h3>
             <p className="text-sm text-muted-foreground mb-4">
               Your one-stop online store for quality products.
             </p>
@@ -120,15 +122,16 @@ export default function Footer() {
             <address className="not-italic text-sm text-muted-foreground">
               <p>Thika Highway Rd</p>
               <p>Mombasa, Kenya</p>
-              <p className="mt-2">Email: </p>
-              <p>Phone: </p>
+              <p className="mt-2">Email: info@blessedtwo.com</p>
+              <p>Phone: 0727 833 691</p>
             </address>
           </div>
         </div>
 
         <div className="border-t mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Shop Example. All rights reserved.
+            © {new Date().getFullYear()} Blessed Two Electronics. All rights
+            reserved.
           </p>
           <div className="flex gap-4 mt-4 md:mt-0">
             <Link

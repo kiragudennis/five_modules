@@ -210,12 +210,12 @@ export default function TrackingPage({
   const totalItems = orders.reduce(
     (sum, order) =>
       sum + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0),
-    0
+    0,
   );
 
   const totalAmount = orders.reduce(
     (sum, order) => sum + order.total_amount,
-    0
+    0,
   );
   const currency = mainOrder.currency || "KES";
 
@@ -306,7 +306,7 @@ export default function TrackingPage({
       const estimatedDate = new Date(orderDate);
       estimatedDate.setDate(
         estimatedDate.getDate() +
-          (mainOrder.shipping_method === "express" ? 2 : 7)
+          (mainOrder.shipping_method === "express" ? 2 : 7),
       );
       return estimatedDate.toLocaleDateString("en-KE", {
         weekday: "long",
@@ -365,7 +365,7 @@ export default function TrackingPage({
 
         {/* Tracking Overview Card */}
         <Card className="mb-8 border-amber-200 dark:border-amber-800/50 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20">
-          <CardContent className="p-6">
+          <CardContent>
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
@@ -421,7 +421,7 @@ export default function TrackingPage({
                     "border-amber-500",
                     copied
                       ? "bg-green-500 hover:bg-green-600"
-                      : "text-amber-600 hover:bg-amber-50"
+                      : "text-amber-600 hover:bg-amber-50",
                   )}
                 >
                   {copied ? (
@@ -455,8 +455,8 @@ export default function TrackingPage({
           <div className="lg:col-span-2 space-y-6">
             {/* Tracking Timeline */}
             <Card>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-6">
+              <CardContent>
+                <div className="flex flex-warp justify-between items-center mb-6">
                   <h3 className="text-lg font-bold">Shipment Progress</h3>
                   <Badge variant="outline">
                     {currentStepIndex + 1} of {TRACKING_STEPS.length} steps
@@ -467,38 +467,40 @@ export default function TrackingPage({
                 <div className="relative mb-8">
                   <Progress
                     value={
-                      (currentStepIndex / (TRACKING_STEPS.length - 1)) * 100
+                      ((currentStepIndex + 1) / TRACKING_STEPS.length) * 100
                     }
                     className="h-2"
                   />
-                  <div className="flex justify-between mt-4">
+                  <div className="flex justify-between items-start mt-4 relative overflow-auto">
                     {TRACKING_STEPS.map((step, index) => (
                       <div
                         key={step.status}
-                        className="flex flex-col items-center relative"
-                        style={{
-                          left: `${
-                            (index / (TRACKING_STEPS.length - 1)) * 100
-                          }%`,
-                          transform: "translateX(-50%)",
-                        }}
+                        className="flex flex-col items-center relative z-10"
                       >
+                        {/* Progress line between steps */}
+                        {index > 0 && (
+                          <div
+                            className="absolute top-5 -left-1/2 w-full h-0.5 bg-gray-200 dark:bg-gray-700 -z-10"
+                            style={{ width: "calc(100% + 1rem)" }}
+                          />
+                        )}
+
                         <div
                           className={cn(
                             "w-10 h-10 rounded-full flex items-center justify-center mb-2 border-2",
                             index <= currentStepIndex
                               ? `${step.color} text-white border-white shadow-lg`
-                              : "bg-gray-200 dark:bg-gray-700 text-gray-500 border-gray-300"
+                              : "bg-gray-200 dark:bg-gray-700 text-gray-500 border-gray-300",
                           )}
                         >
                           <step.icon className="h-5 w-5" />
                         </div>
                         <span
                           className={cn(
-                            "text-xs font-medium whitespace-nowrap text-center",
+                            "text-xs font-medium whitespace-nowrap text-center pl-2",
                             index <= currentStepIndex
                               ? "text-gray-900 dark:text-white font-semibold"
-                              : "text-gray-500"
+                              : "text-gray-500",
                           )}
                         >
                           {step.label}
@@ -567,8 +569,8 @@ export default function TrackingPage({
                                   update.status === "completed"
                                   ? "bg-green-500"
                                   : update.status === "shipped"
-                                  ? "bg-blue-500"
-                                  : "bg-amber-500"
+                                    ? "bg-blue-500"
+                                    : "bg-amber-500",
                               )}
                             />
                           </div>
@@ -580,7 +582,7 @@ export default function TrackingPage({
                               <p className="text-sm text-muted-foreground">
                                 {format(
                                   new Date(update.created_at),
-                                  "MMM dd, HH:mm"
+                                  "MMM dd, HH:mm",
                                 )}
                               </p>
                             </div>
@@ -610,7 +612,7 @@ export default function TrackingPage({
 
             {/* Order Details */}
             <Card>
-              <CardContent className="p-6">
+              <CardContent>
                 <h3 className="text-lg font-bold mb-6">Order Details</h3>
 
                 {orders.map((order, orderIndex) => {
@@ -630,7 +632,7 @@ export default function TrackingPage({
                             Placed on{" "}
                             {format(
                               new Date(order.created_at),
-                              "MMMM dd, yyyy HH:mm"
+                              "MMMM dd, yyyy HH:mm",
                             )}
                           </p>
                         </div>
@@ -724,7 +726,7 @@ export default function TrackingPage({
                                 -
                                 {formatCurrency(
                                   order.wholesale_savings,
-                                  currency
+                                  currency,
                                 )}
                               </span>
                             </div>
@@ -739,7 +741,7 @@ export default function TrackingPage({
                                 -
                                 {formatCurrency(
                                   order.coupon_discount,
-                                  currency
+                                  currency,
                                 )}
                               </span>
                             </div>
@@ -762,7 +764,7 @@ export default function TrackingPage({
                               <span>
                                 {formatCurrency(
                                   order.installation_cost,
-                                  currency
+                                  currency,
                                 )}
                               </span>
                             </div>
@@ -823,7 +825,7 @@ export default function TrackingPage({
           <div className="space-y-6">
             {/* Customer Information */}
             <Card>
-              <CardContent className="p-6">
+              <CardContent>
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <Users className="h-5 w-5 text-amber-500" />
                   Customer Information
@@ -860,7 +862,7 @@ export default function TrackingPage({
 
             {/* Shipping Address */}
             <Card>
-              <CardContent className="p-6">
+              <CardContent>
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <MapPin className="h-5 w-5 text-blue-500" />
                   Shipping Address
@@ -909,7 +911,7 @@ export default function TrackingPage({
 
             {/* Delivery Information */}
             <Card>
-              <CardContent className="p-6">
+              <CardContent>
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <Truck className="h-5 w-5 text-green-500" />
                   Delivery Information
@@ -956,7 +958,7 @@ export default function TrackingPage({
 
             {/* Support Card */}
             <Card className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200">
-              <CardContent className="p-6">
+              <CardContent>
                 <h3 className="text-lg font-bold mb-4">Need Help?</h3>
 
                 <div className="space-y-3">

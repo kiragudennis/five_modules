@@ -52,7 +52,13 @@ export default function SuccessPage({
   const [isLoading, setIsLoading] = useState(true);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const { dispatch } = useStore();
+  const { profile } = useAuth();
   const router = useRouter();
+  const [paymentStatus, setPaymentStatus] = useState<
+    "idle" | "processing" | "success" | "error"
+  >("idle");
+  const [phoneNumber, setPhoneNumber] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -130,6 +136,67 @@ export default function SuccessPage({
       return () => clearTimeout(timer);
     }
   }, [paymentComplete]);
+
+  // M-Pesa payment
+  const handleMPesaPayment = async () => {
+    setPaymentStatus("processing");
+
+    try {
+      if (!profile) {
+        toast.info("Haven't logged in yet, redirecting to login...");
+        return router.push("/login");
+      }
+
+      if (!phoneNumber) {
+        setPaymentStatus("error");
+        setErrorMessage("Please enter your phone number.");
+        toast.error("Please enter your phone number.");
+        return;
+      }
+
+      const res = await fetch("/api/checkout/mpesa/retrial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: orderDetails.id, phoneNumber }),
+      });
+
+      const data = await res.json();
+      console.log("Data:", data);
+
+      if (!res.ok || data.error) {
+        setPaymentStatus("error");
+        setErrorMessage(data.error || "Failed to initiate M-Pesa payment.");
+        toast.error(data.error || "Failed to initiate M-Pesa payment.");
+        console.error("M-Pesa payment error:", data);
+        return;
+      }
+
+      // Simulate successful payment
+      setPaymentStatus("success");
+
+      // they have received an STK push notification
+      toast.success(
+        "M-Pesa payment initiated successfully! Please complete the payment on your phone.",
+      );
+
+      const { orderId: confirmedOrderId, data: mpesaResponse } = data;
+
+      if (mpesaResponse?.CustomerMessage) {
+        toast.info(mpesaResponse.CustomerMessage);
+      }
+
+      router.push(`/checkout/success?orderId=${confirmedOrderId}`);
+    } catch (error) {
+      console.error("Payment error:", error);
+      setPaymentStatus("error");
+      setErrorMessage(
+        "There was an error processing your M-Pesa payment. Please try again.",
+      );
+      toast.error(
+        "There was an error processing your M-Pesa payment. Please try again.",
+      );
+    }
+  };
 
   if (isLoading) {
     return (
@@ -252,7 +319,7 @@ export default function SuccessPage({
       const estimatedDate = new Date(orderDate);
       estimatedDate.setDate(
         estimatedDate.getDate() +
-          (orderDetails.shipping_method === "express" ? 2 : 7)
+          (orderDetails.shipping_method === "express" ? 2 : 7),
       );
       return estimatedDate.toLocaleDateString("en-KE", {
         weekday: "long",
@@ -363,7 +430,7 @@ export default function SuccessPage({
                             icon={<Calendar className="h-4 w-4" />}
                             label="Order Date"
                             value={new Date(
-                              orderDetails.created_at
+                              orderDetails.created_at,
                             ).toLocaleDateString("en-KE", {
                               weekday: "long",
                               year: "numeric",
@@ -443,7 +510,7 @@ export default function SuccessPage({
                                 -
                                 {formatCurrency(
                                   orderDetails.coupon_discount,
-                                  orderDetails.currency
+                                  orderDetails.currency,
                                 )}
                               </span>
                             )}
@@ -488,14 +555,14 @@ export default function SuccessPage({
                               {formatCurrency(
                                 item.total_price ||
                                   item.applied_price * item.quantity,
-                                orderDetails.currency
+                                orderDetails.currency,
                               )}
                             </p>
                             <span className="text-sm text-muted-foreground">
                               @{" "}
                               {formatCurrency(
                                 item.applied_price,
-                                orderDetails.currency
+                                orderDetails.currency,
                               )}
                             </span>
                           </div>
@@ -509,7 +576,7 @@ export default function SuccessPage({
                         <span>
                           {formatCurrency(
                             orderDetails.subtotal,
-                            orderDetails.currency
+                            orderDetails.currency,
                           )}
                         </span>
                       </div>
@@ -521,7 +588,7 @@ export default function SuccessPage({
                             -
                             {formatCurrency(
                               orderDetails.wholesale_savings,
-                              orderDetails.currency
+                              orderDetails.currency,
                             )}
                           </span>
                         </div>
@@ -534,7 +601,7 @@ export default function SuccessPage({
                             -
                             {formatCurrency(
                               orderDetails.coupon_discount,
-                              orderDetails.currency
+                              orderDetails.currency,
                             )}
                           </span>
                         </div>
@@ -545,7 +612,7 @@ export default function SuccessPage({
                         <span>
                           {formatCurrency(
                             orderDetails.shipping_total,
-                            orderDetails.currency
+                            orderDetails.currency,
                           )}
                         </span>
                       </div>
@@ -556,7 +623,7 @@ export default function SuccessPage({
                           <span>
                             {formatCurrency(
                               orderDetails.installation_cost,
-                              orderDetails.currency
+                              orderDetails.currency,
                             )}
                           </span>
                         </div>
@@ -569,7 +636,7 @@ export default function SuccessPage({
                         <span className="text-2xl text-green-600">
                           {formatCurrency(
                             orderDetails.total_amount,
-                            orderDetails.currency
+                            orderDetails.currency,
                           )}
                         </span>
                       </div>
@@ -625,7 +692,7 @@ export default function SuccessPage({
                           <span>
                             {formatCurrency(
                               orderDetails.shipping_total,
-                              orderDetails.currency
+                              orderDetails.currency,
                             )}
                           </span>
                         </div>
@@ -658,7 +725,7 @@ export default function SuccessPage({
                               </span>
                               <span>
                                 {new Date(
-                                  orderDetails.installation_date
+                                  orderDetails.installation_date,
                                 ).toLocaleDateString()}
                               </span>
                             </div>
@@ -697,7 +764,16 @@ export default function SuccessPage({
                           <Badge className="bg-green-100 text-green-800 border-green-200">
                             Tracking #: {orderDetails.tracking_number}
                           </Badge>
-                          <Button size="sm" variant="outline">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!orderDetails.tracking_number}
+                            onClick={() =>
+                              router.push(
+                                `/tracking/${orderDetails.tracking_number}`,
+                              )
+                            }
+                          >
                             Track Shipment
                           </Button>
                         </div>
@@ -824,15 +900,7 @@ export default function SuccessPage({
                     instructions or return to checkout to complete payment.
                   </p>
                   <Button asChild className="w-full">
-                    <Link
-                      href={`/checkout/payment/${
-                        orderDetails.payment_method === "paypal"
-                          ? "paypal"
-                          : "mpesa"
-                      }?orderId=${orderId}`}
-                    >
-                      Complete Payment Now
-                    </Link>
+                    <Link href={"#complete-payment"}>Complete Payment Now</Link>
                   </Button>
                 </div>
               )}
@@ -859,7 +927,137 @@ export default function SuccessPage({
                 )}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent
+              id="complete-payment"
+              className="space-y-6 scroll-mt-20"
+            >
+              {/* 🚚 Sidebar Next Steps */}
+              <div className="bg-background rounded-lg border p-4 sm:p-6 space-y-6 h-fit">
+                {/* Payment Status Messages */}
+                {paymentStatus === "processing" && (
+                  <div className="mb-6 p-4 bg-blue-50 text-blue-700 rounded-lg flex items-center">
+                    <div className="animate-spin mr-2 h-5 w-5 border-2 border-blue-700 border-t-transparent rounded-full"></div>
+                    <p>Processing your payment...</p>
+                  </div>
+                )}
+
+                {paymentStatus === "success" && (
+                  <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-lg flex items-center">
+                    <CheckCircle className="mr-2 h-5 w-5" />
+                    <p>
+                      Payment successful! Redirecting to confirmation page...
+                    </p>
+                  </div>
+                )}
+
+                {paymentStatus === "error" && (
+                  <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg flex items-center">
+                    <AlertCircle className="mr-2 h-5 w-5" />
+                    <p>{errorMessage}</p>
+                  </div>
+                )}
+                {orderDetails.status === "pending" ? (
+                  <>
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">Payment Pending</h3>
+                        <p className="text-muted-foreground text-sm">
+                          Your order was placed, but payment hasn’t been
+                          completed. Please finish your payment below.
+                        </p>
+                        <span className="text-xs text-muted-foreground mt-2">
+                          📝 If you’ve already completed payment, reload this
+                          page to refresh the status.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Payment retry component */}
+                    <div className="border rounded-lg p-4">
+                      {orderDetails.shipping_info?.paymentMethod ===
+                        "paypal" && (
+                        <Badge
+                          variant="outline"
+                          className="bg-red-100 text-red-800 border-red-200"
+                        >
+                          Recent Payment Method
+                        </Badge>
+                      )}
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          // 🚀 redirect back to PayPal checkout flow
+                          router.push(
+                            `/checkout/processing/retrial?orderId=${orderDetails.id}`,
+                          );
+                        }}
+                        className="w-full bg-[#0070ba] hover:bg-[#003087] text-white"
+                      >
+                        Retry with PayPal
+                      </Button>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="flex items-center gap-4 my-6">
+                      <div className="flex-grow border-t border-gray-200 opacity-50" />
+                      <span className="text-sm text-muted-foreground">Or</span>
+                      <div className="flex-grow border-t border-gray-200 opacity-50" />
+                    </div>
+
+                    <div className="border rounded-lg p-4 space-y-3">
+                      {orderDetails.shipping_info?.paymentMethod ===
+                        "mpesa" && (
+                        <Badge
+                          variant="outline"
+                          className="bg-red-100 text-red-800 border-red-200"
+                        >
+                          Recent Payment Method
+                        </Badge>
+                      )}
+                      <input
+                        type="tel"
+                        placeholder="e.g., 254712345678"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        className="w-full border rounded-md px-3 py-2 text-sm"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleMPesaPayment}
+                        className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white"
+                        disabled={phoneNumber.length !== 12}
+                      >
+                        Retry with M-Pesa
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-4">
+                      <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                        <Package className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-1">What’s next?</h3>
+                        <p className="text-muted-foreground text-sm">
+                          We’re packing your items. You’ll get an email once
+                          your order ships, with tracking info included.
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href={`/orders/${orderDetails.id}/invoice`}>
+                        <FileDown className="h-4 w-4 mr-2" />
+                        Download Invoice
+                      </Link>
+                    </Button>
+                  </>
+                )}
+              </div>
               {isOrderPaid ? (
                 <>
                   <div className="text-center py-4">
@@ -874,7 +1072,7 @@ export default function SuccessPage({
 
                   <div className="space-y-3">
                     <Button asChild className="w-full">
-                      <Link href="/account/orders">
+                      <Link href="/accounts">
                         <Eye className="h-4 w-4 mr-2" />
                         View All Orders
                       </Link>
@@ -900,28 +1098,12 @@ export default function SuccessPage({
                   </div>
 
                   <div className="space-y-3">
-                    {orderDetails.payment_method === "mpesa" && (
-                      <Button asChild className="w-full">
-                        <Link
-                          href={`/checkout/payment/mpesa?orderId=${orderId}`}
-                        >
-                          <Smartphone className="h-4 w-4 mr-2" />
-                          Complete M-Pesa Payment
-                        </Link>
-                      </Button>
-                    )}
-
-                    {orderDetails.payment_method === "paypal" && (
-                      <Button asChild className="w-full">
-                        <Link
-                          href={`/checkout/payment/paypal?orderId=${orderId}`}
-                        >
-                          <CreditCard className="h-4 w-4 mr-2" />
-                          Complete PayPal Payment
-                        </Link>
-                      </Button>
-                    )}
-
+                    <Button asChild className="w-full">
+                      <Link href={"#complete-payment"}>
+                        <Smartphone className="h-4 w-4 mr-2" />
+                        Complete M-Pesa Payment
+                      </Link>
+                    </Button>
                     {orderDetails.payment_method === "cash_on_delivery" && (
                       <div className="p-4 bg-blue-50 rounded-lg">
                         <p className="text-sm">
@@ -954,7 +1136,7 @@ export default function SuccessPage({
                     variant="ghost"
                     className="w-full justify-start"
                   >
-                    <Link href="/account">
+                    <Link href="/accounts">
                       <Settings className="h-4 w-4 mr-2" />
                       My Account
                     </Link>

@@ -52,7 +52,7 @@ export default function AdminDashboard() {
   return (
     <div className="px-2 py-6">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Admin</h1>
+        <h1 className="text-3xl font-bold truncate">Admin Dashboard</h1>
         <div className="flex gap-4">
           <Button asChild>
             <Link href="/admin/products/new">Add New Product</Link>
