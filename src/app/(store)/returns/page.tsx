@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function ReturnsPageContent() {
+export default function ReturnsPageContent() {
   const faqs = [
     {
       question: "How long do I have to return a product?",
