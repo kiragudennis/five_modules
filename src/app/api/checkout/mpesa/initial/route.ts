@@ -8,7 +8,6 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const body = await req.json();
-
   const { cart, phoneNumber } = body;
 
   // Destructure the new cart structure
@@ -186,8 +185,6 @@ export async function POST(req: Request) {
       },
     };
 
-    console.log("Order data received in the backend:", orderPayload);
-
     const { data: orderData, error: orderErr } = await supabaseAdmin
       .from("orders")
       .insert(orderPayload)
@@ -257,7 +254,6 @@ export async function POST(req: Request) {
           // Continue without coupon - order already created
         } else {
           couponResult = couponData;
-          console.log("Coupon applied successfully:", couponData);
         }
       } catch (couponErr) {
         console.warn(
@@ -269,7 +265,7 @@ export async function POST(req: Request) {
     }
 
     // Update amountKES with final total after coupon
-    if (couponResult && couponResult.discount_amount) {
+    if (couponResult && couponResult.success) {
       amountKES = Math.max(1, amountKES - couponResult.discount_amount); // Ensure positive amount
     }
 
@@ -293,7 +289,6 @@ export async function POST(req: Request) {
           // Continue without redeem - order already created
         } else {
           redeemResult = redeemData;
-          console.log("Redeem code applied successfully:", redeemData);
         }
       } catch (redeemErr) {
         console.warn(
@@ -304,10 +299,9 @@ export async function POST(req: Request) {
       }
     }
 
-    if (redeemResult.success) {
+    if (redeemResult && redeemResult.success) {
       // Update amountKES with loyalty discount
       amountKES = Math.max(1, amountKES - redeemResult.discount_amount);
-      console.log("Loyalty discount applied:", redeemResult.discount_amount);
     }
 
     // 📦 3. Initiate M-Pesa payment

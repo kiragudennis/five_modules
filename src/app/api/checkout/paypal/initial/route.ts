@@ -204,7 +204,6 @@ export async function POST(req: Request) {
           // Continue without coupon - order already created
         } else {
           couponResult = couponData;
-          console.log("Coupon applied successfully:", couponData);
         }
       } catch (couponErr) {
         console.warn(
@@ -241,7 +240,6 @@ export async function POST(req: Request) {
           // Continue without redeem - order already created
         } else {
           redeemResult = redeemData;
-          console.log("Redeem code applied successfully:", redeemData);
         }
       } catch (redeemErr) {
         console.warn(
@@ -252,10 +250,9 @@ export async function POST(req: Request) {
       }
     }
 
-    if (redeemResult.success) {
+    if (redeemResult && redeemResult.success) {
       // Update amountKES with loyalty discount
       finalAmount = Math.max(1, finalAmount - redeemResult.discount_amount);
-      console.log("Loyalty discount applied:", redeemResult.discount_amount);
     }
 
     // 📦 5. Get PayPal access token
