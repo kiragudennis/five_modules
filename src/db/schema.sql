@@ -93,6 +93,27 @@ ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
+CREATE POLICY "User can update own profile"
+ON users
+FOR UPDATE
+USING (id = auth.uid())
+WITH CHECK (
+  id = auth.uid()
+);
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
 -- Create index for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);

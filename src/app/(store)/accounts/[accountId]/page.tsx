@@ -166,7 +166,6 @@ export default function AccountPage() {
         .from("users")
         .update({
           ...formData,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", accountId);
 

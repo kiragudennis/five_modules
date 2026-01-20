@@ -87,7 +87,6 @@ export default function ConfirmSignupPage() {
           .update({
             email_verified: true,
             last_login: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           })
           .eq("id", user.id); // Use user.id from getUser()
 

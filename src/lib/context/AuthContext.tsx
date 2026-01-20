@@ -86,7 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           business_name: data.business_name,
           business_type: data.business_type,
-          business_customer: data.metadata?.business_customer,
 
           receive_offers: data.receive_offers,
           receive_newsletter: data.receive_newsletter,
@@ -173,7 +172,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from("users")
       .update({
         last_login: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .eq("id", data.user.id);
 

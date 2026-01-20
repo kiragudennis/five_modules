@@ -34,7 +34,6 @@ export async function GET(request: Request) {
       .from("users")
       .update({
         last_login: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       })
       .eq("id", data.user.id);
 
