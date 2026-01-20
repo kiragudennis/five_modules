@@ -1,4 +1,5 @@
 // app/accounts/[accountId]/page.tsx
+// single account page
 "use client";
 
 import { useState, useEffect } from "react";
