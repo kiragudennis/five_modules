@@ -1,5 +1,5 @@
 // app/accounts/[accountId]/page.tsx
-//
+// Hi blessedtwoelectronics-afk! You've successfully authenticated, but GitHub does not provide shell access.
 "use client";
 
 import { useState, useEffect } from "react";
