@@ -775,7 +775,9 @@ export default function AccountPage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() =>
-                                    router.push(`/tracking/${order.id}`)
+                                    router.push(
+                                      `/tracking/${order.tracking_number}`,
+                                    )
                                   }
                                   disabled={!order.tracking_number}
                                 >

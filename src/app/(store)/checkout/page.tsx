@@ -972,7 +972,7 @@ export default function CheckoutPage() {
                               control={form.control}
                               name="installationRequired"
                               render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4 bg-blue-50/50">
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4">
                                   <FormControl>
                                     <Checkbox
                                       checked={field.value}
@@ -1130,7 +1130,7 @@ export default function CheckoutPage() {
                             )}
 
                             {!installationRequired && (
-                              <div className="p-4 border rounded-lg bg-gray-50">
+                              <div className="p-4 border rounded-lg">
                                 <div className="flex items-start gap-3">
                                   <Info className="h-5 w-5 text-gray-500 mt-0.5" />
                                   <div>

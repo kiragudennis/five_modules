@@ -440,7 +440,7 @@ export default function TrackingPage({
                   asChild
                   className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600"
                 >
-                  <a href={`tel:${mainOrder.customer_phone || "0700000000"}`}>
+                  <a href={"tel:0727833691"}>
                     <Phone className="h-4 w-4 mr-2" />
                     Contact Support
                   </a>
@@ -967,7 +967,7 @@ export default function TrackingPage({
                     variant="outline"
                     className="w-full justify-start"
                   >
-                    <a href={`tel:0700000000`}>
+                    <a href={`tel:0727833691`}>
                       <Phone className="h-4 w-4 mr-2" />
                       Call Support
                     </a>
