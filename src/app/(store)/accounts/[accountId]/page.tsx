@@ -26,7 +26,6 @@ import {
   Phone,
   MapPin,
   Building,
-  Calendar,
   ShoppingBag,
   CreditCard,
   Package,
