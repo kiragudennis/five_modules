@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   if (error || !user) {
     return NextResponse.json(
       { error: "Unauthorized", redirect: "/login" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -49,12 +49,12 @@ export async function POST(req: Request) {
           error: "Order already paid",
           url: "/checkout/success?orderId=" + order.id,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
     // Get PayPal access token
     const basicAuth = Buffer.from(
-      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+      `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`,
     ).toString("base64");
 
     const tokenRes = await fetch(`${PAYPAL_BASE_URL}/v1/oauth2/token`, {
@@ -84,16 +84,16 @@ export async function POST(req: Request) {
             custom_id: order.id, // safe place for your internal ID
             amount: {
               currency_code: order.currency,
-              value: order.total.toFixed(2),
+              value: order.total_amount.toFixed(2),
             },
           },
         ],
         application_context: {
           brand_name: "Blessed Two Electronics",
           locale: "en-US",
-          landing_page: "BILLING", // LOGIN, BILLING, or NO_PREFERENCE
+          landing_page: "NO_PREFERENCE",
           shipping_preference:
-            order.shipping.method === "pickup"
+            order.shipping_method === "pickup"
               ? "NO_SHIPPING"
               : "SET_PROVIDED_ADDRESS",
           user_action: "PAY_NOW",
@@ -107,7 +107,7 @@ export async function POST(req: Request) {
     const orderData = await orderRes.json();
 
     const approveUrl = orderData.links?.find(
-      (link: any) => link.rel === "approve"
+      (link: any) => link.rel === "approve",
     )?.href;
 
     if (!approveUrl) {

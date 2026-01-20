@@ -57,7 +57,8 @@ interface Order {
   shipping_method: string;
   items: Array<{
     product_name: string;
-    qty: number;
+    product_image: string;
+    quantity: number;
     unit_price: number;
   }>;
 }
@@ -117,7 +118,8 @@ export default function AccountPage() {
           product_id,
           quantity,
           unit_price,
-          product_name
+          product_name,
+          product_image
         )
       `,
         )
@@ -704,9 +706,10 @@ export default function AccountPage() {
                                         key={index}
                                         className="flex items-center gap-3 p-2 bg-muted/50 rounded"
                                       >
-                                        <div className="h-8 w-8 bg-gray-100 rounded flex items-center justify-center">
-                                          <Package className="h-4 w-4 text-gray-500" />
-                                        </div>
+                                        <img
+                                          src={item.product_image}
+                                          className="h-8 w-8"
+                                        />
                                         <div className="flex-1 min-w-0">
                                           <p className="font-medium truncate">
                                             {item.product_name}

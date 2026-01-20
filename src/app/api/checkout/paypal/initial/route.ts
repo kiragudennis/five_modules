@@ -28,6 +28,8 @@ export async function POST(req: Request) {
     metadata,
   } = cart;
 
+  console.log("Cart:", cart);
+
   // Validate required fields
   if (!items || !customer || !shipping || !totals) {
     return NextResponse.json(
@@ -317,7 +319,7 @@ export async function POST(req: Request) {
     ];
 
     // Add shipping cost as an item if it's not included in breakdown
-    if (shipping.cost > 0) {
+    if (shipping && shipping.cost > 0) {
       purchaseUnits[0].items.push({
         name: `${shipping.method} Shipping`,
         unit_amount: {
@@ -330,7 +332,7 @@ export async function POST(req: Request) {
     }
 
     // Add installation cost as an item if applicable
-    if (services?.installation?.cost > 0) {
+    if (services && services?.installation?.cost > 0) {
       purchaseUnits[0].items.push({
         name: services.installation.service?.name || "Installation Service",
         unit_amount: {
@@ -357,7 +359,7 @@ export async function POST(req: Request) {
             experience_context: {
               brand_name: "Blessed Two Electronics",
               locale: "en-US",
-              landing_page: "BILLING", // LOGIN, BILLING, or NO_PREFERENCE
+              landing_page: "NO_PREFERENCE",
               shipping_preference:
                 shipping.method === "pickup"
                   ? "NO_SHIPPING"
