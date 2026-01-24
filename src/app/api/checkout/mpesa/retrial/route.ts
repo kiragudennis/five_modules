@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: "Invalid phone number" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   if (error || !user) {
     return NextResponse.json(
       { error: "Unauthorized", redirect: "/login" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -59,12 +59,14 @@ export async function POST(req: Request) {
   }
 
   // Convert CURRENCY → KES with 12h caching
-  let amountKES = orderData.total;
-  if (orderData.currency !== "KSH") {
+  let amountKES = orderData.total_amount;
+  const currency = orderData.currency || "KES"; // Assuming currency is in totals
+
+  if (currency !== "KES") {
     try {
       const res = await fetch(
         `https://api.exchangerate.host/${endpoint}?access_key=${access_key}&from=${orderData.currency}&to=KES&amount=${amountKES}`,
-        { next: { revalidate: 3600 * 12 } } // 12h cache
+        { next: { revalidate: 3600 * 12 } }, // 12h cache
       );
       const json = await res.json();
 
@@ -75,7 +77,7 @@ export async function POST(req: Request) {
     } catch (err) {
       console.error(
         "Exchange rate fetch failed, defaulting to hardcoded rate",
-        err
+        err,
       );
       amountKES = Math.round(orderData.total * 131); // fallback
     }
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
   const passKey = process.env.MPESA_PASSKEY!;
   const timestamp = `${year}${month}${day}${hours}${minutes}${seconds}`;
   const password = Buffer.from(shortCode + passKey + timestamp).toString(
-    "base64"
+    "base64",
   );
 
   try {
@@ -113,7 +115,7 @@ export async function POST(req: Request) {
         CallBackURL: `${siteUrl}/api/webhooks/mpesa?orderId=${
           orderData.id
         }&callbackSecret=${process.env.MPESA_CALLBACK_SECRET!}`,
-        AccountReference: "World Samma Academy Shop",
+        AccountReference: "Blessed Two Electronics",
         TransactionDesc: "Payment for order",
       },
       {
@@ -121,7 +123,7 @@ export async function POST(req: Request) {
           "Content-type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
     if (data.ResponseCode !== "0") {
       throw new Error(`M-Pesa error: ${data.ResponseDescription}`);
@@ -131,7 +133,7 @@ export async function POST(req: Request) {
       { orderId: orderData.id, mpesa: data },
       {
         status: 200,
-      }
+      },
     );
   } catch (error: any) {
     console.error("M-Pesa checkout error:", error);
@@ -145,7 +147,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(
       { error: "Failed to initiate payment" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

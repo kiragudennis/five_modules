@@ -46,7 +46,7 @@ async function fetchFeatured() {
       `${process.env.NEXT_PUBLIC_SITE_URL}/api/products/featured`,
       {
         next: { revalidate: 1800 },
-      }
+      },
     );
 
     if (response.ok) {
@@ -130,7 +130,7 @@ function FeaturedProductsGrid({ products }: { products: Product[] }) {
                           <span className="text-xs text-muted-foreground line-through">
                             {formatCurrency(
                               product.originalPrice,
-                              product.currency
+                              product.currency,
                             )}
                           </span>
                         )}
@@ -351,7 +351,7 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
     const expiryDate = new Date(coupon.valid_until);
     const today = new Date();
     const daysLeft = Math.ceil(
-      (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     return {
@@ -889,7 +889,7 @@ export default async function Home() {
                   asChild
                   size="lg"
                   variant="outline"
-                  className="border-white text-white hover:bg-white/20 font-bold px-10 py-6 text-lg rounded-xl hover:scale-105 transition-transform duration-300"
+                  className="border-white text-black hover:bg-white/20 font-bold px-10 py-6 text-lg rounded-xl hover:scale-105 transition-transform duration-300"
                 >
                   <Link href="/contact">Get Free Consultation</Link>
                 </Button>

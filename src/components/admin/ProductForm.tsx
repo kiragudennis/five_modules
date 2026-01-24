@@ -99,12 +99,13 @@ export default function ProductForm({
       installationType: "DIY",
       has_wholesale: false,
       wholesale_price: 0,
-      wholesale_min_quantity: 10,
+      wholesale_min_quantity: 0,
     },
   });
 
   // Watch the title field and generate slug automatically
   const titleValue = form.watch("title");
+  console.log("Form Errors:", form.formState.errors);
 
   useEffect(() => {
     if (titleValue && !isEditing) {
@@ -183,7 +184,7 @@ export default function ProductForm({
       toast.success(
         isEditing
           ? "Product updated successfully"
-          : "Product created successfully"
+          : "Product created successfully",
       );
     } catch (error: any) {
       console.error("Error saving product:", error);
@@ -480,13 +481,15 @@ export default function ProductForm({
                                 placeholder="1999"
                                 {...field}
                                 type="number"
+                                min="0"
+                                step="0.01"
                                 value={field.value || ""}
                                 onChange={(e) => {
                                   const value =
                                     e.target.value === ""
-                                      ? null
-                                      : Number(e.target.value);
-                                  field.onChange(value);
+                                      ? 0
+                                      : parseFloat(e.target.value);
+                                  field.onChange(isNaN(value) ? 0 : value);
                                 }}
                               />
                             </div>
@@ -515,6 +518,16 @@ export default function ProductForm({
                                 placeholder="10"
                                 {...field}
                                 type="number"
+                                min="0"
+                                step="1"
+                                value={field.value || ""}
+                                onChange={(e) => {
+                                  const value =
+                                    e.target.value === ""
+                                      ? 0
+                                      : parseInt(e.target.value, 10);
+                                  field.onChange(isNaN(value) ? 0 : value);
+                                }}
                               />
                             </div>
                           </FormControl>
@@ -533,7 +546,7 @@ export default function ProductForm({
                         </p>
                         <p>
                           Customers who order{" "}
-                          {form.watch("wholesale_min_quantity") || 10}+ units
+                          {form.watch("wholesale_min_quantity") || 0}+ units
                           will get each unit at KES{" "}
                           {form.watch("wholesale_price") || 0}
                           {form.watch("price") &&
@@ -544,7 +557,7 @@ export default function ProductForm({
                                 (((form.watch("price") ?? 0) -
                                   (form.watch("wholesale_price") ?? 0)) /
                                   (form.watch("price") ?? 1)) *
-                                  100
+                                  100,
                               )}
                               %)
                             </span>
@@ -577,7 +590,7 @@ export default function ProductForm({
                           onValueChange={(value) => {
                             field.onChange(value);
                             const category = lightingCategories.find(
-                              (c) => c.id === value
+                              (c) => c.id === value,
                             );
                             if (category?.subcategories?.[0]) {
                               form.setValue("tags", [

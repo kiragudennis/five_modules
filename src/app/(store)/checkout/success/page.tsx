@@ -56,9 +56,35 @@ export default function SuccessPage({
   const router = useRouter();
   const [paymentStatus, setPaymentStatus] = useState<
     "idle" | "processing" | "success" | "error"
-  >("idle");
+  >("success");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [countdown, setCountdown] = useState(60); // 60 seconds countdown
+
+  // Start countdown when payment is initiated successfully
+  useEffect(() => {
+    if (paymentStatus === "success") {
+      const timer = setTimeout(() => {
+        window.location.reload();
+      }, 60000); // Reload after 60 seconds
+
+      // Countdown timer for UI feedback
+      const countdownInterval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(countdownInterval);
+      };
+    }
+  }, [paymentStatus]);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -222,7 +248,7 @@ export default function SuccessPage({
             We couldn't find your order details. Please check your email for
             confirmation or contact support.
           </p>
-          <div className="space-y-3">
+          <div className="flex items-center space-x-3 w-full justify-evenly">
             <Button asChild>
               <Link href="/contact">Contact Support</Link>
             </Button>
@@ -942,11 +968,30 @@ export default function SuccessPage({
                 )}
 
                 {paymentStatus === "success" && (
-                  <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-lg flex items-center">
-                    <CheckCircle className="mr-2 h-5 w-5" />
-                    <p>
-                      Payment successful! Redirecting to confirmation page...
+                  <div className="mb-6 p-4 bg-green-50 text-green-700 rounded-lg">
+                    <div className="flex items-center">
+                      <CheckCircle className="mr-2 h-5 w-5" />
+                      <p className="font-medium">
+                        Payment initiated successfully!
+                      </p>
+                    </div>
+
+                    <p className="text-sm my-2">
+                      Please check your phone to complete the MPESA payment.
                     </p>
+
+                    <div className="space-x-2">
+                      <p className="text-xs text-center ">
+                        Page will auto-refresh in {countdown} seconds...
+                      </p>
+
+                      <button
+                        onClick={() => window.location.reload()}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm w-full"
+                      >
+                        Refresh Now
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -1028,7 +1073,10 @@ export default function SuccessPage({
                         type="button"
                         onClick={handleMPesaPayment}
                         className="w-full bg-[#4CAF50] hover:bg-[#388E3C] text-white"
-                        disabled={phoneNumber.length !== 12}
+                        disabled={
+                          phoneNumber.length !== 12 ||
+                          paymentStatus === "processing"
+                        }
                       >
                         Retry with M-Pesa
                       </Button>

@@ -236,12 +236,6 @@ export const productSchema = z.object({
     z.number().int().min(0, "Stock must be a non-negative integer."),
   ),
   category: z.string().min(1, "Please select a category."),
-  wattage: z
-    .preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().min(0, "Wattage must be a positive number."),
-    )
-    .optional(),
   voltage: z.string().optional().default("220-240V"),
   colorTemperature: z.string().optional(),
   lumens: z
@@ -257,12 +251,23 @@ export const productSchema = z.object({
     )
     .default(24),
   batteryCapacity: z.string().optional(),
-  solarPanelWattage: z
-    .preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().min(0, "Solar panel wattage must be a positive number."),
-    )
-    .optional(),
+  wattage: z.preprocess((val) => {
+    // Handle empty string, null, or undefined
+    if (val === "" || val === null || val === undefined) {
+      return 0; // or return null if you want it to be truly optional
+    }
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  }, z.number().min(0, "Wattage must be a positive number.").optional()),
+
+  solarPanelWattage: z.preprocess((val) => {
+    // Handle empty string, null, or undefined
+    if (val === "" || val === null || val === undefined) {
+      return 0; // or return null if you want it to be truly optional
+    }
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  }, z.number().min(0, "Solar panel wattage must be a positive number.").optional()),
   dimensions: z.string().optional(),
   ipRating: z.string().optional(),
   currency: z.string(),
@@ -284,6 +289,12 @@ export const productSchema = z.object({
     .default(0),
   installationType: z.string().optional().default("DIY"),
   has_wholesale: z.boolean().default(false),
-  wholesale_price: z.number().min(0).optional(),
-  wholesale_min_quantity: z.number().min(1).optional(),
+  wholesale_price: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    return Number(val);
+  }, z.number().min(0).optional().default(0)),
+  wholesale_min_quantity: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    return Number(val);
+  }, z.number().min(0).optional().default(0)),
 });
