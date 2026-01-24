@@ -59,31 +59,12 @@ import { toast } from "sonner";
 import { lightingCategories } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 
-// Enhanced Product Type
-interface EnhancedProduct extends Product {
-  videoUrl?: string;
-  wattage?: number;
-  voltage?: string;
-  colorTemperature?: string;
-  lumens?: number;
-  warrantyMonths?: number;
-  batteryCapacity?: string;
-  solarPanelWattage?: number;
-  dimensions?: string;
-  ipRating?: string;
-  installationType?: string;
-  energySaving?: boolean;
-  dealOfTheDay?: boolean;
-  bestSeller?: boolean;
-  tags: string[];
-}
-
 export default function ProductDetailPage({
   product,
   relatedProducts,
 }: {
-  product: EnhancedProduct;
-  relatedProducts: EnhancedProduct[];
+  product: Product;
+  relatedProducts: Product[];
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [api, setApi] = useState<CarouselApi>();
@@ -116,7 +97,7 @@ export default function ProductDetailPage({
   // Add to cart with animation
   const { dispatch } = useStore();
 
-  const handleAddToCart = (product: EnhancedProduct) => {
+  const handleAddToCart = (product: Product) => {
     setIsAddingToCart(true);
 
     dispatch({
@@ -146,13 +127,13 @@ export default function ProductDetailPage({
   // Calculate discount percentage
   const discountPercentage = product.originalPrice
     ? Math.round(
-        ((product.originalPrice - product.price) / product.originalPrice) * 100
+        ((product.originalPrice - product.price) / product.originalPrice) * 100,
       )
     : 0;
 
   // Get category details
   const categoryDetails = lightingCategories.find(
-    (cat: any) => cat.id === product.category
+    (cat: any) => cat.id === product.category,
   );
 
   return (
@@ -474,7 +455,7 @@ export default function ProductDetailPage({
                           <p className="text-2xl font-bold text-purple-600">
                             {formatCurrency(
                               product.wholesale_price,
-                              product.currency
+                              product.currency,
                             )}
                           </p>
                         </div>
@@ -492,7 +473,7 @@ export default function ProductDetailPage({
                         {Math.round(
                           ((product.price - product.wholesale_price) /
                             product.price) *
-                            100
+                            100,
                         )}
                         % per unit when you order{" "}
                         {product.wholesale_min_quantity}+ units
@@ -610,7 +591,7 @@ export default function ProductDetailPage({
                       <span className="text-lg text-gray-500 line-through">
                         {formatCurrency(
                           product.originalPrice,
-                          product.currency
+                          product.currency,
                         )}
                       </span>
                       <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
@@ -656,7 +637,7 @@ export default function ProductDetailPage({
                       ? "bg-green-100 text-green-800"
                       : product.stock > 0
                         ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
+                        : "bg-red-100 text-red-800",
                   )}
                 >
                   <div
@@ -666,7 +647,7 @@ export default function ProductDetailPage({
                         ? "bg-green-500"
                         : product.stock > 0
                           ? "bg-yellow-500"
-                          : "bg-red-500"
+                          : "bg-red-500",
                     )}
                   />
                   {product.stock > 10
@@ -780,7 +761,7 @@ export default function ProductDetailPage({
                             {formatCurrency(
                               (product.price - product.wholesale_price) *
                                 quantity,
-                              product.currency
+                              product.currency,
                             )}
                           </>
                         ) : (
@@ -810,7 +791,7 @@ export default function ProductDetailPage({
                       quantity >= product.wholesale_min_quantity
                         ? formatCurrency(
                             product.wholesale_price,
-                            product.currency
+                            product.currency,
                           )
                         : formatCurrency(product.price, product.currency)}
                     </span>
@@ -822,11 +803,11 @@ export default function ProductDetailPage({
                       quantity >= product.wholesale_min_quantity
                         ? formatCurrency(
                             product.wholesale_price * quantity,
-                            product.currency
+                            product.currency,
                           )
                         : formatCurrency(
                             product.price * quantity,
-                            product.currency
+                            product.currency,
                           )}
                     </span>
                   </div>
@@ -838,7 +819,7 @@ export default function ProductDetailPage({
                           {formatCurrency(
                             (product.price - product.wholesale_price) *
                               quantity,
-                            product.currency
+                            product.currency,
                           )}
                         </span>
                       </div>
@@ -1634,7 +1615,7 @@ export default function ProductDetailPage({
                         <span className="font-bold text-amber-600">
                           {formatCurrency(
                             relatedProduct.price,
-                            relatedProduct.currency
+                            relatedProduct.currency,
                           )}
                         </span>
                         {relatedProduct.wattage && (
