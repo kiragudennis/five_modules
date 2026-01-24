@@ -72,7 +72,7 @@ export default function ProductsPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clickedStates, setClickedStates] = useState<Record<string, boolean>>(
-    {}
+    {},
   );
   const [coupons, setCoupons] = useState<Coupon[]>([]);
 
@@ -178,7 +178,7 @@ export default function ProductsPage({
   // Toggle tag selection
   const toggleTag = (tagId: string) => {
     setSelectedTags((prev) =>
-      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId],
     );
   };
 
@@ -284,7 +284,7 @@ export default function ProductsPage({
                             ? `${coupons[0].discount_value}% OFF`
                             : `${formatCurrency(
                                 coupons[0].discount_value,
-                                "KES"
+                                "KES",
                               )} OFF`}
                         </span>
                       </>
@@ -610,7 +610,7 @@ export default function ProductsPage({
                         (((product.originalPrice || product.price) -
                           product.price) /
                           (product.originalPrice || product.price)) *
-                          100
+                          100,
                       )}
                       % OFF
                     </Badge>
@@ -639,7 +639,7 @@ export default function ProductsPage({
                           <span className="text-sm text-gray-500 line-through">
                             {formatCurrency(
                               product.originalPrice,
-                              product.currency
+                              product.currency,
                             )}
                           </span>
                         )}
@@ -693,10 +693,10 @@ export default function ProductsPage({
 
                 {/* Rating Badge */}
                 <div className="absolute top-3 right-3 z-10">
-                  {product.rating && product.rating > 0 && (
+                  {product.rating > 0 && (
                     <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
                       <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span>{product.rating.toFixed(1)}</span>
+                      <span>{product.rating}</span>
                       {product.reviewsCount && product.reviewsCount > 0 && (
                         <span className="text-gray-300 text-xs">
                           ({product.reviewsCount})
@@ -734,7 +734,7 @@ export default function ProductsPage({
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-muted-foreground capitalize">
                           {lightingCategories.find(
-                            (c) => c.id === product.category
+                            (c) => c.id === product.category,
                           )?.name || product.category}
                         </p>
                         {product.tags?.includes("solar-powered") && (
@@ -754,7 +754,7 @@ export default function ProductsPage({
                           <p className="text-sm text-muted-foreground line-through">
                             {formatCurrency(
                               product.originalPrice,
-                              product.currency
+                              product.currency,
                             )}
                           </p>
                         )}
@@ -777,7 +777,7 @@ export default function ProductsPage({
                       "w-full transition-all duration-300 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600",
                       "hover:scale-[1.02] active:scale-[0.98]",
                       clickedStates[product.id] &&
-                        "bg-green-500 hover:bg-green-600 m-0"
+                        "bg-green-500 hover:bg-green-600 m-0",
                     )}
                     disabled={product.stock === 0 || clickedStates[product.id]}
                   >
@@ -840,7 +840,8 @@ export default function ProductsPage({
               const expiryDate = new Date(coupon.valid_until);
               const today = new Date();
               const daysLeft = Math.ceil(
-                (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                (expiryDate.getTime() - today.getTime()) /
+                  (1000 * 60 * 60 * 24),
               );
               const usageLeft = coupon.usage_limit
                 ? coupon.usage_limit - (coupon.used_count || 0)
@@ -914,7 +915,7 @@ export default function ProductsPage({
                           onClick={() => {
                             navigator.clipboard.writeText(coupon.code);
                             toast.success(
-                              `Copied ${coupon.code} to clipboard!`
+                              `Copied ${coupon.code} to clipboard!`,
                             );
                           }}
                         >

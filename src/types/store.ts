@@ -18,7 +18,6 @@ export interface Product {
   weight: number;
   category: string;
   currency: string;
-  belt_level: string;
   tags: string[];
   featured: boolean;
   metadata: { [key: string]: string } | null;
@@ -28,6 +27,20 @@ export interface Product {
   has_wholesale: boolean;
   wholesale_min_quantity: number;
   wholesale_price: number;
+  videoUrl?: string | null;
+  wattage?: number | null;
+  voltage?: string;
+  colorTemperature?: string;
+  lumens?: number | null;
+  warrantyMonths?: number;
+  batteryCapacity?: string;
+  solarPanelWattage?: number | null;
+  dimensions?: string;
+  ipRating?: string;
+  dealOfTheDay?: boolean;
+  bestSeller?: boolean;
+  energySaving?: boolean;
+  installationType?: string;
   created_at: string;
 }
 
