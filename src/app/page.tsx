@@ -92,7 +92,7 @@ function FeaturedProductsGrid({ products }: { products: Product[] }) {
               {product.rating > 0 && (
                 <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
                   <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                  <span>{product.rating.toFixed(1)}</span>
+                  <span>{product.rating}</span>
                   <span className="text-muted-foreground text-xs">
                     ({product.reviewsCount})
                   </span>
