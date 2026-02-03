@@ -41,6 +41,7 @@ export interface Product {
   bestSeller?: boolean;
   energySaving?: boolean;
   installationType?: string;
+  referral_points?: number;
   created_at: string;
 }
 
@@ -235,7 +236,7 @@ export const productSchema = z.object({
     .min(20, "Description must be at least 20 characters."),
   slug: z.string().min(3, "Slug must be at least 3 characters."),
   images: z.array(z.string()).optional(),
-  videoUrl: z.string().optional(),
+  videoUrl: z.string().optional().nullable(),
   price: z.preprocess(
     (val) => (val === "" || val === null ? undefined : Number(val)),
     z.number().min(0, "Price must be a positive number."),
@@ -251,12 +252,10 @@ export const productSchema = z.object({
   category: z.string().min(1, "Please select a category."),
   voltage: z.string().optional().default("220-240V"),
   colorTemperature: z.string().optional(),
-  lumens: z
-    .preprocess(
-      (val) => (val === "" || val === null ? undefined : Number(val)),
-      z.number().min(0, "Lumens must be a positive number."),
-    )
-    .optional(),
+  lumens: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    return Number(val);
+  }, z.number().min(0, "Lumens must be a positive number.").optional().default(0)),
   warrantyMonths: z
     .preprocess(
       (val) => (val === "" || val === null ? undefined : Number(val)),
@@ -302,6 +301,10 @@ export const productSchema = z.object({
     .default(0),
   installationType: z.string().optional().default("DIY"),
   has_wholesale: z.boolean().default(false),
+  referral_points: z.preprocess((val) => {
+    if (val === "" || val === null || val === undefined) return 0;
+    return Number(val);
+  }, z.number().min(0).optional().default(0)),
   wholesale_price: z.preprocess((val) => {
     if (val === "" || val === null || val === undefined) return 0;
     return Number(val);

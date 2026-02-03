@@ -97,6 +97,7 @@ export default function ProductForm({
       energySaving: false,
       weight: 0,
       installationType: "DIY",
+      referral_points: 0,
       has_wholesale: false,
       wholesale_price: 0,
       wholesale_min_quantity: 0,
@@ -215,10 +216,10 @@ export default function ProductForm({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {isEditing ? "Edit Lighting Product" : "Add New Lighting Product"}
+            {isEditing ? "Edit Lighting Product" : "New Lighting Product"}
           </h2>
           <p className="text-gray-600 dark:text-gray-300">
             {isEditing
@@ -579,7 +580,7 @@ export default function ProductForm({
                   Category & Features
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
                     control={form.control}
                     name="category"
@@ -622,6 +623,18 @@ export default function ProductForm({
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="referral_points"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Referral Points</FormLabel>
+                        <Input placeholder="100" {...field} type="number" />
                         <FormMessage />
                       </FormItem>
                     )}

@@ -134,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initializeAuth();
+    cleanOldReferrals();
 
     const {
       data: { subscription },
@@ -250,6 +251,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Unexpected delete error:", err);
       return false;
     }
+  };
+
+  const cleanOldReferrals = () => {
+    if (typeof window === "undefined") return;
+
+    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const keys = Object.keys(localStorage);
+
+    keys.forEach((key) => {
+      if (key.startsWith("referral_")) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || "{}");
+          if (
+            data.timestamp &&
+            new Date(data.timestamp).getTime() < oneWeekAgo
+          ) {
+            localStorage.removeItem(key);
+          }
+        } catch (e) {
+          localStorage.removeItem(key);
+        }
+      }
+    });
   };
 
   const value = useMemo<AuthContextType>(() => {

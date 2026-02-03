@@ -32,6 +32,7 @@ import {
   Globe,
   Users,
   MessageCircle,
+  Gift,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart, useStore } from "@/lib/context/StoreContext";
@@ -95,7 +96,7 @@ export default function ProductDetailPage({
     return shareUrl.toString();
   };
 
-  // Handle existing referrals
+  // Referral capture
   useEffect(() => {
     const generatelink = generateReferralLink();
     setUrl(generatelink);
@@ -105,7 +106,7 @@ export default function ProductDetailPage({
       const referrerId = urlParams.get("customerId");
       const productId = urlParams.get("productId");
 
-      if (referrerId && productId) {
+      if (referrerId && productId && referrerId !== profile?.id) {
         // Create unique referral key for this combination
         const referralKey = `referral_${productId}_${referrerId}`;
 
@@ -116,9 +117,16 @@ export default function ProductDetailPage({
           const referralData = JSON.parse(existingReferral);
           const expiresAt = new Date(referralData.expiresAt);
 
-          // If referral has expired, replace it
+          // If referral is still valid, just update timestamp
           if (expiresAt > new Date()) {
-            console.log("Referral already exists and is valid");
+            // Update timestamp but keep existing data
+            localStorage.setItem(
+              referralKey,
+              JSON.stringify({
+                ...referralData,
+                timestamp: new Date().toISOString(),
+              }),
+            );
             return;
           }
         }
@@ -130,20 +138,26 @@ export default function ProductDetailPage({
             referrerId,
             productId,
             timestamp: new Date().toISOString(),
-            // Clear after 7 days (or configure as needed)
             expiresAt: new Date(
               Date.now() + 7 * 24 * 60 * 60 * 1000,
             ).toISOString(),
           }),
         );
 
-        // Show notification
-        const currentUserId = profile?.id;
-        if (currentUserId && referrerId !== currentUserId) {
-          toast.success(
-            "Referral link applied! Complete purchase to earn points.",
-          );
-        }
+        // Show success notification with points info
+        toast.success(
+          <div className="flex items-start gap-3">
+            <Gift className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Referral Link Applied! 🎉</p>
+              <p className="text-sm text-muted-foreground">
+                Your friend will earn {product.referral_points || 100} points
+                when you purchase
+              </p>
+            </div>
+          </div>,
+          { duration: 8000 },
+        );
       }
     }
   }, [product.id, profile?.id]);
@@ -551,31 +565,45 @@ export default function ProductDetailPage({
                   )}
 
                   {/* Share & Actions */}
-                  <div className="flex items-center justify-between mt-6 pt-6 border-t border-amber-100">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-center justify-between mt-6 pt-6 border-t border-amber-100 gap-4">
+                    {/* Share Component */}
+                    <div className="relative group">
                       <ProductShare url={url} product={product} />
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsWishlisted(!isWishlisted)}
-                        className={`border-amber-300 ${
-                          isWishlisted
-                            ? "text-red-600 border-red-200 bg-red-50"
-                            : "text-amber-600 hover:bg-amber-50"
-                        }`}
-                      >
-                        <Heart
-                          className={`h-4 w-4 ${
-                            isWishlisted ? "fill-red-600" : ""
+                    <div className="flex items-center gap-4">
+                      {/* Referral Points Display */}
+                      <div className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-800">
+                        <Gift className="h-4 w-4 text-green-600" />
+                        <div>
+                          <p className="text-xs font-medium text-green-700 dark:text-green-300">
+                            Earn {product.referral_points || 100} Points
+                          </p>
+                          <p className="text-xs text-green-600 dark:text-green-400">
+                            Share & earn when friends buy
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsWishlisted(!isWishlisted)}
+                          className={`border-amber-300 ${
+                            isWishlisted
+                              ? "text-red-600 border-red-200 bg-red-50"
+                              : "text-amber-600 hover:bg-amber-50"
                           }`}
-                        />
-                        <span className="hidden sm:inline ml-2">
-                          {isWishlisted ? "Wishlisted" : "Add to Wishlist"}
-                        </span>
-                      </Button>
+                        >
+                          <Heart
+                            className={`h-4 w-4 ${
+                              isWishlisted ? "fill-red-600" : ""
+                            }`}
+                          />
+                          <span className="hidden sm:inline ml-2">
+                            {isWishlisted ? "Wishlisted" : "Add to Wishlist"}
+                          </span>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
