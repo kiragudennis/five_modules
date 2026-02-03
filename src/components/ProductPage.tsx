@@ -58,6 +58,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { lightingCategories } from "@/lib/constants";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/context/AuthContext";
 
 export default function ProductDetailPage({
   product,
@@ -72,12 +73,80 @@ export default function ProductDetailPage({
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [showVideo, setShowVideo] = useState(false);
-  const { cartItems, totalItems } = useCart();
+  const { totalItems } = useCart();
+  const { profile } = useAuth();
   const router = useRouter();
+  const [url, setUrl] = useState(
+    typeof window !== "undefined" ? window.location.origin : "",
+  );
 
-  console.log("CartItems:", cartItems, "Total Items:", totalItems);
+  const generateReferralLink = () => {
+    const shareUrl = new URL(`${url}/products/${product.slug}`);
 
-  const url = typeof window !== "undefined" ? window.location.href : "";
+    // Add customer ID and product ID if logged in
+    if (profile?.id) {
+      shareUrl.searchParams.set("customerId", profile.id);
+      shareUrl.searchParams.set("productId", product.id);
+
+      // Add a timestamp to prevent caching issues
+      shareUrl.searchParams.set("ref", Date.now().toString());
+    }
+
+    return shareUrl.toString();
+  };
+
+  // Handle existing referrals
+  useEffect(() => {
+    const generatelink = generateReferralLink();
+    setUrl(generatelink);
+
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const referrerId = urlParams.get("customerId");
+      const productId = urlParams.get("productId");
+
+      if (referrerId && productId) {
+        // Create unique referral key for this combination
+        const referralKey = `referral_${productId}_${referrerId}`;
+
+        // Check if referral already exists and is still valid
+        const existingReferral = localStorage.getItem(referralKey);
+
+        if (existingReferral) {
+          const referralData = JSON.parse(existingReferral);
+          const expiresAt = new Date(referralData.expiresAt);
+
+          // If referral has expired, replace it
+          if (expiresAt > new Date()) {
+            console.log("Referral already exists and is valid");
+            return;
+          }
+        }
+
+        // Store new referral
+        localStorage.setItem(
+          referralKey,
+          JSON.stringify({
+            referrerId,
+            productId,
+            timestamp: new Date().toISOString(),
+            // Clear after 7 days (or configure as needed)
+            expiresAt: new Date(
+              Date.now() + 7 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+          }),
+        );
+
+        // Show notification
+        const currentUserId = profile?.id;
+        if (currentUserId && referrerId !== currentUserId) {
+          toast.success(
+            "Referral link applied! Complete purchase to earn points.",
+          );
+        }
+      }
+    }
+  }, [product.id, profile?.id]);
 
   useEffect(() => {
     if (!api) return;

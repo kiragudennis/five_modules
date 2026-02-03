@@ -4,6 +4,21 @@ CREATE TABLE users (
     email text NOT NULL UNIQUE,
     role text DEFAULT 'customer' NOT NULL,
     metadata jsonb,
+    full_name TEXT,
+    phone TEXT,
+    address TEXT,
+    city TEXT,
+    postal_code TEXT,
+    country TEXT DEFAULT 'Kenya',
+    business_name TEXT,
+    business_type TEXT,
+    receive_offers BOOLEAN DEFAULT TRUE,
+    receive_newsletter BOOLEAN DEFAULT TRUE,
+    email_verified BOOLEAN DEFAULT FALSE,
+    verification_token TEXT,
+    verification_sent_at TIMESTAMPTZ,
+    last_login TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ DEFAULT now(),
     created_at timestamptz DEFAULT now()
 );
 
@@ -28,6 +43,21 @@ CREATE TABLE products (
     rating numeric(2,1) DEFAULT 0,
     reviewsCount integer DEFAULT 0,
     isDealOfTheDay boolean DEFAULT false,
+    video_url TEXT,
+    wattage INTEGER,
+    voltage TEXT DEFAULT '220-240V',
+    color_temperature TEXT,
+    lumens INTEGER,
+    warranty_months INTEGER DEFAULT 24,
+    battery_capacity TEXT,
+    solar_panel_wattage INTEGER,
+    dimensions TEXT,
+    ip_rating TEXT,
+    deal_of_the_day BOOLEAN DEFAULT FALSE,
+    best_seller BOOLEAN DEFAULT FALSE,
+    energy_saving BOOLEAN DEFAULT FALSE,
+    installation_type TEXT DEFAULT 'DIY',
+    referral_points INTEGER DEFAULT 0,
     created_at timestamptz DEFAULT now()
 );
 
@@ -74,24 +104,6 @@ CREATE TABLE page_views (
     user_id uuid REFERENCES users(id),
     created_at timestamptz DEFAULT now()
 );
-
--- Update users table with additional fields
-ALTER TABLE users 
-ADD COLUMN IF NOT EXISTS full_name TEXT,
-ADD COLUMN IF NOT EXISTS phone TEXT,
-ADD COLUMN IF NOT EXISTS address TEXT,
-ADD COLUMN IF NOT EXISTS city TEXT,
-ADD COLUMN IF NOT EXISTS postal_code TEXT,
-ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'Kenya',
-ADD COLUMN IF NOT EXISTS business_name TEXT,
-ADD COLUMN IF NOT EXISTS business_type TEXT,
-ADD COLUMN IF NOT EXISTS receive_offers BOOLEAN DEFAULT TRUE,
-ADD COLUMN IF NOT EXISTS receive_newsletter BOOLEAN DEFAULT TRUE,
-ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS verification_token TEXT,
-ADD COLUMN IF NOT EXISTS verification_sent_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 CREATE POLICY "User can update own profile"
 ON users
@@ -713,23 +725,6 @@ USING (
 
 -- Note: You will need to create more specific RLS policies based on your application's needs.
 -- For example, admins should have broader access, while customers should only be able to see and manage their own data.
-
--- Update products table with lighting-specific fields
-ALTER TABLE products 
-ADD COLUMN IF NOT EXISTS video_url TEXT,
-ADD COLUMN IF NOT EXISTS wattage INTEGER,
-ADD COLUMN IF NOT EXISTS voltage TEXT DEFAULT '220-240V',
-ADD COLUMN IF NOT EXISTS color_temperature TEXT,
-ADD COLUMN IF NOT EXISTS lumens INTEGER,
-ADD COLUMN IF NOT EXISTS warranty_months INTEGER DEFAULT 24,
-ADD COLUMN IF NOT EXISTS battery_capacity TEXT,
-ADD COLUMN IF NOT EXISTS solar_panel_wattage INTEGER,
-ADD COLUMN IF NOT EXISTS dimensions TEXT,
-ADD COLUMN IF NOT EXISTS ip_rating TEXT,
-ADD COLUMN IF NOT EXISTS deal_of_the_day BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS best_seller BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS energy_saving BOOLEAN DEFAULT FALSE,
-ADD COLUMN IF NOT EXISTS installation_type TEXT DEFAULT 'DIY';
 
 -- Create index for better performance
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);

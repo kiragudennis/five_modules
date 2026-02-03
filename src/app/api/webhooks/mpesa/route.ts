@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     if (!orderId || !callbackSecret) {
       return NextResponse.json(
         { error: "Missing orderId or callbackSecret" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (callbackSecret !== process.env.MPESA_CALLBACK_SECRET) {
       return NextResponse.json(
         { error: "Invalid callback secret" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     if (!Body || !Body.stkCallback) {
       return NextResponse.json(
         { error: "Invalid request body" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -39,11 +39,11 @@ export async function POST(request: Request) {
     const items = stkCallback.CallbackMetadata?.Item || [];
     const amountItem = items.find((item: any) => item.Name === "Amount");
     const receiptItem = items.find(
-      (item: any) => item.Name === "MpesaReceiptNumber"
+      (item: any) => item.Name === "MpesaReceiptNumber",
     );
     const phoneItem = items.find((item: any) => item.Name === "PhoneNumber");
     const transactionDateItem = items.find(
-      (item: any) => item.Name === "TransactionDate"
+      (item: any) => item.Name === "TransactionDate",
     );
 
     const amount = amountItem?.Value || 0;
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     if (stkCallback.ResultCode !== 0) {
       console.log(
         `Payment failed for order ${orderId}:`,
-        stkCallback.ResultDesc
+        stkCallback.ResultDesc,
       );
 
       await supabaseAdmin
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         { message: "Payment not successful - order status updated" },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -96,8 +96,27 @@ export async function POST(request: Request) {
       console.log(`Order ${orderId} already processed`);
       return NextResponse.json(
         { message: "Order already processed" },
-        { status: 200 }
+        { status: 200 },
       );
+    }
+
+    if (order?.referred_by) {
+      // Award referral points if applicable
+
+      // 🔥 CALL RPC FUNCTION TO AWARD REFERRAL POINTS
+      const { data: referralResult, error: referralError } =
+        await supabaseAdmin.rpc("award_referral_points_on_order_complete", {
+          p_order_id: orderId,
+        });
+
+      if (referralError) {
+        console.error("RPC error:", referralError);
+        // Continue anyway, don't fail the webhook
+      } else if (referralResult && !referralResult.success) {
+        console.log("Referral points not awarded:", referralResult.error);
+      } else if (referralResult && referralResult.success) {
+        console.log("Referral points awarded:", referralResult);
+      }
     }
 
     // Convert transaction date to timestamp if available
@@ -112,7 +131,7 @@ export async function POST(request: Request) {
         const minute = transactionDate.substring(10, 12);
         const second = transactionDate.substring(12, 14);
         paidAt = new Date(
-          `${year}-${month}-${day}T${hour}:${minute}:${second}Z`
+          `${year}-${month}-${day}T${hour}:${minute}:${second}Z`,
         );
       } catch (e) {
         console.warn("Failed to parse transaction date:", e);
@@ -147,7 +166,7 @@ export async function POST(request: Request) {
       console.error("Error updating order:", updateError);
       return NextResponse.json(
         { error: "Failed to update order" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -188,13 +207,13 @@ export async function POST(request: Request) {
         receiptNumber: receipt,
         amount,
       },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     console.error("❌ Mpesa callback error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -461,6 +461,55 @@ export default function CheckoutPage() {
     setIsSubmitting(true);
 
     try {
+      // Get referral data from localStorage for items in cart
+      const itemsWithReferral = cartItems.map((item) => {
+        // Check for referral for this specific product
+        const referralKey = `referral_${item.product.id}_*`;
+        const keys = Object.keys(localStorage);
+
+        // Find any referral for this product
+        const productReferralKey = keys.find((key) =>
+          key.startsWith(`referral_${item.product.id}_`),
+        );
+
+        if (productReferralKey) {
+          const referralData = JSON.parse(
+            localStorage.getItem(productReferralKey) || "{}",
+          );
+
+          // Check if referral is valid and not self-referral
+          if (
+            referralData.referrerId &&
+            referralData.referrerId !== profile?.id &&
+            new Date(referralData.expiresAt) > new Date()
+          ) {
+            return {
+              ...item,
+              referral: referralData,
+            };
+          }
+        }
+
+        return {
+          ...item,
+          referral: null,
+        };
+      });
+
+      // Find the most recent valid referral
+      let latestReferral = null;
+      let latestTimestamp = 0;
+
+      itemsWithReferral.forEach((item) => {
+        if (
+          item.referral &&
+          new Date(item.referral.timestamp).getTime() > latestTimestamp
+        ) {
+          latestTimestamp = new Date(item.referral.timestamp).getTime();
+          latestReferral = item.referral;
+        }
+      });
+
       // Build comprehensive order data
       const orderData = {
         // Basic order info
@@ -553,6 +602,15 @@ export default function CheckoutPage() {
           createdAt: new Date().toISOString(),
           cartCount: cartItems.length,
           wholesaleApplied: wholesaleSavings > 0,
+          // Add only one referral (the most recent valid one)
+          ...(latestReferral && {
+            referral: {
+              referrerId: latestReferral.referrerId,
+              productId: latestReferral.productId,
+              source: "product_share",
+              timestamp: latestReferral.timestamp,
+            },
+          }),
         },
       };
 

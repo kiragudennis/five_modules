@@ -21,6 +21,11 @@ CREATE TABLE orders (
     customer_name text NOT NULL,
     customer_email text NOT NULL,
     customer_phone text NOT NULL,
+
+    -- Product referral details
+    referral_source TEXT,
+    referred_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    referral_product_id UUID REFERENCES products(id) ON DELETE SET NULL,
     
     -- Shipping Information (Structured columns + JSONB for backward compatibility)
     shipping_address text NOT NULL,
@@ -157,6 +162,8 @@ CREATE INDEX idx_order_items_product_id ON order_items(product_id);
 CREATE INDEX idx_order_items_category ON order_items(product_category);
 CREATE INDEX idx_order_items_created_at ON order_items(created_at DESC);
 CREATE INDEX idx_order_items_wholesale ON order_items(has_wholesale) WHERE has_wholesale = true;
+CREATE INDEX idx_orders_referred_by ON orders(referred_by);
+CREATE INDEX idx_orders_referral_product ON orders(referral_product_id);
 
 -- Function to automatically populate product details when inserting order items
 CREATE OR REPLACE FUNCTION public.snapshot_product_details()

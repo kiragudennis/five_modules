@@ -128,6 +128,11 @@ export async function POST(req: Request) {
       customer_email: customer.email,
       customer_phone: customer.phone,
 
+      // Product referral details
+      referral_source: metadata?.referral.source || "",
+      referred_by: metadata?.referral.referrerId || null,
+      referral_product_id: metadata?.referral.productId || null,
+
       // Shipping Information (flattened)
       shipping_address: shipping.address,
       shipping_city: shipping.city,
@@ -179,6 +184,7 @@ export async function POST(req: Request) {
         converted_amount_kes: amountKES,
         cart_count: metadata?.cartCount,
         wholesale_applied: metadata?.wholesaleApplied,
+        referral: metadata?.referral || null,
         user_agent: req.headers.get("user-agent"),
         ip_address:
           req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"),

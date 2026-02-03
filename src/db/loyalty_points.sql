@@ -576,6 +576,167 @@ BEGIN
 END;
 $$;
 
+-- Function to award referral points with all validations
+CREATE OR REPLACE FUNCTION award_referral_points_on_order_complete(
+  p_order_id uuid
+)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_order orders%ROWTYPE;
+  v_referrer_id uuid;
+  v_product_id uuid;
+  v_product_name text;
+  v_points_to_award integer;
+  v_points_per_unit integer;
+  v_product_quantity integer;
+  v_result json;
+BEGIN
+  -- Get order details
+  SELECT * INTO v_order
+  FROM orders
+  WHERE id = p_order_id;
+  
+  -- Check if order exists and is completed
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'Order not found');
+  END IF;
+  
+  IF v_order.payment_status != 'completed' OR v_order.status != 'completed' THEN
+    RETURN json_build_object('success', false, 'error', 'Order not completed');
+  END IF;
+  
+  -- Check if order has referral
+  IF v_order.referred_by IS NULL OR v_order.referral_product_id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'No referral data');
+  END IF;
+  
+  v_referrer_id := v_order.referred_by;
+  v_product_id := v_order.referral_product_id;
+  
+  -- 1. Prevent self-referral
+  IF v_order.user_id = v_referrer_id THEN
+    RETURN json_build_object('success', false, 'error', 'Self-referral not allowed');
+  END IF;
+  
+  -- 2. Check if points already awarded for this order
+  IF EXISTS (
+    SELECT 1 FROM loyalty_transactions 
+    WHERE order_id = p_order_id 
+    AND user_id = v_referrer_id 
+    AND transaction_type = 'earned'
+    AND description LIKE '%Referral points%'
+  ) THEN
+    RETURN json_build_object('success', false, 'error', 'Points already awarded');
+  END IF;
+  
+  -- 3. Check if referrer and referee already have completed transaction for same product
+  IF EXISTS (
+    SELECT 1 FROM orders o
+    WHERE o.user_id = v_order.user_id
+    AND o.referred_by = v_referrer_id
+    AND o.referral_product_id = v_product_id
+    AND o.payment_status = 'completed'
+    AND o.status = 'completed'
+    AND o.id != p_order_id
+    LIMIT 1
+  ) THEN
+    RETURN json_build_object('success', false, 'error', 'Duplicate referral for same product');
+  END IF;
+  
+  -- 4. Check if referred product is in the order
+  SELECT oi.quantity INTO v_product_quantity
+  FROM order_items oi
+  WHERE oi.order_id = p_order_id
+  AND oi.product_id = v_product_id
+  LIMIT 1;
+  
+  IF NOT FOUND OR v_product_quantity IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Referred product not in order');
+  END IF;
+  
+  -- 5. Get product details for points calculation
+  SELECT 
+    p.referral_points,
+    p.name
+  INTO 
+    v_points_per_unit,
+    v_product_name
+  FROM products p
+  WHERE p.id = v_product_id;
+  
+  IF NOT FOUND THEN
+    -- Use default points if product not found or no referral_points set
+    v_points_per_unit := 100;
+    v_product_name := 'Product';
+  END IF;
+  
+  -- Use default if null
+  IF v_points_per_unit IS NULL THEN
+    v_points_per_unit := 100;
+  END IF;
+  
+  -- Calculate total points
+  v_points_to_award := v_points_per_unit * v_product_quantity;
+  
+  -- Minimum 10 points
+  IF v_points_to_award < 10 THEN
+    v_points_to_award := 10;
+  END IF;
+  
+  -- 6. Award points
+  INSERT INTO loyalty_points (user_id, points, points_earned)
+  VALUES (v_referrer_id, v_points_to_award, v_points_to_award)
+  ON CONFLICT (user_id) DO UPDATE
+  SET 
+    points = loyalty_points.points + v_points_to_award,
+    points_earned = loyalty_points.points_earned + v_points_to_award,
+    updated_at = NOW();
+  
+  -- 7. Record transaction
+  INSERT INTO loyalty_transactions (
+    user_id, 
+    order_id, 
+    points_change, 
+    current_points, 
+    transaction_type, 
+    description
+  ) VALUES (
+    v_referrer_id,
+    p_order_id,
+    v_points_to_award,
+    (SELECT points FROM loyalty_points WHERE user_id = v_referrer_id),
+    'earned',
+    'Referral points for ' || v_product_name || ' (Order #' || v_order.order_number || ')'
+  );
+  
+  -- 8. Update tier if needed
+  UPDATE loyalty_points lp
+  SET tier = (
+    SELECT tier 
+    FROM loyalty_tiers 
+    WHERE min_points <= (SELECT points FROM loyalty_points WHERE user_id = v_referrer_id)
+    ORDER BY min_points DESC 
+    LIMIT 1
+  )
+  WHERE user_id = v_referrer_id;
+  
+  RETURN json_build_object(
+    'success', true,
+    'points_awarded', v_points_to_award,
+    'referrer_id', v_referrer_id,
+    'product_id', v_product_id,
+    'product_name', v_product_name,
+    'quantity', v_product_quantity
+  );
+  
+EXCEPTION WHEN OTHERS THEN
+  RETURN json_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+
 -- Function to award loyalty points after order completion
 CREATE OR REPLACE FUNCTION award_loyalty_points()
 RETURNS trigger
@@ -590,6 +751,11 @@ BEGIN
     -- Only award points when order is marked as completed and paid
     IF NEW.status = 'completed' AND NEW.payment_status = 'paid' 
        AND (OLD.status != 'completed' OR OLD.payment_status != 'paid') THEN
+
+       -- Skip if this is a referral order (let the RPC handle it)
+        IF NEW.referred_by IS NOT NULL THEN
+            RETURN NEW;
+        END IF;
         
         -- Get user's current tier
         SELECT lt.* INTO user_tier

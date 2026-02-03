@@ -27,14 +27,14 @@ export async function POST(req: Request) {
   const earlyBan = await banIfInvalid(
     req,
     headersMissing,
-    "Missing PayPal headers"
+    "Missing PayPal headers",
   );
   if (earlyBan) {
     return new Response("OK", { status: 200 });
   }
 
   const authString = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
+    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`,
   ).toString("base64");
 
   const tokenRes = await fetch(`${PAYPAL_BASE_URL}/v1/oauth2/token`, {
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
         webhook_id: process.env.PAYPAL_WEBHOOK_ID,
         webhook_event: body,
       }),
-    }
+    },
   );
 
   const verifyData = await verifyRes.json();
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   const isBanned = await banIfInvalid(
     req,
     isInvalid,
-    "Invalid PayPal signature"
+    "Invalid PayPal signature",
   );
 
   if (isBanned) {
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
             Authorization: `Bearer ${access_token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       const captureData = await captureRes.json();
@@ -157,6 +157,25 @@ export async function POST(req: Request) {
       if (order.payment_status === "completed") {
         console.log(`Order ${supabaseOrderId} already processed`);
         return NextResponse.json({ status: "already_processed" });
+      }
+
+      if (order?.referred_by) {
+        // Award referral points if applicable
+
+        // 🔥 CALL RPC FUNCTION TO AWARD REFERRAL POINTS
+        const { data: referralResult, error: referralError } =
+          await supabaseAdmin.rpc("award_referral_points_on_order_complete", {
+            p_order_id: supabaseOrderId,
+          });
+
+        if (referralError) {
+          console.error("RPC error:", referralError);
+          // Continue anyway, don't fail the webhook
+        } else if (referralResult && !referralResult.success) {
+          console.log("Referral points not awarded:", referralResult.error);
+        } else if (referralResult && referralResult.success) {
+          console.log("Referral points awarded:", referralResult);
+        }
       }
 
       const amount = resource.amount.value;
