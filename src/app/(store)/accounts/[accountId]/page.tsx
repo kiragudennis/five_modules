@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import Link from "next/link";
 
 interface Order {
   id: string;
@@ -67,6 +68,8 @@ export default function AccountPage() {
   const { accountId } = useParams();
   const router = useRouter();
   const { supabase, profile: currentUser, signOut } = useAuth();
+  const searchParams = new URLSearchParams(window.location.search);
+  const showTab = searchParams.get("tab") || "overview";
 
   const [profile, setProfile] = useState<any>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -307,7 +310,7 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs defaultValue={showTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="orders">Orders</TabsTrigger>
@@ -635,9 +638,18 @@ export default function AccountPage() {
           <TabsContent value="orders">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShoppingBag className="h-5 w-5" />
-                  Order History
+                <CardTitle className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="h-5 w-5" />
+                    Order History
+                  </div>
+                  <div>
+                    <Link href="/accounts/loyalty" passHref>
+                      <Button variant="outline" size="sm">
+                        View Loyalty Points
+                      </Button>
+                    </Link>
+                  </div>
                 </CardTitle>
                 <CardDescription>{orders.length} total orders</CardDescription>
               </CardHeader>

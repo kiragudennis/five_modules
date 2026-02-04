@@ -1,11 +1,15 @@
 // app/api/notifications/order-update/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { format } from "date-fns";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { resend, secureRatelimit } from "@/lib/limit";
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const { success } = await secureRatelimit(request);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
 
@@ -83,13 +87,13 @@ export async function POST(request: NextRequest) {
             <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Order Date:</strong></td>
             <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">${format(
               new Date(orderDate),
-              "MMM dd, yyyy"
+              "MMM dd, yyyy",
             )}</td>
           </tr>
           <tr>
             <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;"><strong>Total Amount:</strong></td>
             <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; text-align: right;">KES ${orderTotal.toFixed(
-              2
+              2,
             )}</td>
           </tr>
           ${
@@ -113,7 +117,7 @@ export async function POST(request: NextRequest) {
             Quantity: ${item.quantity} × KES ${item.price.toFixed(2)}<br>
             <span style="color: #6b7280;">SKU: ${item.sku}</span>
           </div>
-        `
+        `,
           )
           .join("")}
       </div>
@@ -189,7 +193,7 @@ export async function POST(request: NextRequest) {
       console.error("Resend error:", error);
       return NextResponse.json(
         { error: "Failed to send email" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -198,7 +202,7 @@ export async function POST(request: NextRequest) {
     console.error("Notification error:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

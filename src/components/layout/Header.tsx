@@ -19,11 +19,10 @@ import { useStore } from "@/lib/context/StoreContext";
 import { Badge } from "../ui/badge";
 
 const navigation = [
-  { name: "Home", href: "/accounts" },
+  { name: "Home", href: "/" },
   { name: "Products", href: "/products" },
   { name: "Categories", href: "/categories" },
   { name: "Account", href: "/accounts" },
-  { name: "Loyalty", href: "/accounts/loyalty" },
   { name: "About", href: "/about" },
   { name: "Contact", href: "/contact" },
 ];
@@ -56,7 +55,7 @@ export default function Header() {
             href="/"
             className="font-bold text-xl bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent animate-gradient-xy"
           >
-            Blessed Two
+            BTE
           </Link>
 
           <nav className="hidden md:flex gap-6">

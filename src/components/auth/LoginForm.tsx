@@ -25,7 +25,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginForm() {
   const { signIn, signInWithGoogle } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  const router = useRouter();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),

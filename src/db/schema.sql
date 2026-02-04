@@ -657,6 +657,20 @@ USING (public.is_admin());
 CREATE POLICY "Allow admin access" ON page_views FOR ALL 
 USING (public.is_admin());
 
+CREATE POLICY "Allow admin access" ON loyalty_points FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON loyalty_tiers FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON loyalty_transactions FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON loyalty_redemptions FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON birthday_gifts FOR ALL 
+USING (public.is_admin());
 
 -- Storage bucket RLS using your users.role approach
 -- Update storage bucket RLS to use users

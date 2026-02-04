@@ -1,12 +1,16 @@
 // app/api/notifications/bulk-shipping/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { format } from "date-fns";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import { resend, secureRatelimit } from "@/lib/limit";
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const { success } = await secureRatelimit(request);
+  if (!success) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
     const { orderIds, subject, template } = body;
@@ -22,7 +26,7 @@ export async function POST(request: NextRequest) {
           products(name)
         ),
         transactions(*)
-      `
+      `,
       )
       .in("id", orderIds);
 
@@ -41,25 +45,25 @@ export async function POST(request: NextRequest) {
         .replace(/{tracking_number}/g, order.tracking_number || "Not assigned")
         .replace(
           /{shipping_method}/g,
-          order.metadata?.shipping_info?.shipping_method || "Standard"
+          order.metadata?.shipping_info?.shipping_method || "Standard",
         )
         .replace(
           /{estimated_delivery}/g,
           order.metadata?.shipping_info?.estimated_delivery
             ? format(
                 new Date(order.metadata.shipping_info.estimated_delivery),
-                "MMM dd, yyyy"
+                "MMM dd, yyyy",
               )
-            : "3-5 business days"
+            : "3-5 business days",
         )
         .replace(
           /{order_date}/g,
-          format(new Date(order.created_at), "MMM dd, yyyy")
+          format(new Date(order.created_at), "MMM dd, yyyy"),
         )
         .replace(/{order_total}/g, `KES ${order.total.toFixed(2)}`)
         .replace(
           /{shipping_address}/g,
-          `${order.shipping_info.address}, ${order.shipping_info.city}, ${order.shipping_info.country}`
+          `${order.shipping_info.address}, ${order.shipping_info.city}, ${order.shipping_info.country}`,
         );
 
       // Create HTML email
@@ -119,7 +123,7 @@ export async function POST(request: NextRequest) {
 
       // Send email
       return resend.emails.send({
-        from: "Blessed Two Shipping <shipping@blessedtwo.co.ke>",
+        from: "Blessed Two Shipping <shipping@noreply.worldsammaorg>",
         to: [order.shipping_info.email],
         subject: subject,
         html: html,
@@ -152,7 +156,7 @@ export async function POST(request: NextRequest) {
     console.error("Bulk email error:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
