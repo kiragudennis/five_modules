@@ -746,6 +746,32 @@ CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured) WHERE fea
 CREATE INDEX IF NOT EXISTS idx_products_deal_of_day ON products(deal_of_the_day) WHERE deal_of_the_day = TRUE;
 CREATE INDEX IF NOT EXISTS idx_products_best_seller ON products(best_seller) WHERE best_seller = TRUE;
 CREATE INDEX IF NOT EXISTS idx_products_energy_saving ON products(energy_saving) WHERE energy_saving = TRUE;
+-- Add these indexes to your Supabase database
+CREATE INDEX idx_products_title ON products USING gin(to_tsvector('english', title));
+CREATE INDEX idx_products_tags ON products USING gin(tags);
+CREATE INDEX idx_products_price ON products(price);
+CREATE INDEX idx_products_created_at ON products(created_at DESC);
+
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS search_vector tsvector;
+
+CREATE FUNCTION products_search_vector_trigger() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('english', COALESCE(NEW.title, '')), 'A') ||
+    setweight(to_tsvector('english', COALESCE(NEW.description, '')), 'B') ||
+    setweight(to_tsvector('english', COALESCE(array_to_string(NEW.tags, ' '), '')), 'C');
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_products_search_vector ON products;
+CREATE TRIGGER trg_products_search_vector
+  BEFORE INSERT OR UPDATE ON products
+  FOR EACH ROW EXECUTE FUNCTION products_search_vector_trigger();
+
+CREATE INDEX IF NOT EXISTS idx_products_search_vector ON products USING gin(search_vector);
 
 -- Update metadata column to include additional specs
 COMMENT ON COLUMN products.metadata IS 'Additional product specifications in JSON format';

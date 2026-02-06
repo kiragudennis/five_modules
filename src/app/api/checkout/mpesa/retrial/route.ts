@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { generateToken } from "@/lib/utils";
 import axios from "axios";
+import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -24,6 +25,12 @@ export async function POST(req: Request) {
       { error: "Invalid phone number" },
       { status: 400 },
     );
+  }
+
+  const verification = await checkBotId();
+
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { success } = await secureRatelimit(req);

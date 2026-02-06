@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { secureRatelimit } from "@/lib/limit";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { checkBotId } from "botid/server";
 
 const PAYPAL_BASE_URL =
   process.env.NODE_ENV === "production"
@@ -13,6 +14,12 @@ export async function POST(req: Request) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
   const body = await req.json();
   const { orderId } = body;
+
+  const verification = await checkBotId();
+
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
 
   const { success } = await secureRatelimit(req);
   if (!success) {

@@ -1,9 +1,16 @@
 // app/api/coupons/validate/route.ts
 import { secureRatelimit } from "@/lib/limit";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { checkBotId } from "botid/server";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+  const verification = await checkBotId();
+
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   // Rate limiting
   const { success } = await secureRatelimit(request);
   if (!success) {

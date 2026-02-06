@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
   Clock,
   Tag,
   Phone,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,135 +52,243 @@ import { ProductCardSkeleton } from "@/components/ProductSkeleton";
 import Image from "next/image";
 import { toast } from "sonner";
 import { lightingCategories, lightingTags, sortOptions } from "@/lib/constants";
+import ProductCard from "@/components/product-card";
+import { LoadingSpinner } from "@/components/loading-spinner";
+import { Input } from "@/components/ui/input";
 
 export default function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; deal?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    deal?: string;
+    q?: string;
+    page?: string;
+  }>;
 }) {
-  const { category, deal } = use(searchParams);
+  const {
+    category,
+    deal,
+    q: initialQuery = "",
+    page: initialPage = "1",
+  } = use(searchParams);
   const { state } = useStore();
   const orderData = state.pendingOrder;
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState(category || "");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState("featured");
+  const [sortBy, setSortBy] = useState("");
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
   const [showDealsOnly, setShowDealsOnly] = useState(Boolean(deal) || false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { dispatch } = useStore();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clickedStates, setClickedStates] = useState<Record<string, boolean>>(
     {},
   );
   const [coupons, setCoupons] = useState<Coupon[]>([]);
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await axios.get("/api/products");
-      setProducts(res.data.products || []);
-      setCoupons(res.data.coupons || []); // Add state for coupons
-    } catch (err: any) {
-      setError(err.message || "Failed to load products");
-      console.error("Error fetching products:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Search state
+  const [searchInput, setSearchInput] = useState(initialQuery);
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [currentPage, setCurrentPage] = useState(parseInt(initialPage));
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalProducts: 0,
+    limit: 24,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const memoizedProducts = useMemo(() => allProducts, [allProducts]);
 
+  // Sync URL with current state
   useEffect(() => {
-    if (!orderData) {
-      fetchProducts();
-    } else {
-      router.push("/checkout/payment");
-    }
-  }, [orderData, fetchProducts, router]);
+    const params = new URLSearchParams();
+    if (selectedCategory) params.set("category", selectedCategory);
+    if (searchQuery) params.set("q", searchQuery);
+    if (currentPage > 1) params.set("page", currentPage.toString());
+    if (showDealsOnly) params.set("deal", "true");
 
-  const handleAddToCart = (productId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, "", newUrl);
+  }, [selectedCategory, searchQuery, currentPage, showDealsOnly]);
 
-    // Find the product
-    const product = products.find((p) => p.id === productId);
-    if (!product) return;
+  // Handle search button click
+  const handleSearchClick = useCallback(() => {
+    setSearchQuery(searchInput);
+    setCurrentPage(1);
+    setHasMore(true);
+    setAllProducts([]); // Clear existing products for new search
+  }, [searchInput]);
 
-    // Set animation state
-    setClickedStates((prev) => ({ ...prev, [productId]: true }));
-
-    // Dispatch to cart
-    dispatch({
-      type: "ADD_TO_CART",
-      payload: { product, quantity: 1 },
-    });
-
-    // Reset after animation
-    setTimeout(() => {
-      setClickedStates((prev) => ({ ...prev, [productId]: false }));
-    }, 1500);
-  };
-
-  // Filter and sort products
-  const filteredProducts = products
-    .filter((product) => {
-      // Filter by category
-      if (selectedCategory && product.category !== selectedCategory) {
-        return false;
+  // Handle Enter key press
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        handleSearchClick();
       }
+    },
+    [handleSearchClick],
+  );
 
-      // Filter by tags
-      if (
-        selectedTags.length > 0 &&
-        !selectedTags.some((tag) => product.tags?.includes(tag))
-      ) {
-        return false;
+  // Fetch products function
+  const fetchProducts = useCallback(
+    async (page = 1, isLoadMore = false) => {
+      const controller = new AbortController();
+      try {
+        if (isLoadMore) {
+          setIsLoadingMore(true);
+        } else {
+          setIsLoadingSearch(true);
+        }
+
+        setError(null);
+
+        const params = new URLSearchParams({
+          page: page.toString(),
+          limit: "24",
+          ...(searchQuery && { q: searchQuery }),
+          ...(selectedCategory && { category: selectedCategory }),
+          ...(selectedTags.length > 0 && { tags: selectedTags.join(",") }),
+          ...(showFeaturedOnly && { featured: "true" }),
+          ...(showDealsOnly && { deals: "true" }),
+          ...(sortBy && { sort: sortBy }),
+        });
+
+        const res = await axios.get(`/api/products/search?${params}`, {
+          signal: controller.signal,
+        });
+
+        if (isLoadMore) {
+          setAllProducts((prev) => [...prev, ...(res.data.products || [])]);
+        } else {
+          setAllProducts(res.data.products || []);
+        }
+
+        setPagination(
+          res.data.pagination || {
+            currentPage: 1,
+            totalPages: 1,
+            totalProducts: 0,
+            limit: 24,
+            hasNextPage: false,
+            hasPreviousPage: false,
+          },
+        );
+
+        setHasMore(res.data.pagination?.hasNextPage || false);
+
+        // Load coupons only on initial page load without search
+        if (!searchQuery && page === 1 && !isLoadMore) {
+          const couponsRes = await axios.get("/api/products");
+          setCoupons(couponsRes.data.coupons || []);
+        }
+      } catch (err: any) {
+        if (err.name === "AbortError") {
+          console.log("Request cancelled");
+          return;
+        }
+        setError(err.message || "Failed to load products");
+        console.error("Error fetching products:", err);
+      } finally {
+        setIsLoadingSearch(false);
+        setIsLoadingMore(false);
       }
+      return () => controller.abort();
+    },
+    [
+      selectedCategory,
+      selectedTags,
+      showFeaturedOnly,
+      showDealsOnly,
+      sortBy,
+      searchQuery,
+    ],
+  );
 
-      // Filter by featured
-      if (showFeaturedOnly && !product.featured) {
-        return false;
+  // Effect for search and filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+    setHasMore(true);
+    fetchProducts(1, false);
+  }, [
+    searchQuery,
+    selectedCategory,
+    selectedTags,
+    showFeaturedOnly,
+    showDealsOnly,
+    sortBy,
+  ]);
+
+  // Load more products function
+  const loadMoreProducts = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+
+    const nextPage = pagination.currentPage + 1;
+    await fetchProducts(nextPage, true);
+  }, [isLoadingMore, hasMore, pagination.currentPage, fetchProducts]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (!loadMoreRef.current || isLoadingMore || !hasMore) return;
+
+    const options = {
+      root: null,
+      rootMargin: "100px",
+      threshold: 0.1,
+    };
+
+    observerRef.current = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && !isLoadingMore && hasMore) {
+        loadMoreProducts();
       }
+    }, options);
 
-      // Filter by deals
-      if (showDealsOnly && !product.isDealOfTheDay) {
-        return false;
+    observerRef.current.observe(loadMoreRef.current);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
       }
+    };
+  }, [loadMoreProducts, isLoadingMore, hasMore]);
 
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "newest":
-          return (
-            new Date(b.created_at || 0).getTime() -
-            new Date(a.created_at || 0).getTime()
-          );
-        case "price-asc":
-          return a.price - b.price;
-        case "price-desc":
-          return b.price - a.price;
-        case "rating-desc":
-          return (b.rating || 0) - (a.rating || 0);
-        case "deal":
-          if (a.isDealOfTheDay && !b.isDealOfTheDay) return -1;
-          if (!a.isDealOfTheDay && b.isDealOfTheDay) return 1;
-          return 0;
-        case "featured":
-        default:
-          if (a.featured && !b.featured) return -1;
-          if (!a.featured && b.featured) return 1;
-          return 0;
-      }
-    });
+  // Handle add to cart
+  const handleAddToCart = useCallback(
+    (productId: string, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-  // Toggle tag selection
-  const toggleTag = (tagId: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId],
-    );
+      const product = memoizedProducts.find((p) => p.id === productId);
+      if (!product) return;
+
+      setClickedStates((prev) => ({ ...prev, [productId]: true }));
+
+      dispatch({
+        type: "ADD_TO_CART",
+        payload: { product, quantity: 1 },
+      });
+
+      setTimeout(() => {
+        setClickedStates((prev) => ({ ...prev, [productId]: false }));
+      }, 1500);
+    },
+    [memoizedProducts, dispatch],
+  );
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setCurrentPage(1);
   };
 
   // Clear all filters
@@ -188,12 +297,33 @@ export default function ProductsPage({
     setSelectedTags([]);
     setShowFeaturedOnly(false);
     setShowDealsOnly(false);
+    setSearchInput("");
+    setSearchQuery("");
+    setCurrentPage(1);
+    setAllProducts([]);
+    setHasMore(true);
+  };
+
+  // Toggle tag selection
+  const toggleTag = (tagId: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId],
+    );
   };
 
   // Apply filters and close sheet
   const applyFilters = () => {
     setIsFilterOpen(false);
   };
+
+  // Load initial products
+  useEffect(() => {
+    if (!orderData) {
+      fetchProducts();
+    } else {
+      router.push("/checkout/payment");
+    }
+  }, [orderData]);
 
   if (error) {
     return (
@@ -246,9 +376,9 @@ export default function ProductsPage({
 
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="text-sm">
-              {filteredProducts.length} products
+              {allProducts.length} products
             </Badge>
-            {products.some((p) => p.isDealOfTheDay) && (
+            {allProducts.some((p) => p.isDealOfTheDay) && (
               <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white">
                 <Bolt className="w-3 h-3 mr-1" />
                 Hot Deals
@@ -319,8 +449,59 @@ export default function ProductsPage({
         </div>
       </div>
 
-      {/* Filter and Sort Bar */}
+      {/* Filter and Sort Bar with Search */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        {/* Search Bar */}
+        <div className="w-full md:max-w-md">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder="Search products by name, description, or features..."
+                className="w-full pl-10 pr-10 py-3 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-sm"
+              />
+              {searchInput && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+            <Button
+              onClick={handleSearchClick}
+              disabled={isLoadingSearch || !searchInput}
+              className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white whitespace-nowrap"
+            >
+              {isLoadingSearch ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Searching...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Search
+                </div>
+              )}
+            </Button>
+          </div>
+
+          {/* Search status */}
+          {searchQuery && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-500">
+                Found {pagination.totalProducts} products for "{searchQuery}"
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
             <SheetTrigger asChild>
@@ -581,7 +762,7 @@ export default function ProductsPage({
       </div>
 
       {/* Deal of the Day Section */}
-      {products.some((p) => p.isDealOfTheDay) && (
+      {allProducts.some((p) => p.isDealOfTheDay) && (
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-red-500 to-transparent" />
@@ -595,7 +776,7 @@ export default function ProductsPage({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {products
+            {allProducts
               .filter((p) => p.isDealOfTheDay)
               .slice(0, 3)
               .map((product) => (
@@ -667,140 +848,60 @@ export default function ProductsPage({
 
       {/* Products Grid */}
       <div className="grid grid-cols-2 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 sm:gap-6">
-        {loading
-          ? Array.from({ length: 12 }).map((_, index) => (
+        {isLoadingSearch
+          ? Array.from({ length: 24 }).map((_, index) => (
               <ProductCardSkeleton key={index} />
             ))
-          : filteredProducts.map((product) => (
-              <Card
-                key={product.id}
-                className="group relative overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 pt-0 border hover:border-amber-200 dark:hover:border-amber-800"
-              >
-                {/* Product Badges */}
-                <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
-                  {product.isDealOfTheDay && (
-                    <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white animate-pulse text-xs">
-                      🔥 Deal
-                    </Badge>
-                  )}
-                  {product.featured && (
-                    <Badge className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs">
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      Featured
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Rating Badge */}
-                <div className="absolute top-3 right-3 z-10">
-                  {product.rating > 0 && (
-                    <div className="bg-black/80 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span>{product.rating}</span>
-                      {product.reviewsCount && product.reviewsCount > 0 && (
-                        <span className="text-gray-300 text-xs">
-                          ({product.reviewsCount})
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <Link href={`/products/${product.slug}`} className="block">
-                  <div className="aspect-square relative">
-                    {product.images?.[0] ? (
-                      <>
-                        <Image
-                          src={product.images[0]}
-                          alt={product.title}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30">
-                        <Lightbulb className="h-8 w-8 text-amber-500 dark:text-amber-400" />
-                      </div>
-                    )}
-                  </div>
-
-                  <CardHeader className="sm:pb-2">
-                    <CardTitle className="sm:text-lg font-semibold line-clamp-1 pt-2 text-gray-900 dark:text-white">
-                      {product.title}
-                    </CardTitle>
-                    {product.category && (
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-muted-foreground capitalize">
-                          {lightingCategories.find(
-                            (c) => c.id === product.category,
-                          )?.name || product.category}
-                        </p>
-                        {product.tags?.includes("solar-powered") && (
-                          <Sun className="w-3 h-3 text-amber-500" />
-                        )}
-                      </div>
-                    )}
-                  </CardHeader>
-
-                  <CardContent className="pt-0">
-                    <div className="flex flex-col sm:flex-row items-center justify-between">
-                      <div>
-                        <p className="sm:text-xl font-bold text-gray-900 dark:text-white">
-                          {formatCurrency(product.price, product.currency)}
-                        </p>
-                        {product.originalPrice && (
-                          <p className="text-sm text-muted-foreground line-through">
-                            {formatCurrency(
-                              product.originalPrice,
-                              product.currency,
-                            )}
-                          </p>
-                        )}
-                      </div>
-                      <Badge
-                        variant={product.stock > 0 ? "outline" : "destructive"}
-                      >
-                        {product.stock > 0
-                          ? `${product.stock} in stock`
-                          : "Out of stock"}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Link>
-
-                <CardFooter className="pt-0">
-                  <Button
-                    onClick={(e) => handleAddToCart(product.id, e)}
-                    className={cn(
-                      "w-full transition-all duration-300 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600",
-                      "hover:scale-[1.02] active:scale-[0.98]",
-                      clickedStates[product.id] &&
-                        "bg-green-500 hover:bg-green-600 m-0",
-                    )}
-                    disabled={product.stock === 0 || clickedStates[product.id]}
-                  >
-                    <span className="flex items-center justify-center gap-2">
-                      {clickedStates[product.id] ? (
-                        <>
-                          <Check className="h-4 w-4 animate-[bounce_0.3s]" />
-                          <span className="animate-[fadeIn_0.3s]">Added!</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart className="h-4 w-4" />
-                          Add to Cart
-                        </>
-                      )}
-                    </span>
-                  </Button>
-                </CardFooter>
-              </Card>
+          : allProducts.map((product) => (
+              <ProductCard
+                key={`${product.id}-${product.created_at}`}
+                product={product}
+                isClicked={clickedStates[product.id] || false}
+                onAddToCart={handleAddToCart}
+                isInStock={product.stock > 0}
+              />
             ))}
       </div>
 
-      {/* Coupons Section - Updated */}
+      {/* Infinite Scroll Loader */}
+      <div ref={loadMoreRef} className="py-8">
+        {isLoadingMore && (
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <LoadingSpinner />
+            <p className="text-sm text-gray-500">Loading more products...</p>
+          </div>
+        )}
+
+        {!hasMore && allProducts.length > 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No more products to load</p>
+          </div>
+        )}
+      </div>
+
+      {/* Show total count */}
+      {allProducts.length > 0 && !isLoadingSearch && (
+        <div className="text-center py-4">
+          <p className="text-sm text-gray-500">
+            Showing {allProducts.length} of {pagination.totalProducts} products
+          </p>
+        </div>
+      )}
+
+      {/* Manual Load More Button */}
+      {hasMore && !isLoadingMore && allProducts.length > 0 && (
+        <div className="text-center py-8">
+          <Button
+            onClick={loadMoreProducts}
+            variant="outline"
+            className="cursor-pointer"
+          >
+            Load More Products
+          </Button>
+        </div>
+      )}
+
+      {/* Coupons Section */}
       <div id="coupons" className="mt-16 pt-8 border-t">
         <div className="text-center mb-8">
           <h3 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2">
@@ -836,7 +937,6 @@ export default function ProductsPage({
                   ? `KES ${coupon.min_order_amount.toLocaleString()}`
                   : "No minimum";
 
-              // Calculate urgency
               const expiryDate = new Date(coupon.valid_until);
               const today = new Date();
               const daysLeft = Math.ceil(
@@ -852,7 +952,6 @@ export default function ProductsPage({
                   key={coupon.id}
                   className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 p-6 hover:shadow-lg transition-all duration-300 group"
                 >
-                  {/* Limited Badge */}
                   {usageLeft && usageLeft <= 10 && (
                     <div className="absolute top-4 right-4">
                       <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs animate-pulse">
@@ -861,7 +960,6 @@ export default function ProductsPage({
                     </div>
                   )}
 
-                  {/* Urgent Badge */}
                   {daysLeft <= 3 && (
                     <div className="absolute top-4 right-32">
                       <Badge variant="destructive" className="text-xs">

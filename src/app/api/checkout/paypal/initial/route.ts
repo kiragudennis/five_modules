@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { secureRatelimit } from "@/lib/limit";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { checkBotId } from "botid/server";
 
 const PAYPAL_BASE_URL =
   process.env.VERCEL_ENV === "production"
@@ -49,6 +50,12 @@ export async function POST(req: Request) {
       { error: "Missing customer information" },
       { status: 400 },
     );
+  }
+
+  const verification = await checkBotId();
+
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 
   const { success } = await secureRatelimit(req);
