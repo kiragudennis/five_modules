@@ -226,6 +226,18 @@ export const formSchema = z.object({
   specialInstructions: z.string().optional(),
 });
 
+export const productVarietySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Variety name is required"),
+  sku: z.string().min(1, "SKU is required"),
+  price: z.number().min(0, "Price must be positive"),
+  original_price: z.number().min(0).optional().nullable(),
+  stock: z.number().int().min(0, "Stock must be 0 or greater"),
+  images: z.array(z.string()).default([]),
+  attributes: z.record(z.string(), z.any()).default({}),
+  is_default: z.boolean().default(false),
+});
+
 // Product schema for lighting products
 export const productSchema = z.object({
   name: z.string().min(3, "Product name must be at least 3 characters."),
@@ -313,4 +325,6 @@ export const productSchema = z.object({
     if (val === "" || val === null || val === undefined) return 0;
     return Number(val);
   }, z.number().min(0).optional().default(0)),
+  has_varieties: z.boolean().default(false),
+  varieties: z.array(productVarietySchema).default([]),
 });

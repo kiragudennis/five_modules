@@ -61,6 +61,27 @@ CREATE TABLE products (
     created_at timestamptz DEFAULT now()
 );
 
+-- Product varieties table for products with multiple options
+CREATE TABLE product_varieties (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id uuid REFERENCES products(id) ON DELETE CASCADE,
+    name text NOT NULL, -- e.g., "20W Cool White", "30W Warm White"
+    sku text UNIQUE NOT NULL,
+    price numeric(10, 2) NOT NULL,
+    original_price numeric(10, 2),
+    stock integer DEFAULT 0,
+    images text[] DEFAULT '{}',
+    attributes jsonb NOT NULL DEFAULT '{}', -- Store variant attributes like {wattage: 20, colorTemp: "4000K"}
+    is_default boolean DEFAULT false,
+    metadata jsonb,
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
+);
+
+-- Index for faster lookups
+CREATE INDEX idx_product_varieties_product_id ON product_varieties(product_id);
+CREATE INDEX idx_product_varieties_sku ON product_varieties(sku);
+
 -- Create orders table
 CREATE TABLE orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -604,6 +625,7 @@ create index on products (slug);
 -- Enable RLS for all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_varieties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
@@ -643,6 +665,9 @@ CREATE POLICY "Allow admin access" ON users FOR ALL
 USING (public.is_admin());
 
 CREATE POLICY "Allow admin access" ON products FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON product_varieties FOR ALL 
 USING (public.is_admin());
 
 CREATE POLICY "Allow admin access" ON orders FOR ALL 

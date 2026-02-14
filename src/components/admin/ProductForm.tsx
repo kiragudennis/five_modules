@@ -1,4 +1,5 @@
 // @ts-nocheck
+// This component is a comprehensive form for creating and editing lighting products in the admin dashboard. It includes fields for product information, pricing, stock, category, features, and technical specifications. The form uses react-hook-form for state management and validation with zod. It also integrates with Supabase for data persistence and provides a user-friendly interface with dynamic fields based on the selected category.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -48,6 +49,7 @@ import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import { Card, CardContent } from "../ui/card";
 import { productSchema } from "@/types/store";
+import { VarietiesManager } from "./VarietiesManager";
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
@@ -99,6 +101,7 @@ export default function ProductForm({
       installationType: "DIY",
       referral_points: 0,
       has_wholesale: false,
+      has_varieties: false,
       wholesale_price: 0,
       wholesale_min_quantity: 0,
     },
@@ -176,6 +179,36 @@ export default function ProductForm({
           .select();
       } else {
         result = await supabase.from("products").insert([productData]).select();
+
+        // Handle varieties if enabled
+        if (values.has_varieties && result.data) {
+          // Delete existing varieties
+          await supabase
+            .from("product_varieties")
+            .delete()
+            .eq("product_id", result.data.id);
+
+          // Insert new varieties
+          if (values.varieties && values.varieties.length > 0) {
+            const { error: varietiesError } = await supabase
+              .from("product_varieties")
+              .insert(
+                values.varieties.map((variety) => ({
+                  product_id: product.id,
+                  name: variety.name,
+                  sku: variety.sku,
+                  price: variety.price,
+                  original_price: variety.original_price,
+                  stock: variety.stock,
+                  images: variety.images || [],
+                  attributes: variety.attributes,
+                  is_default: variety.is_default,
+                })),
+              );
+
+            if (varietiesError) throw varietiesError;
+          }
+        }
       }
 
       if (result.error) throw result.error;
@@ -568,6 +601,54 @@ export default function ProductForm({
                     </div>
                   </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Varieties Section */}
+          <Card>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Product Varieties
+                  </h3>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="has_varieties"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-lg border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            // Reset base fields when enabling varieties
+                            if (checked) {
+                              form.setValue("sku", "");
+                              form.setValue("price", 0);
+                              form.setValue("stock", 0);
+                            }
+                          }}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          This product has multiple varieties
+                        </FormLabel>
+                        <FormDescription>
+                          Enable if this product comes in different wattages,
+                          colors, or configurations
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <VarietiesManager disabled={isSubmitting} />
               </div>
             </CardContent>
           </Card>
@@ -1026,7 +1107,7 @@ export default function ProductForm({
                             value={field.value || []}
                             onChange={field.onChange}
                             disabled={isSubmitting}
-                            maxImages={8}
+                            maxFiles={8}
                           />
                         </FormControl>
                         <FormDescription>

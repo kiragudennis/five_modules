@@ -7,7 +7,6 @@ import {
   Search,
   Edit,
   Trash2,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -68,7 +67,7 @@ export default function AdminProductsPage() {
 
     // Add confirmation dialog
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${name}"? This action cannot be undone.`
+      `Are you sure you want to delete "${name}"? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -84,7 +83,7 @@ export default function AdminProductsPage() {
 
       // Find the product to get images (before optimistic update)
       const productToDelete = originalProducts.find(
-        (product) => product.id === id
+        (product) => product.id === id,
       );
 
       // Delete images from storage if they exist
@@ -145,7 +144,7 @@ export default function AdminProductsPage() {
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // Clear filters
@@ -303,8 +302,8 @@ export default function AdminProductsPage() {
                         product.stock <= 5
                           ? "text-red-500"
                           : product.stock <= 10
-                          ? "text-yellow-500"
-                          : "text-green-500"
+                            ? "text-yellow-500"
+                            : "text-green-500"
                       }`}
                     >
                       {product.stock}
@@ -381,7 +380,7 @@ export default function AdminProductsPage() {
                   >
                     {page}
                   </Button>
-                )
+                ),
               )}
 
               <Button
