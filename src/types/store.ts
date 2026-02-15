@@ -228,6 +228,7 @@ export const formSchema = z.object({
 
 export const productVarietySchema = z.object({
   id: z.string().optional(),
+  product_id: z.string(),
   name: z.string().min(1, "Variety name is required"),
   sku: z.string().min(1, "SKU is required"),
   price: z.number().min(0, "Price must be positive"),
@@ -239,6 +240,8 @@ export const productVarietySchema = z.object({
     .default({}),
   is_default: z.boolean().default(false),
 });
+
+export type Variaty = z.infer<typeof productVarietySchema>;
 
 export type VarietyAttributes = {
   wattage?: number;
@@ -335,5 +338,4 @@ export const productSchema = z.object({
     return Number(val);
   }, z.number().min(0).optional().default(0)),
   has_varieties: z.boolean().default(false),
-  varieties: z.array(productVarietySchema).default([]),
 });

@@ -78,6 +78,7 @@ export function ImageUpload({
       }
 
       onChange([...value, ...uploadedUrls]);
+      console.log("Uploaded image URLs:", uploadedUrls);
       toast.success(`Uploaded ${files.length} image(s) successfully`);
     } catch (error: any) {
       console.error("Error uploading image:", error);

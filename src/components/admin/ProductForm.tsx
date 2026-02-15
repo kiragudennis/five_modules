@@ -48,7 +48,7 @@ import { TagInput } from "../tag-input";
 import { Badge } from "../ui/badge";
 import { Separator } from "../ui/separator";
 import { Card, CardContent } from "../ui/card";
-import { productSchema } from "@/types/store";
+import { productSchema, Variaty } from "@/types/store";
 import { VarietiesManager } from "./VarietiesManager";
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -66,6 +66,7 @@ export default function ProductForm({
   const { supabase } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [variaties, setVariaties] = useState<Variaty[]>([]);
 
   // Initialize form with default values or initial data
   const form = useForm<ProductFormValues>({
@@ -124,49 +125,23 @@ export default function ProductForm({
     }
   }, [titleValue, form, isEditing]);
 
-  // Fetch existing varieties if editing
+  // Fetch existing varieties when editing
   useEffect(() => {
-    const fetchVarieties = async () => {
-      if (isEditing && initialData?.id) {
-        try {
-          const { data: varieties, error } = await supabase
-            .from("product_varieties")
-            .select("*")
-            .eq("product_id", initialData.id)
-            .order("created_at");
+    if (isEditing && initialData?.id) {
+      const fetchVarieties = async () => {
+        const { data } = await supabase
+          .from("product_varieties")
+          .select("*")
+          .eq("product_id", initialData.id);
 
-          if (error) throw error;
-
-          if (varieties && varieties.length > 0) {
-            // Transform database fields to match form schema
-            const formattedVarieties = varieties.map((v) => ({
-              id: v.id,
-              name: v.name,
-              sku: v.sku,
-              price: v.price,
-              original_price: v.original_price,
-              stock: v.stock,
-              images: v.images || [],
-              attributes: v.attributes,
-              is_default: v.is_default,
-            }));
-
-            // Set varieties in form
-            form.setValue("varieties", formattedVarieties);
-
-            // If there are varieties, set has_varieties to true
-            if (!form.getValues("has_varieties")) {
-              form.setValue("has_varieties", true);
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching varieties:", error);
+        if (data) {
+          setVariaties(data);
+          form.setValue("has_varieties", true);
         }
-      }
-    };
-
-    fetchVarieties();
-  }, [isEditing, initialData?.id, supabase, form]);
+      };
+      fetchVarieties();
+    }
+  }, [isEditing, initialData?.id]);
 
   // Watch category for dynamic fields
   const categoryValue = form.watch("category");
@@ -233,8 +208,6 @@ export default function ProductForm({
         referral_points: values.referral_points,
       };
 
-      let productId: string;
-
       if (isEditing && initialData?.id) {
         // Update existing product
         const { data, error } = await supabase
@@ -245,7 +218,6 @@ export default function ProductForm({
           .single();
 
         if (error) throw error;
-        productId = initialData.id;
       } else {
         // Create new product
         const { data, error } = await supabase
@@ -255,41 +227,6 @@ export default function ProductForm({
           .single();
 
         if (error) throw error;
-        productId = data.id;
-      }
-
-      // Handle varieties if enabled
-      if (
-        values.has_varieties &&
-        values.varieties &&
-        values.varieties.length > 0
-      ) {
-        // First, delete existing varieties if editing
-        if (isEditing) {
-          await supabase
-            .from("product_varieties")
-            .delete()
-            .eq("product_id", productId);
-        }
-
-        // Insert new varieties
-        const { error: varietiesError } = await supabase
-          .from("product_varieties")
-          .insert(
-            values.varieties.map((variety) => ({
-              product_id: productId,
-              name: variety.name,
-              sku: variety.sku,
-              price: variety.price,
-              original_price: variety.original_price || null,
-              stock: variety.stock,
-              images: variety.images || [],
-              attributes: variety.attributes,
-              is_default: variety.is_default,
-            })),
-          );
-
-        if (varietiesError) throw varietiesError;
       }
 
       router.push("/admin/products");
@@ -726,7 +663,12 @@ export default function ProductForm({
                   )}
                 />
 
-                <VarietiesManager disabled={isSubmitting} />
+                <VarietiesManager
+                  disabled={isSubmitting}
+                  productId={initialData?.id}
+                  variaties={variaties}
+                  onVarietiesChange={setVariaties}
+                />
               </div>
             </CardContent>
           </Card>
