@@ -61,6 +61,9 @@ CREATE TABLE products (
     created_at timestamptz DEFAULT now()
 );
 
+-- Add has_varieties boolean column to products table
+ALTER TABLE products ADD COLUMN has_varieties boolean DEFAULT false;
+
 -- Product varieties table for products with multiple options
 CREATE TABLE product_varieties (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

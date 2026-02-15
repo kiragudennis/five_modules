@@ -1,3 +1,5 @@
+// ImageUpload.tsx
+"use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, X, Loader2 } from "lucide-react";

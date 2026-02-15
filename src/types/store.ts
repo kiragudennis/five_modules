@@ -234,9 +234,18 @@ export const productVarietySchema = z.object({
   original_price: z.number().min(0).optional().nullable(),
   stock: z.number().int().min(0, "Stock must be 0 or greater"),
   images: z.array(z.string()).default([]),
-  attributes: z.record(z.string(), z.any()).default({}),
+  attributes: z
+    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+    .default({}),
   is_default: z.boolean().default(false),
 });
+
+export type VarietyAttributes = {
+  wattage?: number;
+  colorTemp?: string;
+  // Add other possible attributes here
+  [key: string]: string | number | boolean | undefined;
+};
 
 // Product schema for lighting products
 export const productSchema = z.object({

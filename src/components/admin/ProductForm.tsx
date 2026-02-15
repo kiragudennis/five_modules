@@ -124,6 +124,50 @@ export default function ProductForm({
     }
   }, [titleValue, form, isEditing]);
 
+  // Fetch existing varieties if editing
+  useEffect(() => {
+    const fetchVarieties = async () => {
+      if (isEditing && initialData?.id) {
+        try {
+          const { data: varieties, error } = await supabase
+            .from("product_varieties")
+            .select("*")
+            .eq("product_id", initialData.id)
+            .order("created_at");
+
+          if (error) throw error;
+
+          if (varieties && varieties.length > 0) {
+            // Transform database fields to match form schema
+            const formattedVarieties = varieties.map((v) => ({
+              id: v.id,
+              name: v.name,
+              sku: v.sku,
+              price: v.price,
+              original_price: v.original_price,
+              stock: v.stock,
+              images: v.images || [],
+              attributes: v.attributes,
+              is_default: v.is_default,
+            }));
+
+            // Set varieties in form
+            form.setValue("varieties", formattedVarieties);
+
+            // If there are varieties, set has_varieties to true
+            if (!form.getValues("has_varieties")) {
+              form.setValue("has_varieties", true);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching varieties:", error);
+        }
+      }
+    };
+
+    fetchVarieties();
+  }, [isEditing, initialData?.id, supabase, form]);
+
   // Watch category for dynamic fields
   const categoryValue = form.watch("category");
   useEffect(() => {
@@ -148,70 +192,105 @@ export default function ProductForm({
 
   const categorySpecs = getCategorySpecs(selectedCategory);
 
-  // Form submission handler
+  // Product form submission handler
   const onSubmit = async (values: ProductFormValues) => {
     setIsSubmitting(true);
 
     try {
       const productData = {
-        ...values,
-        price: Number(values.price),
+        name: values.name,
+        title: values.title,
+        description: values.description,
+        slug: values.slug,
+        images: values.images || [],
+        videoUrl: values.videoUrl,
+        sku: values.sku, // Always required now
+        price: Number(values.price), // Always required now
         originalPrice:
           Number(values.originalPrice) > 0
             ? Number(values.originalPrice)
             : null,
-        stock: Number(values.stock),
-        wattage: values.wattage || null,
-        lumens: values.lumens || null,
-        solarPanelWattage: values.solarPanelWattage || null,
+        stock: Number(values.stock), // Always required now
+        category: values.category,
+        currency: values.currency,
         weight: values.weight || 0,
         tags: values.tags || [],
-        images: values.images || [],
-        videoUrl: values.videoUrl || null,
+        featured: values.featured,
+        has_varieties: values.has_varieties,
+        wattage: values.wattage || null,
+        voltage: values.voltage,
+        colorTemperature: values.colorTemperature,
+        lumens: values.lumens || null,
+        warrantyMonths: values.warrantyMonths,
+        batteryCapacity: values.batteryCapacity,
+        solarPanelWattage: values.solarPanelWattage || null,
+        dimensions: values.dimensions,
+        ipRating: values.ipRating,
+        dealOfTheDay: values.dealOfTheDay,
+        bestSeller: values.bestSeller,
+        energySaving: values.energySaving,
+        installationType: values.installationType,
+        referral_points: values.referral_points,
       };
 
-      let result;
+      let productId: string;
+
       if (isEditing && initialData?.id) {
-        result = await supabase
+        // Update existing product
+        const { data, error } = await supabase
           .from("products")
           .update(productData)
           .eq("id", initialData.id)
-          .select();
-      } else {
-        result = await supabase.from("products").insert([productData]).select();
+          .select()
+          .single();
 
-        // Handle varieties if enabled
-        if (values.has_varieties && result.data) {
-          // Delete existing varieties
+        if (error) throw error;
+        productId = initialData.id;
+      } else {
+        // Create new product
+        const { data, error } = await supabase
+          .from("products")
+          .insert([productData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        productId = data.id;
+      }
+
+      // Handle varieties if enabled
+      if (
+        values.has_varieties &&
+        values.varieties &&
+        values.varieties.length > 0
+      ) {
+        // First, delete existing varieties if editing
+        if (isEditing) {
           await supabase
             .from("product_varieties")
             .delete()
-            .eq("product_id", result.data.id);
-
-          // Insert new varieties
-          if (values.varieties && values.varieties.length > 0) {
-            const { error: varietiesError } = await supabase
-              .from("product_varieties")
-              .insert(
-                values.varieties.map((variety) => ({
-                  product_id: product.id,
-                  name: variety.name,
-                  sku: variety.sku,
-                  price: variety.price,
-                  original_price: variety.original_price,
-                  stock: variety.stock,
-                  images: variety.images || [],
-                  attributes: variety.attributes,
-                  is_default: variety.is_default,
-                })),
-              );
-
-            if (varietiesError) throw varietiesError;
-          }
+            .eq("product_id", productId);
         }
-      }
 
-      if (result.error) throw result.error;
+        // Insert new varieties
+        const { error: varietiesError } = await supabase
+          .from("product_varieties")
+          .insert(
+            values.varieties.map((variety) => ({
+              product_id: productId,
+              name: variety.name,
+              sku: variety.sku,
+              price: variety.price,
+              original_price: variety.original_price || null,
+              stock: variety.stock,
+              images: variety.images || [],
+              attributes: variety.attributes,
+              is_default: variety.is_default,
+            })),
+          );
+
+        if (varietiesError) throw varietiesError;
+      }
 
       router.push("/admin/products");
       router.refresh();
@@ -626,11 +705,9 @@ export default function ProductForm({
                           checked={field.value}
                           onCheckedChange={(checked) => {
                             field.onChange(checked);
-                            // Reset base fields when enabling varieties
-                            if (checked) {
-                              form.setValue("sku", "");
-                              form.setValue("price", 0);
-                              form.setValue("stock", 0);
+                            // Clear varieties when disabling
+                            if (!checked) {
+                              form.setValue("varieties", []);
                             }
                           }}
                         />
@@ -641,7 +718,8 @@ export default function ProductForm({
                         </FormLabel>
                         <FormDescription>
                           Enable if this product comes in different wattages,
-                          colors, or configurations
+                          colors, or configurations. The base SKU and price will
+                          be used as a template for varieties.
                         </FormDescription>
                       </div>
                     </FormItem>
