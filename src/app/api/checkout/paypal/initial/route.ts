@@ -170,6 +170,7 @@ export async function POST(req: Request) {
       has_wholesale: item.has_wholesale,
       applied_price: item.applied_price,
       quantity: item.quantity,
+      variant: item.variant ? JSON.stringify(item.variant) : null,
       metadata: {
         original_data: {
           name: item.name,
