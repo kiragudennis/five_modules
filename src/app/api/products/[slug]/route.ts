@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, context: any) {
     // Fetch the specific product
     const { data: product, error: productError } = await supabaseAdmin
       .from("products")
-      .select("*")
+      .select(`*, varieties:product_varieties(*)`)
       .eq("slug", slug)
       .single();
 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest, context: any) {
     // Cache product details aggressively
     response.headers.set(
       "Cache-Control",
-      "public, s-maxage=3600, stale-while-revalidate=1800"
+      "public, s-maxage=3600, stale-while-revalidate=1800",
     );
 
     return response;
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest, context: any) {
     console.error("Product fetch error:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

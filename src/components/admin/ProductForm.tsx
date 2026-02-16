@@ -179,13 +179,13 @@ export default function ProductForm({
         slug: values.slug,
         images: values.images || [],
         videoUrl: values.videoUrl,
-        sku: values.sku, // Always required now
-        price: Number(values.price), // Always required now
+        sku: values.sku,
+        price: Number(values.price),
         originalPrice:
           Number(values.originalPrice) > 0
             ? Number(values.originalPrice)
             : null,
-        stock: Number(values.stock), // Always required now
+        stock: Number(values.stock),
         category: values.category,
         currency: values.currency,
         weight: values.weight || 0,
@@ -208,6 +208,8 @@ export default function ProductForm({
         referral_points: values.referral_points,
       };
 
+      let productId: string;
+
       if (isEditing && initialData?.id) {
         // Update existing product
         const { data, error } = await supabase
@@ -218,6 +220,7 @@ export default function ProductForm({
           .single();
 
         if (error) throw error;
+        productId = initialData.id;
       } else {
         // Create new product
         const { data, error } = await supabase
@@ -227,6 +230,24 @@ export default function ProductForm({
           .single();
 
         if (error) throw error;
+        productId = data.id;
+      }
+
+      // Handle varieties if the product has varieties
+      if (values.has_varieties && variaties.length > 0) {
+        await saveProductVarieties(productId, variaties);
+      } else if (isEditing && initialData?.id) {
+        // If product had varieties but now doesn't, delete all varieties
+        const { error } = await supabase
+          .from("product_varieties")
+          .delete()
+          .eq("product_id", initialData.id);
+
+        if (error) {
+          console.error("Error deleting old varieties:", error);
+          toast.error("Error updating product varieties");
+          return;
+        }
       }
 
       router.push("/admin/products");
@@ -241,6 +262,45 @@ export default function ProductForm({
       toast.error(error.message || "Error saving product");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Helper function to save varieties
+  const saveProductVarieties = async (
+    productId: string,
+    varieties: Variaty[],
+  ) => {
+    try {
+      // If editing, delete all existing varieties first
+      if (isEditing && initialData?.id) {
+        const { error: deleteError } = await supabase
+          .from("product_varieties")
+          .delete()
+          .eq("product_id", initialData.id);
+
+        if (deleteError) {
+          throw new Error("Failed to update varieties");
+        }
+      }
+
+      // Prepare varieties for insertion (remove temporary IDs)
+      const varietiesToInsert = varieties.map(({ id, ...variety }) => ({
+        ...variety,
+        product_id: productId,
+      }));
+
+      // Insert all varieties
+      const { error: insertError } = await supabase
+        .from("product_varieties")
+        .insert(varietiesToInsert);
+
+      if (insertError) {
+        console.error("Error inserting varieties:", insertError);
+        throw new Error("Failed to save product varieties");
+      }
+    } catch (error) {
+      console.error("Error in saveProductVarieties:", error);
+      throw error;
     }
   };
 

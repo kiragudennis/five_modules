@@ -1,7 +1,7 @@
 // app/products/[slug]/page.tsx
 import { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Product } from "@/types/store";
+import { Product, Variaty } from "@/types/store";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const SITE_URL =
@@ -10,10 +10,15 @@ const SITE_URL =
 // --- Single, shared data fetch function ---
 async function fetchProductData(slug: string) {
   try {
-    // Fetch product directly from Supabase
+    // Fetch product with its varieties directly from Supabase
     const { data: product, error } = await supabaseAdmin
       .from("products")
-      .select(`*`)
+      .select(
+        `
+        *,
+        varieties:product_varieties(*)
+      `,
+      )
       .eq("slug", slug)
       .single();
 
@@ -41,15 +46,22 @@ async function fetchProductData(slug: string) {
         rating,
         reviewsCount,
         stock
-      `
+      `,
       )
       .eq("category", product.category)
       .neq("id", product.id)
       .limit(4)
       .order("created_at", { ascending: false });
 
+    // Transform the data to ensure types match
+    const transformedProduct: Product = {
+      ...product,
+      varieties: product.varieties || [],
+      // Ensure other fields match Product type
+    };
+
     return {
-      product: product as Product,
+      product: transformedProduct,
       relatedProducts: (relatedProducts || []) as Product[],
     };
   } catch (error) {
@@ -76,7 +88,6 @@ export async function generateStaticParams() {
 }
 
 // Cache the product data for the current request
-// This ensures generateMetadata and the page component share the same data
 import { cache } from "react";
 import ProductDetailPage from "@/components/ProductPage";
 
@@ -238,7 +249,6 @@ export default async function ProductPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      {/* No suspense needed since we already have the data */}
       <ProductDetailPage product={product} relatedProducts={relatedProducts} />
     </>
   );

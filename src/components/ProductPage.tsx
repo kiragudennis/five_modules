@@ -33,10 +33,11 @@ import {
   Users,
   MessageCircle,
   Gift,
+  Images,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart, useStore } from "@/lib/context/StoreContext";
-import { Product } from "@/types/store";
+import { Product, Variaty } from "@/types/store";
 import { FloatingCartButton } from "@/components/cartButton";
 import {
   Carousel,
@@ -60,6 +61,7 @@ import { toast } from "sonner";
 import { lightingCategories } from "@/lib/constants";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
+import { ProductVarieties } from "./ProductVarieties";
 
 export default function ProductDetailPage({
   product,
@@ -80,6 +82,56 @@ export default function ProductDetailPage({
   const [url, setUrl] = useState(
     typeof window !== "undefined" ? window.location.origin : "",
   );
+  const [selectedVariety, setSelectedVariety] = useState<Variaty | null>(
+    product.varieties?.find((v) => v.is_default) ||
+      product.varieties?.[0] ||
+      null,
+  );
+  const [currentImages, setCurrentImages] = useState(
+    selectedVariety?.images?.length
+      ? selectedVariety.images
+      : product.images || [],
+  );
+  const [showingVarietyImages, setShowingVarietyImages] = useState(
+    !!selectedVariety?.images?.length,
+  );
+
+  const handleVarietyChange = (variety: Variaty) => {
+    setSelectedVariety(variety);
+  };
+
+  const handleVarietyImagesChange = (images: string[]) => {
+    setCurrentImages(images);
+    setShowingVarietyImages(true);
+
+    // Optional: Show a toast notification
+    toast.info(`Now showing ${selectedVariety?.name}`, {
+      duration: 2000,
+    });
+  };
+
+  const resetToMainImages = () => {
+    setCurrentImages(product.images || []);
+    setShowingVarietyImages(false);
+    setSelectedVariety(null);
+  };
+
+  // Update price display based on selected variety
+  const displayPrice = selectedVariety?.price || product.price;
+  const displayOriginalPrice =
+    selectedVariety?.original_price || product.originalPrice;
+  const displayWholesalePrice =
+    selectedVariety?.wholesale_price || product.wholesale_price;
+  const displayWholesaleMinQuantity =
+    selectedVariety?.wholesale_min_quantity || product.wholesale_min_quantity;
+  const displayStock = selectedVariety?.stock || product.stock;
+  const displaySku = selectedVariety?.sku || product.sku;
+
+  // Get attributes for selected variety;
+  const displayAttributes = selectedVariety?.attributes;
+  // get watage or colorTemp;
+  const wattage = displayAttributes?.wattage || product.wattage;
+  const colorTemp = displayAttributes?.colorTemp || product.colorTemperature;
 
   const generateReferralLink = () => {
     const shareUrl = new URL(`${url}/products/${product.slug}`);
@@ -189,8 +241,17 @@ export default function ProductDetailPage({
         product: {
           ...product,
           tags: product.tags ?? [],
+          id: selectedVariety?.id || product.id, // Use variety ID for cart item
+          sku: displaySku,
+          price: displayPrice,
+          originalPrice: displayOriginalPrice,
+          wholesale_price: displayWholesalePrice,
+          wholesale_min_quantity: displayWholesaleMinQuantity,
+          stock: displayStock,
+          images: currentImages,
         },
         quantity: quantity,
+        variant: selectedVariety || undefined,
       },
     });
 
@@ -202,15 +263,15 @@ export default function ProductDetailPage({
 
   const handleQuantityChange = (change: number) => {
     const newQuantity = quantity + change;
-    if (newQuantity >= 1 && newQuantity <= product.stock) {
+    if (newQuantity >= 1 && newQuantity <= displayStock) {
       setQuantity(newQuantity);
     }
   };
 
   // Calculate discount percentage
-  const discountPercentage = product.originalPrice
+  const discountPercentage = displayOriginalPrice
     ? Math.round(
-        ((product.originalPrice - product.price) / product.originalPrice) * 100,
+        ((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100,
       )
     : 0;
 
@@ -268,20 +329,33 @@ export default function ProductDetailPage({
         <div className="lg:col-span-2">
           <Card className="border-amber-100 dark:border-amber-800/30">
             <CardContent>
-              {product.images?.length ? (
+              {currentImages.length ? (
                 <div className="flex flex-col w-full">
-                  {/* Deal of the Day Banner */}
-                  {product.dealOfTheDay && (
+                  {/* Variety Images Banner */}
+                  {showingVarietyImages && selectedVariety && (
                     <div className="mb-4">
-                      <div className="flex flex-col sm:flex-row bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 text-white p-3 rounded-lg flex items-center justify-between animate-pulse">
+                      <div className="flex flex-wrap items-center justify-between bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-3 rounded-lg">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold">⚡ DEAL OF THE DAY!</span>
+                          <Images className="h-5 w-5" />
+                          <span className="font-medium text-sm">
+                            Showing {selectedVariety.name}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span className="text-sm">
-                            Ends tonight at midnight
-                          </span>
+                          <Badge
+                            variant="outline"
+                            className="bg-white/20 text-white border-white/30"
+                          >
+                            {selectedVariety.images?.length || 0} image(s)
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={resetToMainImages}
+                            className="text-white hover:bg-white/20"
+                          >
+                            View Main Product
+                          </Button>
                         </div>
                       </div>
                     </div>
@@ -291,8 +365,8 @@ export default function ProductDetailPage({
                   <div className="relative">
                     <Carousel className="w-full" setApi={setApi}>
                       <CarouselContent>
-                        {/* Video thumbnail if available */}
-                        {product.videoUrl && (
+                        {/* Video thumbnail if available and not showing variety images */}
+                        {!showingVarietyImages && product.videoUrl && (
                           <CarouselItem>
                             <div className="aspect-square relative rounded-lg overflow-hidden border border-amber-200 group cursor-pointer">
                               {showVideo ? (
@@ -334,8 +408,8 @@ export default function ProductDetailPage({
                           </CarouselItem>
                         )}
 
-                        {/* Product Images */}
-                        {product.images.map((img, idx) => (
+                        {/* Product/Variety Images */}
+                        {currentImages.map((img, idx) => (
                           <CarouselItem key={idx}>
                             <div className="aspect-square relative rounded-lg overflow-hidden border border-amber-200">
                               <Image
@@ -347,12 +421,24 @@ export default function ProductDetailPage({
                                 priority={idx === 0}
                               />
 
-                              {/* Discount Badge */}
-                              {discountPercentage > 0 && idx === 0 && (
-                                <Badge className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-orange-500 border-0 text-white">
-                                  SAVE {discountPercentage}%
-                                </Badge>
-                              )}
+                              {/* Variety Badge for variety images */}
+                              {showingVarietyImages &&
+                                selectedVariety &&
+                                idx === 0 && (
+                                  <Badge className="absolute top-3 left-3 bg-blue-500 border-0">
+                                    <Images className="h-3 w-3 mr-1" />
+                                    {selectedVariety.name}
+                                  </Badge>
+                                )}
+
+                              {/* Other badges remain the same */}
+                              {!showingVarietyImages &&
+                                discountPercentage > 0 &&
+                                idx === 0 && (
+                                  <Badge className="absolute top-3 left-3 bg-gradient-to-r from-red-500 to-orange-500 border-0 text-white">
+                                    SAVE {discountPercentage}%
+                                  </Badge>
+                                )}
 
                               {/* Featured Badge */}
                               {product.featured && idx === 0 && (
@@ -379,15 +465,14 @@ export default function ProductDetailPage({
 
                     {/* Image counter */}
                     <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-                      {activeIndex + 1} /{" "}
-                      {product.images.length + (product.videoUrl ? 1 : 0)}
+                      {activeIndex + 1} / {currentImages.length}
                     </div>
                   </div>
 
                   {/* Thumbnail row */}
                   <div className="mt-4 flex gap-2 overflow-x-auto p-2">
-                    {/* Video thumbnail */}
-                    {product.videoUrl && (
+                    {/* Video thumbnail - only show when not showing variety images */}
+                    {!showingVarietyImages && product.videoUrl && (
                       <button
                         onClick={() => {
                           api?.scrollTo(0);
@@ -403,7 +488,7 @@ export default function ProductDetailPage({
                           <Play className="h-4 w-4 text-white fill-white" />
                         </div>
                         <Image
-                          src={product.images[0]}
+                          src={currentImages[0]}
                           alt="Video thumbnail"
                           fill
                           className="object-cover"
@@ -413,38 +498,47 @@ export default function ProductDetailPage({
                     )}
 
                     {/* Image thumbnails */}
-                    {product.images.map((img, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          api?.scrollTo(idx + (product.videoUrl ? 1 : 0));
-                          setShowVideo(false);
-                        }}
-                        className={`relative w-16 h-16 border rounded-lg overflow-hidden flex-shrink-0 transition-all ${
-                          activeIndex === idx + (product.videoUrl ? 1 : 0)
-                            ? "ring-2 ring-amber-500 ring-offset-2"
-                            : "opacity-70 hover:opacity-100 border-amber-100"
-                        }`}
-                      >
-                        <Image
-                          src={img}
-                          alt={`Thumbnail ${idx + 1}`}
-                          fill
-                          className="object-cover"
-                          sizes="64px"
-                        />
-                      </button>
-                    ))}
+                    {currentImages.map((img, idx) => {
+                      const imageIndex =
+                        idx +
+                        (!showingVarietyImages && product.videoUrl ? 1 : 0);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            api?.scrollTo(imageIndex);
+                            setShowVideo(false);
+                          }}
+                          className={`relative w-16 h-16 border rounded-lg overflow-hidden flex-shrink-0 transition-all ${
+                            activeIndex === imageIndex
+                              ? "ring-2 ring-amber-500 ring-offset-2"
+                              : "opacity-70 hover:opacity-100 border-amber-100"
+                          }`}
+                        >
+                          <Image
+                            src={img}
+                            alt={`Thumbnail ${idx + 1}`}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                          />
+                          {/* Show variety indicator on thumbnails when viewing variety images */}
+                          {showingVarietyImages && (
+                            <div className="absolute top-0 left-0 bg-blue-500 text-white text-[8px] px-1 rounded-br">
+                              V
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   {/* Technical Highlights */}
                   <div className="mt-4 sm:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {product.wattage && (
+                    {wattage && (
                       <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
                         <Zap className="h-5 w-5 text-amber-600 mx-auto mb-1" />
-                        <div className="text-sm font-semibold">
-                          {product.wattage}W
-                        </div>
+                        <div className="text-sm font-semibold">{wattage}W</div>
                         <div className="text-xs text-muted-foreground">
                           Power
                         </div>
@@ -522,7 +616,7 @@ export default function ProductDetailPage({
                   )}
 
                   {/* Wholesale Pricing Display */}
-                  {product.has_wholesale && product.wholesale_price && (
+                  {product.has_wholesale && displayWholesalePrice && (
                     <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 dark:border-purple-800 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg p-2 sm:p-4 items-baseline gap-3 my-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Users className="h-5 w-5 text-purple-600" />
@@ -537,7 +631,7 @@ export default function ProductDetailPage({
                           </p>
                           <p className="text-2xl font-bold text-purple-600">
                             {formatCurrency(
-                              product.wholesale_price,
+                              displayWholesalePrice,
                               product.currency,
                             )}
                           </p>
@@ -547,22 +641,35 @@ export default function ProductDetailPage({
                             Min. Quantity
                           </p>
                           <p className="text-2xl font-bold text-purple-600">
-                            {product.wholesale_min_quantity}+ units
+                            {displayWholesaleMinQuantity}+ units
                           </p>
                         </div>
                       </div>
                       <p className="text-sm text-purple-600 dark:text-purple-400 mt-2">
                         Save{" "}
                         {Math.round(
-                          ((product.price - product.wholesale_price) /
-                            product.price) *
+                          ((displayPrice - displayWholesalePrice) /
+                            displayPrice) *
                             100,
                         )}
-                        % per unit when you order{" "}
-                        {product.wholesale_min_quantity}+ units
+                        % per unit when you order {displayWholesaleMinQuantity}+
+                        units
                       </p>
                     </div>
                   )}
+
+                  {product.has_varieties &&
+                    product.varieties &&
+                    product.varieties.length > 0 && (
+                      <div className="mb-6">
+                        <ProductVarieties
+                          varieties={product.varieties}
+                          onVarietyChange={handleVarietyChange}
+                          onVarietyImagesChange={handleVarietyImagesChange}
+                          selectedVarietyId={selectedVariety?.id}
+                        />
+                      </div>
+                    )}
 
                   {/* Share & Actions */}
                   <div className="flex flex-col items-center justify-between mt-6 pt-6 border-t border-amber-100 gap-4">
@@ -680,16 +787,13 @@ export default function ProductDetailPage({
                 {/* Price Display */}
                 <div className="flex items-baseline gap-3 mb-4">
                   <span className="text-3xl font-bold text-amber-600">
-                    {formatCurrency(product.price, product.currency)}
+                    {formatCurrency(displayPrice, product.currency)}
                   </span>
 
-                  {product.originalPrice && (
+                  {displayOriginalPrice && (
                     <div className="flex items-center justify-between flex-wrap w-full">
                       <span className="text-lg text-gray-500 line-through">
-                        {formatCurrency(
-                          product.originalPrice,
-                          product.currency,
-                        )}
+                        {formatCurrency(displayOriginalPrice, product.currency)}
                       </span>
                       <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
                         Save {discountPercentage}%
@@ -700,10 +804,10 @@ export default function ProductDetailPage({
 
                 {/* Technical Quick View */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  {product.wattage && (
+                  {wattage && (
                     <div className="flex items-center gap-2 text-sm">
                       <Zap className="h-4 w-4 text-amber-500" />
-                      <span>{product.wattage} Watts</span>
+                      <span>{wattage} Watts</span>
                     </div>
                   )}
                   {product.voltage && (
@@ -712,10 +816,10 @@ export default function ProductDetailPage({
                       <span>{product.voltage}</span>
                     </div>
                   )}
-                  {product.colorTemperature && (
+                  {colorTemp && (
                     <div className="flex items-center gap-2 text-sm">
                       <Thermometer className="h-4 w-4 text-amber-500" />
-                      <span>{product.colorTemperature}</span>
+                      <span>{colorTemp}</span>
                     </div>
                   )}
                   {product.ipRating && (
@@ -730,9 +834,9 @@ export default function ProductDetailPage({
                 <div
                   className={cn(
                     "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm mb-4",
-                    product.stock > 10
+                    displayStock > 10
                       ? "bg-green-100 text-green-800"
-                      : product.stock > 0
+                      : displayStock > 0
                         ? "bg-yellow-100 text-yellow-800"
                         : "bg-red-100 text-red-800",
                   )}
@@ -740,17 +844,17 @@ export default function ProductDetailPage({
                   <div
                     className={cn(
                       "w-2 h-2 rounded-full",
-                      product.stock > 10
+                      displayStock > 10
                         ? "bg-green-500"
-                        : product.stock > 0
+                        : displayStock > 0
                           ? "bg-yellow-500"
                           : "bg-red-500",
                     )}
                   />
-                  {product.stock > 10
-                    ? `In Stock (${product.stock} units)`
-                    : product.stock > 0
-                      ? `Low Stock (Only ${product.stock} left)`
+                  {displayStock > 10
+                    ? `In Stock (${displayStock} units)`
+                    : displayStock > 0
+                      ? `Low Stock (Only ${displayStock} left)`
                       : "Out of Stock"}
                 </div>
               </div>
@@ -836,35 +940,34 @@ export default function ProductDetailPage({
                     </span>
                     <button
                       onClick={() => handleQuantityChange(1)}
-                      disabled={quantity >= product.stock}
+                      disabled={quantity >= displayStock}
                       className="px-4 py-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 hover:bg-amber-50"
                     >
                       +
                     </button>
                   </div>
                   {/* Wholesale Quantity Alert */}
-                  {product.has_wholesale && product.wholesale_min_quantity && (
+                  {product.has_wholesale && displayWholesaleMinQuantity && (
                     <div
                       className={`mt-2 p-2 rounded-md ${
-                        quantity >= product.wholesale_min_quantity
+                        quantity >= displayWholesaleMinQuantity
                           ? "bg-green-100 text-green-800"
                           : "bg-purple-100 text-purple-800"
                       }`}
                     >
                       <p className="text-sm">
-                        {quantity >= product.wholesale_min_quantity ? (
+                        {quantity >= displayWholesaleMinQuantity ? (
                           <>
                             ✅ Wholesale price applied! You're saving{" "}
                             {formatCurrency(
-                              (product.price - product.wholesale_price) *
-                                quantity,
+                              (displayPrice - displayWholesalePrice) * quantity,
                               product.currency,
                             )}
                           </>
                         ) : (
                           <>
-                            📦 Add {product.wholesale_min_quantity - quantity}{" "}
-                            more to get wholesale price
+                            📦 Add {displayWholesaleMinQuantity - quantity} more
+                            to get wholesale price
                           </>
                         )}
                       </p>
@@ -872,9 +975,9 @@ export default function ProductDetailPage({
                   )}
 
                   {/* Low Stock Alert */}
-                  {product.stock > 0 && product.stock <= 10 && (
+                  {displayStock > 0 && displayStock <= 10 && (
                     <p className="text-sm text-amber-600 mt-1">
-                      ⚡ Hurry! Only {product.stock} left in stock
+                      ⚡ Hurry! Only {displayStock} left in stock
                     </p>
                   )}
                 </div>
@@ -885,37 +988,36 @@ export default function ProductDetailPage({
                     <span>Unit Price:</span>
                     <span className="font-medium">
                       {product.has_wholesale &&
-                      quantity >= product.wholesale_min_quantity
+                      quantity >= displayWholesaleMinQuantity
                         ? formatCurrency(
-                            product.wholesale_price,
+                            displayWholesalePrice,
                             product.currency,
                           )
-                        : formatCurrency(product.price, product.currency)}
+                        : formatCurrency(displayPrice, product.currency)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Total:</span>
                     <span className="text-lg font-bold text-amber-600">
                       {product.has_wholesale &&
-                      quantity >= product.wholesale_min_quantity
+                      quantity >= displayWholesaleMinQuantity
                         ? formatCurrency(
-                            product.wholesale_price * quantity,
+                            displayWholesalePrice * quantity,
                             product.currency,
                           )
                         : formatCurrency(
-                            product.price * quantity,
+                            displayPrice * quantity,
                             product.currency,
                           )}
                     </span>
                   </div>
                   {product.has_wholesale &&
-                    quantity >= product.wholesale_min_quantity && (
+                    quantity >= displayWholesaleMinQuantity && (
                       <div className="flex justify-between text-green-600 mt-1">
                         <span>You Save:</span>
                         <span className="font-medium">
                           {formatCurrency(
-                            (product.price - product.wholesale_price) *
-                              quantity,
+                            (displayPrice - displayWholesalePrice) * quantity,
                             product.currency,
                           )}
                         </span>
@@ -924,7 +1026,7 @@ export default function ProductDetailPage({
                 </div>
 
                 <Button
-                  disabled={product.stock === 0 || isAddingToCart}
+                  disabled={displayStock === 0 || isAddingToCart}
                   onClick={() => handleAddToCart(product)}
                   className="w-full h-12 text-lg bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white"
                 >
@@ -936,7 +1038,7 @@ export default function ProductDetailPage({
                   ) : (
                     <>
                       <ShoppingCart className="h-5 w-5 mr-2" />
-                      {product.stock === 0 ? "Out of Stock" : "Add to Cart"}
+                      {displayStock === 0 ? "Out of Stock" : "Add to Cart"}
                     </>
                   )}
                 </Button>
@@ -945,7 +1047,7 @@ export default function ProductDetailPage({
                 <Button
                   variant="outline"
                   onClick={() => {
-                    if (product.stock === 0) {
+                    if (displayStock === 0) {
                       toast.error("There isn't enough stock left");
                     } else if (totalItems === 0) {
                       toast.error("Please add items to cart");
@@ -983,9 +1085,7 @@ export default function ProductDetailPage({
                 {[
                   {
                     label: "Wattage",
-                    value: product.wattage
-                      ? `${product.wattage} Watts`
-                      : "Not specified",
+                    value: wattage ? `${wattage} Watts` : "Not specified",
                     icon: Zap,
                   },
                   {
@@ -1002,7 +1102,7 @@ export default function ProductDetailPage({
                   },
                   {
                     label: "Color Temperature",
-                    value: product.colorTemperature || "Warm White (3000K)",
+                    value: colorTemp || "Warm White (3000K)",
                     icon: Thermometer,
                   },
                   {
@@ -1170,14 +1270,12 @@ export default function ProductDetailPage({
                             {
                               label: "SKU",
                               value:
-                                product.sku ||
+                                displaySku ||
                                 `BTE-${product.id.substring(0, 8)}`,
                             },
                             {
                               label: "Wattage",
-                              value: product.wattage
-                                ? `${product.wattage}W`
-                                : "N/A",
+                              value: wattage ? `${wattage}W` : "N/A",
                             },
                             {
                               label: "Voltage",
@@ -1191,7 +1289,7 @@ export default function ProductDetailPage({
                             },
                             {
                               label: "Color Temperature",
-                              value: product.colorTemperature || "3000K",
+                              value: colorTemp || "3000K",
                             },
                           ].map((spec, idx) => (
                             <div
@@ -1299,8 +1397,7 @@ export default function ProductDetailPage({
                               `${product.warrantyMonths}-Month Warranty`,
                             product.ipRating &&
                               `Weather Resistant (${product.ipRating})`,
-                            product.colorTemperature &&
-                              `Natural Light (${product.colorTemperature})`,
+                            colorTemp && `Natural Light (${colorTemp})`,
                             "Long Lifespan (50,000+ hours)",
                             "Eco Friendly",
                             "Instant On",
@@ -1672,7 +1769,7 @@ export default function ProductDetailPage({
             relatedProducts.map((relatedProduct) => (
               <Card
                 key={relatedProduct.id}
-                className="group hover:shadow-lg transition-all hover:-translate-y-1 border-amber-100 hover:border-amber-300"
+                className="group hover:shadow-lg transition-all hover:-translate-y-1 border-amber-100 hover:border-amber-300 pt-0"
               >
                 <Link href={`/products/${relatedProduct.slug}`}>
                   <div className="aspect-square relative overflow-hidden">
@@ -1682,7 +1779,7 @@ export default function ProductDetailPage({
                           src={relatedProduct.images[0]}
                           alt={relatedProduct.title}
                           fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-110"
+                          className="object-cover transition-transform duration-500 group-hover:scale-110 rounded-t-lg"
                           sizes="(max-width: 768px) 50vw, 25vw"
                         />
                         {relatedProduct.dealOfTheDay && (

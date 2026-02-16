@@ -42,6 +42,8 @@ export interface Product {
   energySaving?: boolean;
   installationType?: string;
   referral_points?: number;
+  has_varieties: boolean;
+  varieties?: Variaty[];
   created_at: string;
 }
 
@@ -187,7 +189,7 @@ export interface ShippingAddress {
 
 export interface CartItem {
   product: Product;
-  variant?: ProductVariant;
+  variant?: Variaty;
   quantity: number;
 }
 
@@ -233,6 +235,8 @@ export const productVarietySchema = z.object({
   sku: z.string().min(1, "SKU is required"),
   price: z.number().min(0, "Price must be positive"),
   original_price: z.number().min(0).optional().nullable(),
+  wholesale_price: z.number().min(0).optional().nullable(),
+  wholesale_min_quantity: z.number().min(0).optional().nullable(),
   stock: z.number().int().min(0, "Stock must be 0 or greater"),
   images: z.array(z.string()).default([]),
   attributes: z

@@ -530,6 +530,7 @@ export default function CheckoutPage() {
             item.quantity >= (item.product.wholesale_min_quantity || 10)
               ? item.product.wholesale_price || item.product.price
               : item.product.price,
+          variety: item.variant,
         })),
 
         // Customer information
