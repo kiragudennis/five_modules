@@ -872,7 +872,9 @@ export default async function Home() {
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
                   <Mail className="w-8 h-8 mx-auto mb-2" />
                   <h4 className="font-bold mb-1">Email Us</h4>
-                  <p className="text-sm opacity-90">info@blessedtwo.com</p>
+                  <p className="text-sm opacity-90">
+                    info@blessedtwoelectronics.com
+                  </p>
                   <p className="text-sm opacity-80">Quick Response</p>
                 </div>
               </div>

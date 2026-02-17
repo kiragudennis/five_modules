@@ -99,7 +99,7 @@ export default function ReturnsPageContent() {
             name: "Returns & Refunds Policy",
             description:
               "Comprehensive returns and refunds policy for Blessed Two Electronics lighting products",
-            url: "https://www.blessedtwo.com/returns",
+            url: "https://www.blessedtwoelectronics.com/returns",
             breadcrumb: {
               "@type": "BreadcrumbList",
               itemListElement: [
@@ -107,13 +107,13 @@ export default function ReturnsPageContent() {
                   "@type": "ListItem",
                   position: 1,
                   name: "Home",
-                  item: "https://www.blessedtwo.com",
+                  item: "https://www.blessedtwoelectronics.com",
                 },
                 {
                   "@type": "ListItem",
                   position: 2,
                   name: "Returns Policy",
-                  item: "https://www.blessedtwo.com/returns",
+                  item: "https://www.blessedtwoelectronics.com/returns",
                 },
               ],
             },
@@ -704,7 +704,7 @@ export default function ReturnsPageContent() {
                       Email Support
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      support@www.blessedtwo.com
+                      support@blessedtwoelectronics.com
                     </div>
                   </div>
                 </div>

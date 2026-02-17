@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com/contact",
+    url: "https://www.blessedtwoelectronics.com/contact",
     title: "Contact Blessed Two Electronics | Lighting Solutions Nairobi",
     description:
       "Contact our lighting experts for consultations, technical support, and installation services.",

@@ -106,7 +106,7 @@ export default function AboutPageContent() {
             name: "About Blessed Two Electronics",
             description:
               "Nairobi's premier lighting solutions provider since 2018",
-            url: "https://blessedtwo.com/about",
+            url: "https://blessedtwoelectronics.com/about",
             breadcrumb: {
               "@type": "BreadcrumbList",
               itemListElement: [
@@ -114,13 +114,13 @@ export default function AboutPageContent() {
                   "@type": "ListItem",
                   position: 1,
                   name: "Home",
-                  item: "https://blessedtwo.com",
+                  item: "https://blessedtwoelectronics.com",
                 },
                 {
                   "@type": "ListItem",
                   position: 2,
                   name: "About",
-                  item: "https://blessedtwo.com/about",
+                  item: "https://blessedtwoelectronics.com/about",
                 },
               ],
             },
@@ -137,8 +137,8 @@ export default function AboutPageContent() {
             name: "Blessed Two Electronics",
             description:
               "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
-            url: "https://blessedtwo.com",
-            logo: "https://blessedtwo.com/logo.png",
+            url: "https://blessedtwoelectronics.com",
+            logo: "https://blessedtwoelectronics.com/logo.png",
             foundingDate: "2018",
             founders: [
               {
@@ -164,7 +164,7 @@ export default function AboutPageContent() {
               "https://www.tiktok.com/@blessed_2_electricals",
               "https://www.facebook.com/blessedtwoelectronics",
               "https://www.instagram.com/blessedtwoelectronics",
-              "https://twitter.com/blessedtwo",
+              "https://twitter.com/blessedtwoelectronics",
             ],
           }),
         }}

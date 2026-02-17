@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com/accounts",
+    url: "https://www.blessedtwoelectronics.com/accounts",
     title: "My Account | Blessed Two Electronics",
     description: "Manage your lighting purchases, orders, and loyalty rewards.",
   },

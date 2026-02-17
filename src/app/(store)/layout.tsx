@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: true,
   },
-  metadataBase: new URL("https://www.blessedtwo.com"),
+  metadataBase: new URL("https://www.blessedtwoelectronics.com"),
   alternates: {
     canonical: "/",
     languages: {
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com",
+    url: "https://www.blessedtwoelectronics.com",
     title: "Blessed Two Electronics - Premium Lighting Solutions",
     description:
       "Your trusted partner for quality lighting solutions in Nairobi. LED bulbs, solar systems, security lights, and professional installation.",
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     description:
       "LED bulbs, solar lighting, security systems & professional installation in Nairobi.",
     images: ["/twitter-image.jpg"],
-    creator: "@blessedtwo",
+    creator: "@blessedtwoelectronics",
   },
   robots: {
     index: true,
@@ -89,9 +89,9 @@ export default function StoreLayout({
             "@context": "https://schema.org",
             "@type": "LocalBusiness",
             name: "Blessed Two Electronics",
-            image: "https://www.blessedtwo.com/logo.jpg",
-            "@id": "https://www.blessedtwo.com",
-            url: "https://www.blessedtwo.com",
+            image: "https://www.blessedtwoelectronics.com/logo.jpg",
+            "@id": "https://www.blessedtwoelectronics.com",
+            url: "https://www.blessedtwoelectronics.com",
             telephone: "+254727833691",
             address: {
               "@type": "PostalAddress",
@@ -147,13 +147,13 @@ export default function StoreLayout({
             "@context": "https://schema.org",
             "@type": "WebSite",
             name: "Blessed Two Electronics",
-            url: "https://blessedtwo.com",
+            url: "https://blessedtwoelectronics.com",
             potentialAction: {
               "@type": "SearchAction",
               target: {
                 "@type": "EntryPoint",
                 urlTemplate:
-                  "https://blessedtwo.com/search?q={search_term_string}",
+                  "https://blessedtwoelectronics.com/search?q={search_term_string}",
               },
               "query-input": "required name=search_term_string",
             },

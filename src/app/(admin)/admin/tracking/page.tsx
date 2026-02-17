@@ -82,12 +82,12 @@ export default function AdminTrackingPage() {
   const [bulkStatus, setBulkStatus] = useState("shipped");
   const [bulkShippingMethod, setBulkShippingMethod] = useState("standard");
   const [bulkEstimatedDelivery, setBulkEstimatedDelivery] = useState(
-    format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "yyyy-MM-dd") // 3 days from now
+    format(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), "yyyy-MM-dd"), // 3 days from now
   );
 
   // Bulk email state
   const [emailSubject, setEmailSubject] = useState(
-    "Your Order Has Shipped! 🚚"
+    "Your Order Has Shipped! 🚚",
   );
   const [emailTemplate, setEmailTemplate] = useState(
     `
@@ -105,7 +105,7 @@ Thank you for shopping with Blessed Two Electronics!
 
 Best regards,
 The Blessed Two Team
-  `.trim()
+  `.trim(),
   );
 
   // Fetch orders
@@ -189,7 +189,7 @@ The Blessed Two Team
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // Select/deselect all
@@ -205,7 +205,7 @@ The Blessed Two Team
     setSelectedOrders((prev) =>
       prev.includes(orderId)
         ? prev.filter((id) => id !== orderId)
-        : [...prev, orderId]
+        : [...prev, orderId],
     );
   };
 
@@ -387,7 +387,7 @@ The Blessed Two Team
           order.installation_required ? "Yes" : "No",
           order.coupon_applied ? "Yes" : "No",
           format(new Date(order.created_at), "yyyy-MM-dd HH:mm:ss"),
-        ].join(",")
+        ].join(","),
       ),
     ].join("\n");
 
@@ -453,7 +453,7 @@ The Blessed Two Team
     shipped: orders.filter((o) => o.status === "shipped").length,
     delivered: orders.filter((o) => o.status === "delivered").length,
     needsTracking: orders.filter(
-      (o) => o.status === "processing" && !o.tracking_number
+      (o) => o.status === "processing" && !o.tracking_number,
     ).length,
     completed: orders.filter((o) => o.status === "completed").length,
     withInstallation: orders.filter((o) => o.installation_required).length,
@@ -574,7 +574,7 @@ The Blessed Two Team
                   onClick={copyTrackingNumbers}
                   disabled={
                     !selectedOrders.some(
-                      (id) => orders.find((o) => o.id === id)?.tracking_number
+                      (id) => orders.find((o) => o.id === id)?.tracking_number,
                     )
                   }
                 >
@@ -778,7 +778,7 @@ The Blessed Two Team
                         <p className="text-xs text-muted-foreground">
                           {format(
                             new Date(order.created_at),
-                            "MMM dd, yyyy HH:mm"
+                            "MMM dd, yyyy HH:mm",
                           )}
                         </p>
                         <div className="flex items-center gap-2">
@@ -852,7 +852,7 @@ The Blessed Two Team
                             {order.shipping_method} •{" "}
                             {formatCurrency(
                               order.shipping_cost,
-                              order.currency
+                              order.currency,
                             )}
                           </p>
                         </div>
@@ -883,7 +883,7 @@ The Blessed Two Team
                               className="h-6 w-6"
                               onClick={() =>
                                 navigator.clipboard.writeText(
-                                  order.tracking_number!
+                                  order.tracking_number!,
                                 )
                               }
                             >
@@ -959,7 +959,7 @@ The Blessed Two Team
                     >
                       {page}
                     </Button>
-                  )
+                  ),
                 )}
 
                 <Button
@@ -1202,7 +1202,7 @@ The Blessed Two Team
                     .replace(/{currency}/g, "KES")
                     .replace(
                       /{tracking_url}/g,
-                      "https://www.blessedtwo.com/tracking/BTE2401010001"
+                      "https://www.blessedtwoelectronics.com/tracking/BTE2401010001",
                     )}
                 </pre>
               </div>

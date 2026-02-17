@@ -1215,7 +1215,7 @@ export default function SuccessPage({
                 <div>
                   <p className="text-sm font-medium mb-1">Order Questions</p>
                   <p className="text-sm text-muted-foreground">
-                    Email: info@blessedtwo.com
+                    Email: info@blessedtwoelectronics.com
                   </p>
                 </div>
                 <div>

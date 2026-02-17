@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com/admin",
+    url: "https://www.blessedtwoelectronics.com/admin",
     title: "Admin Dashboard | Blessed Two Electronics",
     description:
       "Administrative dashboard for managing lighting business operations.",

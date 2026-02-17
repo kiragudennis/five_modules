@@ -316,7 +316,9 @@ export default function TermsOfService() {
               <Mail className="h-5 w-5 flex-shrink-0 text-blue-600" />
               <div>
                 <p className="font-medium">General Inquiries</p>
-                <p className="text-sm text-gray-600">info@blessedtwo.co.ke</p>
+                <p className="text-sm text-gray-600">
+                  info@blessedtwoelectronics.com
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">

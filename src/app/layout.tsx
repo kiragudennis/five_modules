@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: "Blessed Two Electronics",
-      url: "https://www.blessedtwo.com",
+      url: "https://www.blessedtwoelectronics.com",
     },
   ],
   creator: "Blessed Two Electronics",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     address: false,
     telephone: true,
   },
-  metadataBase: new URL("https://www.blessedtwo.com"),
+  metadataBase: new URL("https://www.blessedtwoelectronics.com"),
   alternates: {
     canonical: "/",
     languages: {
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com",
+    url: "https://www.blessedtwoelectronics.com",
     siteName: "Blessed Two Electronics",
     title: "Blessed Two Electronics | Premium Lighting Solutions Nairobi",
     description:

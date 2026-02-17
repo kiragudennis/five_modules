@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com/categories",
+    url: "https://www.blessedtwoelectronis.com/categories",
     title: "Lighting Categories | Blessed Two Electronics",
     description:
       "Browse all lighting categories and solutions available at Blessed Two Electronics.",

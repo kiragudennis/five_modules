@@ -171,13 +171,13 @@ export default function ContactPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-lg font-medium text-blue-600 dark:text-blue-400">
-                    sales@blessedtwo.com
+                    sales@blessedtwoelectronics.com
                   </p>
                   <p className="text-sm text-muted-foreground">
                     For product inquiries & orders
                   </p>
                   <p className="text-lg font-medium text-green-600 dark:text-green-400">
-                    support@blessedtwo.com
+                    support@blessedtwoelectronics.com
                   </p>
                   <p className="text-sm text-muted-foreground">
                     For technical support & installations

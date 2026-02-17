@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com/products",
+    url: "https://www.blessedtwoelectronics.com/products",
     title: "Lighting Products | Blessed Two Electronics",
     description:
       "Complete range of quality lighting solutions for homes, businesses, and industries in Nairobi.",
@@ -76,7 +76,7 @@ export default function ProductsLayout({
             name: "Lighting Products Collection",
             description:
               "Complete collection of lighting products at Blessed Two Electronics",
-            url: "https://www.blessedtwo.com/products",
+            url: "https://www.blessedtwoelectronics.com/products",
             mainEntity: {
               "@type": "ItemList",
               itemListElement: [
@@ -86,7 +86,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "LED Bulbs",
-                    url: "https://www.blessedtwo.com/category/led-bulbs",
+                    url: "https://www.blessedtwoelectronics.com/category/led-bulbs",
                   },
                 },
                 {
@@ -95,7 +95,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "Solar Lighting",
-                    url: "https://www.blessedtwo.com/category/solar-lighting",
+                    url: "https://www.blessedtwoelectronics.com/category/solar-lighting",
                   },
                 },
                 {
@@ -104,7 +104,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "Security Lights",
-                    url: "https://www.blessedtwo.com/category/security-lights",
+                    url: "https://www.blessedtwoelectronics.com/category/security-lights",
                   },
                 },
                 {
@@ -113,7 +113,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "Smart Lighting",
-                    url: "https://www.blessedtwo.com/category/smart-lighting",
+                    url: "https://www.blessedtwoelectronics.com/category/smart-lighting",
                   },
                 },
               ],

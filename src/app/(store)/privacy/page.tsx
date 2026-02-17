@@ -300,7 +300,7 @@ export default function PrivacyPolicy() {
               <div>
                 <p className="font-medium">Email</p>
                 <p className="text-sm text-gray-600">
-                  privacy@blessedtwo.co.ke
+                  privacy@blessedtwoelectronics.co.ke
                 </p>
               </div>
             </div>

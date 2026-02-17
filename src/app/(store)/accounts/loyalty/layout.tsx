@@ -90,7 +90,7 @@ export default function LoyaltyPage({
               name: "Blessed Two Electronics",
             },
             programName: "Lighting Rewards Program",
-            termsOfService: "https://www.blessedtwo.com/terms",
+            termsOfService: "https://www.blessedtwoelectronics.com/terms",
           }),
         }}
       />

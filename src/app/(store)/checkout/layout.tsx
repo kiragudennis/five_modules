@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwo.com/checkout",
+    url: "https://www.blessedtwoelectronics.com/checkout",
     title: "Checkout | Blessed Two Electronics",
     description:
       "Complete your lighting purchase securely with multiple payment options.",

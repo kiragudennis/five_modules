@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
               <div class="footer">
                 <p><strong>Blessed Two Electronics</strong><br>
                 Duruma Road, Nairobi<br>
-                📞 0700 000 000 | 📧 info@blessedtwo.co.ke</p>
+                📞 0727 833 691 | 📧 info@blessedtwoelectronics.com</p>
                 <p>This is an automated message, please do not reply to this email.</p>
               </div>
             </div>
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
 
       // Send email
       return resend.emails.send({
-        from: "Blessed Two Shipping <shipping@noreply.worldsammaorg>",
+        from: "Blessed Two Shipping <shipping@noreply.blessedtwoelectronics.com>",
         to: [order.shipping_info.email],
         subject: subject,
         html: html,
