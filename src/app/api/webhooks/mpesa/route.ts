@@ -170,6 +170,15 @@ export async function POST(request: Request) {
       );
     }
 
+    if (order?.metadata?.bundle) {
+      try {
+        await recordBundlePurchases(order);
+      } catch (bundleError) {
+        console.error("Error recording bundle purchases:", bundleError);
+        // Don't fail the webhook - bundle recording is secondary
+      }
+    }
+
     // Save transaction record
     const { error: txErr } = await supabaseAdmin.from("transactions").insert({
       order_id: orderId,
@@ -216,4 +225,119 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
+}
+
+export async function recordBundlePurchases(order: any) {
+  try {
+    const bundleData = order.metadata?.bundle;
+
+    if (!bundleData || !bundleData.bundle_id) {
+      console.log("No bundle data found for order", order.id);
+      return;
+    }
+
+    console.log("Recording bundle purchase:", bundleData);
+
+    // Start a transaction to ensure data consistency
+    const { data: purchase, error: purchaseError } = await supabaseAdmin
+      .from("bundle_purchases")
+      .insert({
+        bundle_id: bundleData.bundle_id,
+        user_id: order.user_id,
+        order_id: order.id,
+        quantity: 1, // One bundle per order
+        price_paid: calculateBundlePriceFromOrder(order),
+        savings_amount: calculateBundleSavings(order, bundleData),
+        points_used: bundleData.points_required || 0,
+        // loyalty_transaction_id will be linked separately if points were used
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (purchaseError) {
+      throw new Error(
+        `Failed to insert bundle purchase: ${purchaseError.message}`,
+      );
+    }
+
+    console.log("Bundle purchase recorded:", purchase);
+
+    // Update bundle current purchases count
+    const { error: updateError } = await supabaseAdmin.rpc(
+      "increment_mistry_bundle",
+      { bundle_id: bundleData.bundle_id },
+    );
+
+    if (updateError) {
+      console.error("Failed to update bundle purchase count:", updateError);
+      // Don't throw - this is non-critical
+    }
+
+    // If points were used, link the loyalty transaction
+    if (bundleData.points_required && bundleData.points_required > 0) {
+      // Find the loyalty transaction for this order where points were used
+      const { data: loyaltyTx, error: txError } = await supabaseAdmin
+        .from("loyalty_transactions")
+        .select("id")
+        .eq("order_id", order.id)
+        .eq("transaction_type", "redeemed")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!txError && loyaltyTx) {
+        // Link the transaction to bundle purchase
+        await supabaseAdmin
+          .from("bundle_purchases")
+          .update({ loyalty_transaction_id: loyaltyTx.id })
+          .eq("id", purchase.id);
+      }
+    }
+
+    return purchase;
+  } catch (error) {
+    console.error("Error in recordBundlePurchases:", error);
+    throw error;
+  }
+}
+
+function calculateBundlePriceFromOrder(order: any): number {
+  // Calculate how much the customer actually paid for the bundle
+  // This is the total order amount minus shipping, installation, etc.
+  const baseTotal = order.total_amount;
+  const shipping = order.shipping_cost || 0;
+  const installation = order.installation_cost || 0;
+
+  // If there were no other services, the bundle price is the total
+  if (shipping === 0 && installation === 0) {
+    return baseTotal;
+  }
+
+  // Otherwise, we need to estimate the bundle's portion
+  // For now, use a simplified approach - assume bundle price is total minus extras
+  return Math.max(0, baseTotal - shipping - installation);
+}
+
+function calculateBundleSavings(order: any, bundleData: any): number {
+  // Calculate original total of bundle items
+  const orderItems = order.metadata?.items || [];
+  const bundleItems = bundleData.items || [];
+
+  let originalTotal = 0;
+
+  // Match order items with bundle items by product_id
+  bundleItems.forEach((bundleItem: any) => {
+    const orderItem = orderItems.find(
+      (oi: any) => oi.product_id === bundleItem.product_id,
+    );
+    if (orderItem) {
+      originalTotal += (orderItem.unit_price || 0) * bundleItem.quantity;
+    }
+  });
+
+  // Calculate what they actually paid for these items
+  const bundlePrice = calculateBundlePriceFromOrder(order);
+
+  return Math.max(0, originalTotal - bundlePrice);
 }

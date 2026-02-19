@@ -82,6 +82,7 @@ export interface ProfileData {
   city?: string;
   postal_code?: string;
   country?: string;
+  referral_code?: string;
 
   // business
   business_name?: string;
@@ -110,39 +111,99 @@ export interface ProfileData {
   referred_by?: string;
 }
 
-export interface ClubMembership {
-  clubs: {
-    id: string;
-    name: string;
-    slug: string;
-    country_code: string;
-    logo_url: string;
-  };
-  membership_type: string;
+export interface Order {
+  id: string;
+  order_number: string;
+  total_amount: number;
+  status: string;
+  payment_status: string;
+  created_at: string;
+  payment_method: string;
+  shipping_method: string;
+  items: Array<{
+    product_name: string;
+    product_image: string;
+    quantity: number;
+    unit_price: number;
+  }>;
 }
 
-export interface AssociationMembership {
-  associations: {
+export interface EngagementSummary {
+  bundle_count: number;
+  available_bundles: Array<{
     id: string;
     name: string;
     slug: string;
-    country_code: string;
-    county_code: string;
-    logo_url: string;
-  };
-  role: string;
+    image_url: string | null;
+    badge_text: string | null;
+    badge_color: string | null;
+    discount_type: string;
+    discount_value: number;
+    points_required: number;
+    featured: boolean;
+  }>;
+  user_tier: string;
+  loyalty_points: number;
+  spins_today: number;
+  spin_game: {
+    id: string;
+    name: string;
+    free_spins_per_day: number;
+    points_per_spin: number;
+    is_active: boolean;
+  } | null;
+  recent_spin_results: Array<{
+    id: string;
+    prize_type: string;
+    prize_value: string;
+    loyalty_points_awarded: number;
+    is_claimed: boolean;
+    created_at: string;
+    coupon?: {
+      code: string;
+      discount_type: string;
+      discount_value: number;
+    } | null;
+  }>;
+  active_challenges: number;
+  birthday_reward_available: boolean;
+  anniversary_days: number;
 }
 
-export interface CoachingRole {
-  clubs: {
-    id: string;
-    name: string;
-    slug: string;
+export interface SpinGame {
+  id: string;
+  name: string;
+  description: string;
+  free_spins_per_day: number;
+  points_per_spin: number;
+  max_spins_per_day: number;
+  wheel_config: Array<{
+    label: string;
+    value: string;
+    type: string;
+    quantity: number;
+    probability: number;
+    color: string;
+  }>;
+  segment_colors: string[];
+  rules: string | null;
+  is_active: boolean;
+}
+
+export interface SpinResult {
+  id: string;
+  prize_type: string;
+  prize_value: string;
+  prize_details: any;
+  coupon_id: string | null;
+  coupon?: {
+    code: string;
+    discount_type: string;
+    discount_value: number;
+    valid_until: string;
   };
-  role: string;
-  display_name: string;
-  bio: string;
-  public_phone: string;
-  public_email: string;
-  is_public: boolean;
+  loyalty_points_awarded: number;
+  is_claimed: boolean;
+  created_at: string;
+  expires_at: string | null;
 }

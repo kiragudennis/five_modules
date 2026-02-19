@@ -191,6 +191,9 @@ export interface CartItem {
   product: Product;
   variant?: Variaty;
   quantity: number;
+  metadata?: {
+    [key: string]: any;
+  };
 }
 
 export type ShippingZone = "NAIROBI" | "KENYA" | "INTERNATIONAL";

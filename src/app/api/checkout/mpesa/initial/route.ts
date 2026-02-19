@@ -126,6 +126,31 @@ export async function POST(req: Request) {
 
   try {
     // 📦 1. Create order with new schema
+    const orderItems = items.map((item: any) => ({
+      order_id: orderData.id,
+      product_id: item.id,
+      product_name: item.name,
+      product_title: item.title,
+      product_sku: item.sku,
+      product_category: item.category,
+      product_image: item.image,
+      unit_price: item.price,
+      wholesale_price: item.wholesale_price,
+      wholesale_min_quantity: item.wholesale_min_quantity,
+      has_wholesale: item.has_wholesale,
+      applied_price: item.applied_price,
+      quantity: item.quantity,
+      variant: item.variant ? JSON.stringify(item.variant) : null,
+      metadata: {
+        original_data: {
+          name: item.name,
+          title: item.title,
+          sku: item.sku,
+          category: item.category,
+        },
+      },
+    }));
+
     const orderPayload = {
       // User information
       user_id: user.id,
@@ -192,6 +217,8 @@ export async function POST(req: Request) {
         cart_count: metadata?.cartCount,
         wholesale_applied: metadata?.wholesaleApplied,
         referral: metadata?.referral || null,
+        bundle: metadata?.bundle || null,
+        items: orderItems ?? [],
         user_agent: req.headers.get("user-agent"),
         ip_address:
           req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"),
@@ -210,31 +237,6 @@ export async function POST(req: Request) {
     }
 
     // 📦 2. Insert order items (snapshot_product_details trigger will populate product details)
-    const orderItems = items.map((item: any) => ({
-      order_id: orderData.id,
-      product_id: item.id,
-      product_name: item.name,
-      product_title: item.title,
-      product_sku: item.sku,
-      product_category: item.category,
-      product_image: item.image,
-      unit_price: item.price,
-      wholesale_price: item.wholesale_price,
-      wholesale_min_quantity: item.wholesale_min_quantity,
-      has_wholesale: item.has_wholesale,
-      applied_price: item.applied_price,
-      quantity: item.quantity,
-      variant: item.variant ? JSON.stringify(item.variant) : null,
-      metadata: {
-        original_data: {
-          name: item.name,
-          title: item.title,
-          sku: item.sku,
-          category: item.category,
-        },
-      },
-    }));
-
     const { error: itemsErr } = await supabaseAdmin
       .from("order_items")
       .insert(orderItems);

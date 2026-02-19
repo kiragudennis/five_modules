@@ -1,4 +1,4 @@
-// app/account/loyalty/page.tsx (with fixes for TypeScript issues)
+// app/account/loyalty/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";

@@ -1,3 +1,4 @@
+// src/components/Cart.tsx
 "use client";
 
 import { useCart, useStore } from "@/lib/context/StoreContext";
@@ -56,7 +57,7 @@ export function Cart() {
                     <p className="text-primary font-medium">
                       {formatCurrency(
                         item.product.price,
-                        item.product.currency
+                        item.product.currency,
                       )}
                     </p>
                   </div>

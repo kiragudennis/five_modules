@@ -10,6 +10,7 @@ CREATE TABLE users (
     city TEXT,
     postal_code TEXT,
     country TEXT DEFAULT 'Kenya',
+    referral_code TEXT,
     business_name TEXT,
     business_type TEXT,
     receive_offers BOOLEAN DEFAULT TRUE,

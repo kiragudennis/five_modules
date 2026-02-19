@@ -1,4 +1,5 @@
 // @ts-nocheck
+// src/app/(store)/checkout/page.tsx
 
 "use client";
 import { useEffect, useState } from "react";
@@ -86,6 +87,13 @@ export default function CheckoutPage() {
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<any>(null);
   const [applyingLoyalty, setApplyingLoyalty] = useState(false);
   const [loyaltyError, setLoyaltyError] = useState("");
+  const [bundleApplied, setBundleApplied] = useState(false);
+  const [bundleData, setBundleData] = useState(null);
+  const [bundleDiscount, setBundleDiscount] = useState({
+    original: 0,
+    discounted: 0,
+    savings: 0,
+  });
 
   // If cart is empty, redirect to products
   useEffect(() => {
@@ -138,6 +146,64 @@ export default function CheckoutPage() {
       }
     }
   }, []);
+
+  // Check for pending bundle and apply if valid
+  useEffect(() => {
+    // Check for pending bundle in localStorage
+    const pendingBundle = localStorage.getItem("pending_bundle");
+    if (pendingBundle) {
+      const bundle = JSON.parse(pendingBundle);
+
+      // Check if all bundle items are in cart
+      const bundleItemIds = bundle.items.map((i) => i.product_id);
+      const cartItemIds = cartItems.map((i) => i.product.id);
+
+      // Check if all bundle items exist in cart
+      const hasAllItems = bundleItemIds.every((id) => cartItemIds.includes(id));
+
+      if (hasAllItems) {
+        // Apply bundle discount
+        setBundleApplied(true);
+        setBundleData(bundle);
+
+        // Calculate bundle discount
+        const bundleDiscount = calculateBundleDiscount(bundle, cartItems);
+        setBundleDiscount(bundleDiscount);
+
+        toast.success(`${bundle.bundle_name} bundle discount applied!`);
+      } else {
+        // Bundle incomplete, remove from localStorage
+        localStorage.removeItem("pending_bundle");
+      }
+    }
+  }, [cartItems]);
+
+  // Function to calculate bundle discount
+  const calculateBundleDiscount = (bundle, cartItems) => {
+    // Get all items in this bundle from cart
+    const bundleItems = cartItems.filter((item) =>
+      bundle.items.some((bi) => bi.product_id === item.product.id),
+    );
+
+    // Calculate original total
+    const originalTotal = bundleItems.reduce((sum, item) => {
+      return sum + item.product.price * item.quantity;
+    }, 0);
+
+    // Calculate discounted total based on bundle discount type
+    let discountedTotal = originalTotal;
+    if (bundle.discount_type === "percentage") {
+      discountedTotal = originalTotal * (1 - bundle.discount_value / 100);
+    } else {
+      discountedTotal = originalTotal - bundle.discount_value;
+    }
+
+    return {
+      original: originalTotal,
+      discounted: Math.max(0, discountedTotal),
+      savings: originalTotal - Math.max(0, discountedTotal),
+    };
+  };
 
   // Apply loyalty redemption
   const applyLoyaltyRedemption = async () => {
@@ -236,13 +302,16 @@ export default function CheckoutPage() {
   const subtotal = calculateSubtotal();
   const wholesaleSavings = calculateWholesaleSavings();
   const installationCost = selectedInstallation?.cost || 0;
+
+  // Include bundle discount
   const orderTotal = Math.max(
     0,
     subtotal +
       shippingCost +
       installationCost -
       couponDiscount -
-      (loyaltyRedemption?.discount || 0),
+      (loyaltyRedemption?.discount || 0) -
+      (bundleApplied ? bundleDiscount.savings : 0),
   );
 
   // Validate coupon via API
@@ -603,6 +672,21 @@ export default function CheckoutPage() {
           createdAt: new Date().toISOString(),
           cartCount: cartItems.length,
           wholesaleApplied: wholesaleSavings > 0,
+          // Add bundle data if applied
+          ...(bundleApplied &&
+            bundleData && {
+              bundle: {
+                bundle_id: bundleData.bundle_id,
+                bundle_name: bundleData.bundle_name,
+                discount_type: bundleData.discount_type,
+                discount_value: bundleData.discount_value,
+                savings: bundleDiscount.savings,
+                original_total: bundleDiscount.original,
+                discounted_total: bundleDiscount.discounted,
+                points_required: bundleData.points_required,
+                items: bundleData.items,
+              },
+            }),
           // Add only one referral (the most recent valid one)
           ...(latestReferral && {
             referral: {
@@ -1791,6 +1875,42 @@ export default function CheckoutPage() {
                         <span className="font-medium">
                           {formatCurrency(installationCost, "KES")}
                         </span>
+                      </div>
+                    )}
+
+                    {/* Bundle Discount */}
+                    {bundleApplied && bundleDiscount.savings > 0 && (
+                      <div className="bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg mb-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Gift className="h-4 w-4 text-purple-600" />
+                          <span className="font-medium text-purple-700 dark:text-purple-300">
+                            {bundleData.bundle_name} Bundle
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Regular Price:
+                            </span>
+                            <span className="line-through">
+                              {formatCurrency(bundleDiscount.original, "KES")}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Bundle Price:
+                            </span>
+                            <span className="font-medium text-purple-600">
+                              {formatCurrency(bundleDiscount.discounted, "KES")}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-green-600">
+                            <span>You Save:</span>
+                            <span className="font-semibold">
+                              -{formatCurrency(bundleDiscount.savings, "KES")}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
 

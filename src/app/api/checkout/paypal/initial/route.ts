@@ -137,6 +137,8 @@ export async function POST(req: Request) {
         original_currency: totals.currency,
         cart_count: metadata?.cartCount,
         wholesale_applied: metadata?.wholesaleApplied,
+        referral: metadata?.referral || null,
+        bundle: metadata?.bundle || null,
         user_agent: req.headers.get("user-agent"),
         ip_address:
           req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip"),

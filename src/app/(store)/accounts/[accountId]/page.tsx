@@ -1,5 +1,4 @@
 // app/accounts/[accountId]/page.tsx
-// Hi blessedtwoelectronics-afk! You've successfully authenticated, but GitHub does not provide shell access.
 "use client";
 
 import { useState, useEffect } from "react";
@@ -42,27 +41,18 @@ import {
   Crown,
   Wrench,
   LogOut,
+  Trophy,
+  Target,
+  RefreshCw,
+  Gift,
+  Sparkles,
+  Coins,
+  Ticket,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import Link from "next/link";
-
-interface Order {
-  id: string;
-  order_number: string;
-  total_amount: number;
-  status: string;
-  payment_status: string;
-  created_at: string;
-  payment_method: string;
-  shipping_method: string;
-  items: Array<{
-    product_name: string;
-    product_image: string;
-    quantity: number;
-    unit_price: number;
-  }>;
-}
+import { EngagementSummary, Order } from "@/types/customer";
 
 export default function AccountPage() {
   const { accountId } = useParams();
@@ -78,6 +68,7 @@ export default function AccountPage() {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  const [engagement, setEngagement] = useState<EngagementSummary | null>(null);
 
   const isOwnProfile =
     currentUser?.id === accountId || currentUser?.role === "admin";
@@ -155,6 +146,18 @@ export default function AccountPage() {
         completed_orders: completedOrders,
         average_order_value: totalOrders > 0 ? totalSpent / totalOrders : 0,
       });
+
+      // Fetch engagement summary
+      const { data: engagementData, error: engagementError } =
+        await supabase.rpc("get_user_engagement_summary", {
+          p_user_id: accountId,
+        });
+
+      if (engagementError) throw engagementError;
+
+      if (engagementData?.success) {
+        setEngagement(engagementData);
+      }
     } catch (error: any) {
       console.error("Error fetching account data:", error);
       toast.error("Could not load account information");
@@ -287,6 +290,12 @@ export default function AccountPage() {
                   Verified
                 </Badge>
               )}
+              {engagement?.user_tier && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Crown className="h-3 w-3" />
+                  {engagement.user_tier}
+                </Badge>
+              )}
             </div>
           </div>
 
@@ -392,7 +401,260 @@ export default function AccountPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Loyalty Points
+                      </p>
+                      <p className="text-2xl font-bold">
+                        {engagement?.loyalty_points?.toLocaleString() || 0}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+
+            {/* NEW: Engagement Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Your Rewards & Activities
+                </CardTitle>
+                <CardDescription>
+                  Special offers, challenges, and games waiting for you
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Mistry Bundles */}
+                  <Link href={`/accounts/${accountId}/bundles`}>
+                    <div className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all cursor-pointer">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                          <Gift className="h-5 w-5 text-purple-600" />
+                        </div>
+                        <h3 className="font-semibold">Mistry Bundles</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Special discounted bundles just for you
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs">
+                          {engagement?.bundle_count || 0} bundles available
+                        </Badge>
+                        {engagement?.user_tier && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Crown className="h-3 w-3 mr-1" />
+                            {engagement.user_tier}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+
+                  {/* Spin Game */}
+                  <Link href={`/accounts/${accountId}/spin`}>
+                    <div className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all cursor-pointer">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <RefreshCw className="h-5 w-5 text-green-600" />
+                        </div>
+                        <h3 className="font-semibold">Daily Spin</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Spin daily to win points & discounts
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs">
+                          {engagement?.spins_today || 0}/
+                          {engagement?.spin_game?.free_spins_per_day || 1} used
+                          today
+                        </Badge>
+                        {engagement?.spin_game?.points_per_spin && (
+                          <span className="text-xs text-muted-foreground">
+                            <Coins className="h-3 w-3 inline mr-1" />
+                            {engagement.spin_game.points_per_spin} pts
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+
+                  {/* Challenges */}
+                  <Link href={`/accounts/${accountId}/challenges`}>
+                    <div className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all cursor-pointer">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-orange-100 rounded-lg">
+                          <Target className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <h3 className="font-semibold">Challenges</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Complete challenges & earn rewards
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {engagement?.active_challenges || 0} active challenges
+                      </Badge>
+                    </div>
+                  </Link>
+
+                  {/* Rewards */}
+                  <Link href={`/accounts/${accountId}/rewards`}>
+                    <div className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all cursor-pointer">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                          <Trophy className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <h3 className="font-semibold">Rewards</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Anniversary & milestone rewards
+                      </p>
+                      {engagement?.birthday_reward_available && (
+                        <Badge
+                          variant="default"
+                          className="text-xs bg-amber-500"
+                        >
+                          Birthday reward available!
+                        </Badge>
+                      )}
+                      {!engagement?.birthday_reward_available &&
+                        engagement?.anniversary_days && (
+                          <Badge variant="outline" className="text-xs">
+                            {engagement.anniversary_days} days with us
+                          </Badge>
+                        )}
+                    </div>
+                  </Link>
+                </div>
+
+                {/* Featured Bundles Preview */}
+                {engagement?.available_bundles &&
+                  engagement.available_bundles.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="text-sm font-medium mb-3">
+                        Featured Bundles
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {engagement.available_bundles
+                          .slice(0, 3)
+                          .map((bundle) => (
+                            <Link
+                              key={bundle.id}
+                              href={`/products?bundle=${bundle.slug}`}
+                              className="block"
+                            >
+                              <div className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
+                                {bundle.image_url && (
+                                  <img
+                                    src={bundle.image_url}
+                                    alt={bundle.name}
+                                    className="h-12 w-12 object-cover rounded"
+                                  />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">
+                                    {bundle.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {bundle.discount_type === "percentage"
+                                      ? `${bundle.discount_value}% off`
+                                      : `KES ${bundle.discount_value} off`}
+                                    {bundle.points_required > 0 && (
+                                      <span className="ml-2 inline-flex items-center">
+                                        <Coins className="h-3 w-3 mr-1" />
+                                        {bundle.points_required}
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Spin Wins */}
+            {engagement?.recent_spin_results &&
+              engagement.recent_spin_results.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5" />
+                      Recent Spin Wins
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {engagement?.recent_spin_results
+                        .slice(0, 3)
+                        .map((result) => (
+                          <div
+                            key={result.id}
+                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              {result.prize_type === "points" && (
+                                <Coins className="h-4 w-4 text-green-600" />
+                              )}
+                              {result.prize_type === "discount" && (
+                                <Ticket className="h-4 w-4 text-blue-600" />
+                              )}
+                              {result.prize_type === "coupon" && (
+                                <Tag className="h-4 w-4 text-purple-600" />
+                              )}
+                              <div>
+                                <p className="font-medium capitalize">
+                                  {result.prize_type}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {result.prize_type === "points" &&
+                                    `${result.loyalty_points_awarded} pts`}
+                                  {result.prize_type === "discount" &&
+                                    result.prize_value}
+                                  {result.prize_type === "coupon" &&
+                                    `Code: ${result.coupon?.code}`}
+                                </p>
+
+                                <p className="text-xs text-muted-foreground">
+                                  {format(
+                                    new Date(result.created_at),
+                                    "MMM d, h:mm a",
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge
+                              variant={
+                                result.is_claimed ? "default" : "outline"
+                              }
+                            >
+                              {result.is_claimed ? "Claimed" : "Available"}
+                            </Badge>
+                          </div>
+                        ))}
+                    </div>
+                    <Button
+                      variant="link"
+                      className="mt-4 w-full"
+                      onClick={() => router.push(`/accounts/${accountId}/spin`)}
+                    >
+                      View All Spins
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Personal Information */}

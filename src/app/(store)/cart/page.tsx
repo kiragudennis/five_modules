@@ -1,6 +1,7 @@
 // src/app/(store)/cart/page.tsx
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Minus,
@@ -13,6 +14,9 @@ import {
   Phone,
   ShieldCheck,
   CreditCard,
+  Gift,
+  Package,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart, useStore } from "@/lib/context/StoreContext";
@@ -22,21 +26,80 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
+interface BundleGroup {
+  bundleId: string;
+  bundleInstanceId: string;
+  bundleName: string;
+  items: any[];
+  discount_type?: string;
+  discount_value?: number;
+}
+
 export default function CartPage() {
   const { cartItems, clearCart } = useCart();
   const { dispatch } = useStore();
+  const [bundles, setBundles] = useState<Map<string, BundleGroup>>(new Map());
+  const [regularItems, setRegularItems] = useState<any[]>([]);
+
+  // Group cart items by bundle
+  useEffect(() => {
+    const bundleMap = new Map<string, BundleGroup>();
+    const regular: any[] = [];
+
+    cartItems.forEach((item) => {
+      if (item.metadata?.isBundleItem && item.metadata.bundleInstanceId) {
+        const instanceId = item.metadata.bundleInstanceId;
+        if (!bundleMap.has(instanceId)) {
+          bundleMap.set(instanceId, {
+            bundleId: item.metadata.bundleId,
+            bundleInstanceId: instanceId,
+            bundleName: item.metadata.bundleName,
+            discount_type: item.metadata.discount_type,
+            discount_value: item.metadata.discount_value,
+            items: [],
+          });
+        }
+        bundleMap.get(instanceId)!.items.push(item);
+      } else {
+        regular.push(item);
+      }
+    });
+
+    setBundles(bundleMap);
+    setRegularItems(regular);
+  }, [cartItems]);
 
   const subtotal = cartItems.reduce(
     (sum, item) => sum + (item.product.price || 0) * item.quantity,
     0,
   );
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (
+    productId: string,
+    quantity: number,
+    metadata?: any,
+  ) => {
     if (quantity < 1) {
       dispatch({
         type: "REMOVE_FROM_CART",
         payload: { productId },
       });
+
+      // If this was a bundle item, check if we need to remove the entire bundle
+      if (metadata?.isBundleItem && metadata.bundleInstanceId) {
+        const remainingBundleItems = cartItems.filter(
+          (item) =>
+            item.metadata?.bundleInstanceId === metadata.bundleInstanceId &&
+            item.product.id !== productId,
+        );
+
+        if (remainingBundleItems.length === 0) {
+          // Clear the pending bundle from localStorage
+          localStorage.removeItem("pending_bundle");
+          toast.info("Bundle removed from cart");
+        }
+      }
+
       toast.success("Item removed from cart");
     } else {
       dispatch({
@@ -45,6 +108,45 @@ export default function CartPage() {
       });
       toast.success("Quantity updated");
     }
+  };
+
+  const removeBundle = (bundleInstanceId: string) => {
+    // Remove all items in this bundle
+    const bundleItems = cartItems.filter(
+      (item) => item.metadata?.bundleInstanceId === bundleInstanceId,
+    );
+
+    bundleItems.forEach((item) => {
+      dispatch({
+        type: "REMOVE_FROM_CART",
+        payload: { productId: item.product.id },
+      });
+    });
+
+    // Clear from localStorage
+    localStorage.removeItem("pending_bundle");
+    toast.success("Bundle removed from cart");
+  };
+
+  const calculateBundleOriginalTotal = (bundleItems: any[]) => {
+    return bundleItems.reduce((sum, item) => {
+      return (
+        sum +
+        (item.metadata?.originalPrice || item.product.price) * item.quantity
+      );
+    }, 0);
+  };
+
+  const calculateBundleDiscountedTotal = (bundle: BundleGroup) => {
+    const originalTotal = calculateBundleOriginalTotal(bundle.items);
+
+    if (bundle.discount_type === "percentage") {
+      return originalTotal * (1 - (bundle.discount_value || 0) / 100);
+    } else if (bundle.discount_type === "fixed") {
+      return originalTotal - (bundle.discount_value || 0);
+    }
+
+    return originalTotal;
   };
 
   // If cart is empty
@@ -110,7 +212,190 @@ export default function CartPage() {
             </div>
 
             <div className="divide-y">
-              {cartItems.map((item) => (
+              {/* Render Bundles First */}
+              {Array.from(bundles.values()).map((bundle) => {
+                const originalTotal = calculateBundleOriginalTotal(
+                  bundle.items,
+                );
+                const discountedTotal = calculateBundleDiscountedTotal(bundle);
+                const savings = originalTotal - discountedTotal;
+
+                return (
+                  <div
+                    key={bundle.bundleInstanceId}
+                    className="p-6 bg-purple-50/30 dark:bg-purple-950/10"
+                  >
+                    {/* Bundle Header */}
+                    <div className="mb-4 pb-4 border-b border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                            <Gift className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-purple-700 dark:text-purple-300">
+                              {bundle.bundleName} Bundle
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge
+                                variant="outline"
+                                className="text-xs border-purple-300"
+                              >
+                                <Tag className="h-3 w-3 mr-1" />
+                                Bundle Discount
+                              </Badge>
+                              {savings > 0 && (
+                                <span className="text-xs text-green-600">
+                                  Save {formatCurrency(savings, "KES")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeBundle(bundle.bundleInstanceId)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        >
+                          Remove Bundle
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Bundle Items */}
+                    <div className="space-y-4 pl-4">
+                      {bundle.items.map((item) => (
+                        <div
+                          key={item.product.id}
+                          className="flex flex-col sm:flex-row gap-4"
+                        >
+                          {/* Product Image */}
+                          <div className="w-full sm:w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                            {item.product.images?.[0] ? (
+                              <Image
+                                src={item.product.images[0]}
+                                alt={item.product.name}
+                                width={80}
+                                height={80}
+                                className="object-cover rounded-lg"
+                              />
+                            ) : (
+                              <ShoppingBag className="h-6 w-6 text-gray-400" />
+                            )}
+                          </div>
+
+                          {/* Product Details */}
+                          <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-900 dark:text-white">
+                                  {item.product.title || item.product.name}
+                                </h4>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <span className="text-sm line-through text-muted-foreground">
+                                    {formatCurrency(
+                                      item.metadata?.originalPrice ||
+                                        item.product.price,
+                                      "KES",
+                                    )}
+                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs bg-purple-100 text-purple-700"
+                                  >
+                                    Bundle Price
+                                  </Badge>
+                                </div>
+                              </div>
+
+                              {/* Quantity Controls */}
+                              <div className="flex items-center justify-between sm:justify-end gap-4">
+                                <div className="flex items-center border rounded-lg">
+                                  <button
+                                    onClick={() =>
+                                      updateQuantity(
+                                        item.product.id,
+                                        item.quantity - 1,
+                                        item.metadata,
+                                      )
+                                    }
+                                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-l-lg transition-colors"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </button>
+                                  <span className="w-10 text-center font-medium">
+                                    {item.quantity}
+                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      updateQuantity(
+                                        item.product.id,
+                                        item.quantity + 1,
+                                        item.metadata,
+                                      )
+                                    }
+                                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-r-lg transition-colors"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </button>
+                                </div>
+
+                                <button
+                                  onClick={() =>
+                                    updateQuantity(
+                                      item.product.id,
+                                      0,
+                                      item.metadata,
+                                    )
+                                  }
+                                  className="text-sm text-red-500 hover:text-red-700 hover:underline"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Item Total */}
+                            <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                              <span className="text-sm text-muted-foreground">
+                                Item total
+                              </span>
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(
+                                  (item.metadata?.originalPrice ||
+                                    item.product.price) * item.quantity,
+                                  "KES",
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Bundle Total */}
+                    <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-800">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Bundle Total</span>
+                        <div className="text-right">
+                          {savings > 0 && (
+                            <span className="text-sm line-through text-muted-foreground block">
+                              {formatCurrency(originalTotal, "KES")}
+                            </span>
+                          )}
+                          <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                            {formatCurrency(discountedTotal, "KES")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Regular Items */}
+              {regularItems.map((item) => (
                 <div key={item.product.id} className="p-6">
                   <div className="flex flex-col sm:flex-row gap-4">
                     {/* Product Image */}
@@ -147,10 +432,7 @@ export default function CartPage() {
                           </p>
                           <div className="mt-2">
                             <p className="font-semibold text-gray-900 dark:text-white">
-                              {formatCurrency(
-                                item.product.price,
-                                item.product.currency,
-                              )}
+                              {formatCurrency(item.product.price, "KES")}
                             </p>
                             {item.product.wholesale_price &&
                               item.quantity >=
@@ -209,7 +491,7 @@ export default function CartPage() {
                         <span className="font-bold text-gray-900 dark:text-white">
                           {formatCurrency(
                             item.product.price * item.quantity,
-                            item.product.currency,
+                            "KES",
                           )}
                         </span>
                       </div>
@@ -251,7 +533,7 @@ export default function CartPage() {
             </div>
 
             <div className="p-4 sm:p-6 space-y-6">
-              {/* Subtotal Only */}
+              {/* Subtotal */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Subtotal</span>
@@ -260,8 +542,34 @@ export default function CartPage() {
                   </span>
                 </div>
 
+                {/* Bundle Savings Summary */}
+                {Array.from(bundles.values()).map((bundle) => {
+                  const originalTotal = calculateBundleOriginalTotal(
+                    bundle.items,
+                  );
+                  const discountedTotal =
+                    calculateBundleDiscountedTotal(bundle);
+                  const savings = originalTotal - discountedTotal;
+
+                  if (savings > 0) {
+                    return (
+                      <div
+                        key={bundle.bundleInstanceId}
+                        className="text-sm text-green-600"
+                      >
+                        <span>{bundle.bundleName} bundle savings: </span>
+                        <span className="font-medium">
+                          -{formatCurrency(savings, "KES")}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+
                 <div className="text-sm text-muted-foreground italic">
-                  Shipping, taxes, and discounts calculated at checkout
+                  Shipping, taxes, and additional discounts calculated at
+                  checkout
                 </div>
               </div>
 
