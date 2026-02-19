@@ -1,4 +1,4 @@
-import { banIfInvalid } from "@/lib/limit";
+import { banIfInvalid, recordBundlePurchases } from "@/lib/limit";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 
@@ -213,6 +213,16 @@ export async function POST(req: Request) {
         .update(updateData)
         .eq("id", supabaseOrderId)
         .neq("payment_status", "completed"); // Idempotency check
+
+      // If this order included a bundle, record the bundle purchase
+      if (order?.metadata?.bundle) {
+        try {
+          await recordBundlePurchases(order);
+        } catch (bundleError) {
+          console.error("Error recording bundle purchases:", bundleError);
+          // Don't fail the webhook - bundle recording is secondary
+        }
+      }
 
       // ✅ Insert transaction
       await supabaseAdmin.from("transactions").insert({

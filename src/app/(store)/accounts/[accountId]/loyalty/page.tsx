@@ -1,4 +1,4 @@
-// app/account/loyalty/page.tsx
+// app/account/[accountId]/loyalty/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner";
 import { useCart } from "@/lib/context/StoreContext";
 import { useRouter } from "next/navigation";
+import { LoyaltyData, LoyaltyTransaction } from "@/types/store";
 
 const TIER_COLORS: Record<string, string> = {
   bronze: "bg-amber-100 text-amber-800 border-amber-300",
@@ -36,37 +37,6 @@ const TIER_ICONS: Record<string, React.ComponentType<any>> = {
   gold: Crown,
   platinum: Zap,
 };
-
-interface LoyaltyTransaction {
-  date: string;
-  type: string;
-  points: number;
-  description: string;
-  order_number: string | null;
-}
-
-interface LoyaltyData {
-  points: number;
-  tier: string;
-  tierDetails: {
-    name: string;
-    pointsPerShilling: number;
-    discountPercentage: number;
-    freeShippingThreshold: number | null;
-    prioritySupport: boolean;
-    birthdayBonusPoints: number;
-  };
-  nextTier: {
-    name: string;
-    minPoints: number;
-    pointsNeeded: number;
-    discountPercentage: number;
-  } | null;
-  recentTransactions: LoyaltyTransaction[];
-  pointsValue: number;
-  totalEarned: number;
-  totalRedeemed: number;
-}
 
 export default function LoyaltyPage() {
   const { supabase, profile } = useAuth();

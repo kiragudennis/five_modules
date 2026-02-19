@@ -1041,7 +1041,7 @@ BEGIN
       AND (mb.min_tier_required IS NULL OR mb.min_tier_required <= v_user_tier)
       AND (mb.points_required = 0 OR mb.points_required <= v_loyalty_points);
     
-    -- Get featured/available bundles
+       -- Get featured/available bundles
     SELECT JSONB_AGG(
         JSONB_BUILD_OBJECT(
             'id', mb.id,
@@ -1054,15 +1054,19 @@ BEGIN
             'discount_value', mb.discount_value,
             'points_required', mb.points_required,
             'featured', mb.featured
-        ) ORDER BY mb.featured DESC, mb.created_at DESC
-        LIMIT 5
+        )
     ) INTO v_available_bundles
-    FROM mistry_bundles mb
-    WHERE mb.status = 'active'
-      AND (mb.start_date IS NULL OR mb.start_date <= NOW())
-      AND (mb.end_date IS NULL OR mb.end_date >= NOW())
-      AND (mb.min_tier_required IS NULL OR mb.min_tier_required <= v_user_tier)
-      AND (mb.points_required = 0 OR mb.points_required <= v_loyalty_points);
+    FROM (
+        SELECT *
+        FROM mistry_bundles mb
+        WHERE mb.status = 'active'
+          AND (mb.start_date IS NULL OR mb.start_date <= NOW())
+          AND (mb.end_date IS NULL OR mb.end_date >= NOW())
+          AND (mb.min_tier_required IS NULL OR mb.min_tier_required <= v_user_tier)
+          AND (mb.points_required = 0 OR mb.points_required <= v_loyalty_points)
+        ORDER BY mb.featured DESC, mb.created_at DESC
+        LIMIT 5
+    ) mb;
     
     -- Get today's spin count
     SELECT COALESCE(spins_used, 0) INTO v_spins_today
@@ -1083,7 +1087,7 @@ BEGIN
       AND (sg.start_date IS NULL OR sg.start_date <= NOW())
       AND (sg.end_date IS NULL OR sg.end_date >= NOW())
     LIMIT 1;
-    
+
     -- Get recent spin results (last 5)
     SELECT JSONB_AGG(
         JSONB_BUILD_OBJECT(
@@ -1100,12 +1104,16 @@ BEGIN
                     'discount_value', c.discount_value
                 )
             ELSE NULL END
-        ) ORDER BY sr.created_at DESC
-        LIMIT 5
+        )
     ) INTO v_recent_spin_results
-    FROM spin_results sr
-    LEFT JOIN coupons c ON sr.coupon_id = c.id
-    WHERE sr.user_id = p_user_id;
+    FROM (
+        SELECT sr.*, c.id as coupon_id, c.code, c.discount_type, c.discount_value
+        FROM spin_results sr
+        LEFT JOIN coupons c ON sr.coupon_id = c.id
+        WHERE sr.user_id = p_user_id
+        ORDER BY sr.created_at DESC
+        LIMIT 5
+    ) sr;
     
     -- Get active challenges count
     SELECT COUNT(*) INTO v_active_challenges

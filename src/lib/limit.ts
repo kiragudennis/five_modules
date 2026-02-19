@@ -47,7 +47,7 @@ export async function countryAwareRateLimit(
   req: Request,
   maxIPHits = 100, // Allow 100 hits per IP...
   ipWindowSec = 30, // ...every 30 seconds
-  logCountryHits = true // but we’ll just observe the country-wide patterns
+  logCountryHits = true, // but we’ll just observe the country-wide patterns
 ) {
   const ip = getIP(req);
   const country = req.headers.get("cf-ipcountry") ?? "XX";
@@ -96,7 +96,7 @@ async function logAbuseToSupabase(
   country: string,
   strikes: number,
   req: Request,
-  reason: string
+  reason: string,
 ): Promise<void> {
   const userAgent: string = req.headers.get("user-agent") || "unknown";
 
@@ -122,7 +122,7 @@ export function getIP(req: Request): string {
 export async function banIfInvalid(
   req: Request,
   isInvalid: boolean,
-  reason: string
+  reason: string,
 ) {
   if (!isInvalid) return false; // nothing to ban
 
@@ -141,4 +141,77 @@ export async function banIfInvalid(
   }
 
   return true;
+}
+
+export async function recordBundlePurchases(order: any) {
+  try {
+    const bundleData = order.metadata?.bundle;
+
+    if (!bundleData || !bundleData.bundle_id) {
+      console.log("No bundle data found for order", order.id);
+      return;
+    }
+
+    // Start a transaction to ensure data consistency
+    const { data: purchase, error: purchaseError } = await supabaseAdmin
+      .from("bundle_purchases")
+      .insert({
+        bundle_id: bundleData.bundle_id,
+        user_id: order.user_id,
+        order_id: order.id,
+        quantity: 1, // One bundle per order
+        price_paid: bundleData.discounted_total,
+        savings_amount: bundleData.savings,
+        points_used: bundleData.points_required || 0,
+        // loyalty_transaction_id will be linked separately if points were used
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (purchaseError) {
+      throw new Error(
+        `Failed to insert bundle purchase: ${purchaseError.message}`,
+      );
+    }
+
+    console.log("Bundle purchase recorded:", purchase);
+
+    // Update bundle current purchases count
+    const { error: updateError } = await supabaseAdmin.rpc(
+      "increment_mistry_bundle",
+      { bundle_id: bundleData.bundle_id },
+    );
+
+    if (updateError) {
+      console.error("Failed to update bundle purchase count:", updateError);
+      // Don't throw - this is non-critical
+    }
+
+    // If points were used, link the loyalty transaction
+    if (bundleData.points_required && bundleData.points_required > 0) {
+      // Find the loyalty transaction for this order where points were used
+      const { data: loyaltyTx, error: txError } = await supabaseAdmin
+        .from("loyalty_transactions")
+        .select("id")
+        .eq("order_id", order.id)
+        .eq("transaction_type", "redeemed")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!txError && loyaltyTx) {
+        // Link the transaction to bundle purchase
+        await supabaseAdmin
+          .from("bundle_purchases")
+          .update({ loyalty_transaction_id: loyaltyTx.id })
+          .eq("id", purchase.id);
+      }
+    }
+
+    return purchase;
+  } catch (error) {
+    console.error("Error in recordBundlePurchases:", error);
+    throw error;
+  }
 }

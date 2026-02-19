@@ -28,37 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-interface Challenge {
-  id: string;
-  name: string;
-  description: string;
-  type: string;
-  trigger_event: string;
-  requirements: any;
-  reward_points: number;
-  reward_tier_upgrade: string | null;
-  reward_details: any;
-  max_rewards_per_user: number | null;
-  max_total_rewards: number | null;
-  current_rewards_count: number;
-  badge_image_url: string | null;
-  start_date: string | null;
-  end_date: string | null;
-}
-
-interface UserChallenge {
-  id: string;
-  challenge_id: string;
-  status: "in_progress" | "completed" | "reward_claimed" | "expired";
-  progress: number;
-  target: number;
-  completed_at: string | null;
-  reward_claimed_at: string | null;
-  loyalty_points_awarded: number;
-  metadata: any;
-  challenge: Challenge;
-}
+import { Challenge, UserChallenge } from "@/types/customer";
 
 export default function ChallengesPage() {
   const { accountId } = useParams();
@@ -182,7 +152,7 @@ export default function ChallengesPage() {
       }
 
       // Create shareable link
-      const shareLink = `${window.location.origin}/signup?ref=${referralCode}`;
+      const shareLink = `${window.location.origin}/login?ref=${referralCode}`;
 
       // Copy to clipboard
       await navigator.clipboard.writeText(shareLink);

@@ -196,6 +196,100 @@ export interface CartItem {
   };
 }
 
+export interface LoyaltyTransaction {
+  date: string;
+  type: string;
+  points: number;
+  description: string;
+  order_number: string | null;
+}
+
+export interface LoyaltyData {
+  points: number;
+  tier: string;
+  tierDetails: {
+    name: string;
+    pointsPerShilling: number;
+    discountPercentage: number;
+    freeShippingThreshold: number | null;
+    prioritySupport: boolean;
+    birthdayBonusPoints: number;
+  };
+  nextTier: {
+    name: string;
+    minPoints: number;
+    pointsNeeded: number;
+    discountPercentage: number;
+  } | null;
+  recentTransactions: LoyaltyTransaction[];
+  pointsValue: number;
+  totalEarned: number;
+  totalRedeemed: number;
+}
+
+export interface Bundle {
+  id: string;
+  name: string;
+  description: string;
+  slug: string;
+  image_url: string | null;
+  banner_url: string | null;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  bundle_price: number | null;
+  products: Array<{
+    product_id: string;
+    quantity: number;
+    required: boolean;
+  }>;
+  min_tier_required: string | null;
+  points_required: number;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  total_purchases_allowed: number | null;
+  max_purchases_per_user: number | null;
+  current_purchases: number;
+  featured: boolean;
+  badge_text: string | null;
+  badge_color: string | null;
+  terms_conditions: string | null;
+  created_at: string;
+}
+
+export interface BundleProduct {
+  product_id: string;
+  quantity: number;
+  required: boolean;
+}
+
+export interface MistryBundle {
+  id: string;
+  name: string;
+  description: string;
+  slug: string;
+  image_url: string | null;
+  banner_url: string | null;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+  bundle_price: number | null;
+  products: BundleProduct[];
+  min_tier_required: string | null;
+  points_required: number;
+  status: "draft" | "active" | "inactive" | "expired";
+  start_date: string | null;
+  end_date: string | null;
+  max_purchases_per_user: number | null;
+  total_purchases_allowed: number | null;
+  current_purchases: number;
+  featured: boolean;
+  badge_text: string | null;
+  badge_color: string | null;
+  terms_conditions: string | null;
+  created_by: string;
+  created_at: string;
+}
+
 export type ShippingZone = "NAIROBI" | "KENYA" | "INTERNATIONAL";
 
 export interface ShippingOptions {

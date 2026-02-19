@@ -1,7 +1,7 @@
 // app/admin/marketing/bundles/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -45,39 +46,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-interface BundleProduct {
-  product_id: string;
-  quantity: number;
-  required: boolean;
-}
-
-interface MistryBundle {
-  id: string;
-  name: string;
-  description: string;
-  slug: string;
-  image_url: string | null;
-  banner_url: string | null;
-  discount_type: "percentage" | "fixed";
-  discount_value: number;
-  bundle_price: number | null;
-  products: BundleProduct[];
-  min_tier_required: string | null;
-  points_required: number;
-  status: "draft" | "active" | "inactive" | "expired";
-  start_date: string | null;
-  end_date: string | null;
-  max_purchases_per_user: number | null;
-  total_purchases_allowed: number | null;
-  current_purchases: number;
-  featured: boolean;
-  badge_text: string | null;
-  badge_color: string | null;
-  terms_conditions: string | null;
-  created_by: string;
-  created_at: string;
-}
+import { MistryBundle } from "@/types/store";
+import Link from "next/link";
 
 export default function AdminBundlesPage() {
   const { supabase, profile } = useAuth();
@@ -88,6 +58,14 @@ export default function AdminBundlesPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [tiers, setTiers] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // Get create param from URL to open dialog in create mode
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("create") === "true") {
+      setDialogOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (profile?.role !== "admin") return;
@@ -118,8 +96,7 @@ export default function AdminBundlesPage() {
     try {
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, price, image_url, category")
-        .eq("status", "active");
+        .select("id, name, price, images, category");
 
       if (error) throw error;
       setProducts(data || []);
@@ -257,13 +234,17 @@ export default function AdminBundlesPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="container mx-auto px-2 py-8">
+      <div className="flex sm:flex-row flex-col justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold">Mistry Bundles</h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground my-2">
             Create and manage product bundles with special discounts
           </p>
+          {/* Back to Marketing */}
+          <Button variant="link" className="px-0" asChild>
+            <Link href={"/admin/marketing"}>Back to Marketing</Link>
+          </Button>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
@@ -277,6 +258,11 @@ export default function AdminBundlesPage() {
               <DialogTitle>
                 {editingBundle.id ? "Edit Bundle" : "Create New Bundle"}
               </DialogTitle>
+              <DialogDescription>
+                {editingBundle.id
+                  ? "Modify the settings of your bundle and save to update."
+                  : "Configure the details of your new bundle and save to create."}
+              </DialogDescription>
             </DialogHeader>
 
             {editingBundle && (
@@ -372,7 +358,7 @@ export default function AdminBundlesPage() {
                     <div className="space-y-2">
                       <Label>Discount Type *</Label>
                       <Select
-                        value={editingBundle.discount_type}
+                        value={editingBundle.discount_type || "percentage"}
                         onValueChange={(value: "percentage" | "fixed") =>
                           setEditingBundle({
                             ...editingBundle,
@@ -458,9 +444,9 @@ export default function AdminBundlesPage() {
                               toggleProductInBundle(product.id, checked)
                             }
                           />
-                          {product.image_url && (
+                          {product.images.length > 0 && (
                             <img
-                              src={product.image_url}
+                              src={product.images[0]}
                               alt={product.name}
                               className="h-12 w-12 object-cover rounded"
                             />
@@ -507,7 +493,9 @@ export default function AdminBundlesPage() {
                     <div className="space-y-2">
                       <Label>Minimum Tier Required</Label>
                       <Select
-                        value={editingBundle.min_tier_required || ""}
+                        value={
+                          editingBundle.min_tier_required || "no-restriction"
+                        }
                         onValueChange={(value) =>
                           setEditingBundle({
                             ...editingBundle,
@@ -519,7 +507,9 @@ export default function AdminBundlesPage() {
                           <SelectValue placeholder="No tier restriction" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No restriction</SelectItem>
+                          <SelectItem value="no-restriction">
+                            No restriction
+                          </SelectItem>
                           {tiers.map((tier) => (
                             <SelectItem key={tier.tier} value={tier.tier}>
                               <div className="flex items-center gap-2">
@@ -712,7 +702,7 @@ export default function AdminBundlesPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-2">
           <Table>
             <TableHeader>
               <TableRow>
@@ -748,7 +738,7 @@ export default function AdminBundlesPage() {
                 bundles.map((bundle) => (
                   <TableRow key={bundle.id}>
                     <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {bundle.name}
                         {bundle.featured && (
                           <Badge variant="default" className="bg-yellow-500">
@@ -816,11 +806,11 @@ export default function AdminBundlesPage() {
                         <div className="text-sm">
                           {format(new Date(bundle.start_date), "MMM d, yyyy")}
                           {bundle.end_date && (
-                            <>
+                            <div className="flex flex-wrap items-center gap-2">
                               {" "}
                               →{" "}
                               {format(new Date(bundle.end_date), "MMM d, yyyy")}
-                            </>
+                            </div>
                           )}
                         </div>
                       ) : (

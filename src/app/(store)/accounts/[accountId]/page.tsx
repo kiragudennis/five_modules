@@ -329,7 +329,7 @@ export default function AccountPage() {
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 sm:gap-2 gap-6">
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
@@ -358,7 +358,7 @@ export default function AccountPage() {
                       <p className="text-sm text-muted-foreground">
                         Total Spent
                       </p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-xl font-bold">
                         KES {(stats?.total_spent || 0).toLocaleString()}
                       </p>
                     </div>
@@ -906,9 +906,9 @@ export default function AccountPage() {
                     Order History
                   </div>
                   <div>
-                    <Link href="/accounts/loyalty" passHref>
+                    <Link href={`/accounts/${profile.id}/loyalty`} passHref>
                       <Button variant="outline" size="sm">
-                        View Loyalty Points
+                        View My Points
                       </Button>
                     </Link>
                   </div>

@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { useCart, useStore } from "@/lib/context/StoreContext";
+import { useStore } from "@/lib/context/StoreContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,36 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { Product } from "@/types/store";
-
-interface Bundle {
-  id: string;
-  name: string;
-  description: string;
-  slug: string;
-  image_url: string | null;
-  banner_url: string | null;
-  discount_type: "percentage" | "fixed";
-  discount_value: number;
-  bundle_price: number | null;
-  products: Array<{
-    product_id: string;
-    quantity: number;
-    required: boolean;
-  }>;
-  min_tier_required: string | null;
-  points_required: number;
-  status: string;
-  start_date: string | null;
-  end_date: string | null;
-  max_purchases_per_user: number | null;
-  total_purchases_allowed: number | null;
-  current_purchases: number;
-  featured: boolean;
-  badge_text: string | null;
-  badge_color: string | null;
-  terms_conditions: string | null;
-}
+import { Bundle, Product } from "@/types/store";
 
 interface ProductWithDetails extends Product {
   quantity: number;

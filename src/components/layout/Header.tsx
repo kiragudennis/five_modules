@@ -34,6 +34,7 @@ const adminNavigation = [
   { name: "Coupons", href: "/admin/coupons" },
   { name: "Tracking", href: "/admin/tracking" },
   { name: "Customers", href: "/admin/customers" },
+  { name: "Marketing", href: "/admin/marketing" },
   { name: "Analytics", href: "/admin/analytics" },
 ];
 

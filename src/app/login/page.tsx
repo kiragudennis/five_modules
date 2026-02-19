@@ -36,12 +36,12 @@ import { useStore } from "@/lib/context/StoreContext";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string; message?: string }>;
+  searchParams: Promise<{ redirect?: string; message?: string; ref?: string }>;
 }) {
   const { profile } = useAuth();
   const router = useRouter();
   const searchParam = use(searchParams);
-  const { redirect, message } = searchParam;
+  const { redirect, message, ref } = searchParam;
   const [panel, setPanel] = useState<"signin" | "signup">("signin");
   const { state } = useStore();
   const orderData = state.pendingOrder;
@@ -52,8 +52,8 @@ export default function LoginPage({
         redirect || profile.role === "admin"
           ? `/admin`
           : orderData
-          ? "/checkout/payment"
-          : "/products";
+            ? "/checkout/payment"
+            : "/products";
       router.push(redirectPath);
     }
   }, [profile, router, orderData, redirect]);
@@ -152,7 +152,10 @@ export default function LoginPage({
                       </p>
                     </div>
 
-                    <SignUpForm onSuccess={() => setPanel("signin")} />
+                    <SignUpForm
+                      onSuccess={() => setPanel("signin")}
+                      ref={ref}
+                    />
                   </TabsContent>
                 </Tabs>
 

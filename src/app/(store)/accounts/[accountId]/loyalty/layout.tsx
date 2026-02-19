@@ -1,4 +1,4 @@
-// app/account/loyalty/page.tsx
+// app/account/[accountId]loyalty/page.tsx
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -17,9 +17,6 @@ export const metadata: Metadata = {
     title: "Loyalty Rewards Program | Blessed Two Electronics",
     description:
       "Earn and redeem points for discounts on quality lighting solutions.",
-  },
-  alternates: {
-    canonical: "/accounts/loyalty",
   },
   robots: {
     index: true,

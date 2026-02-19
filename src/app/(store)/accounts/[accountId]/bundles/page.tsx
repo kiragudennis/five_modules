@@ -4,16 +4,14 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Gift,
   ChevronLeft,
   Crown,
   Coins,
-  Tag,
   Clock,
   Users,
   Sparkles,
@@ -23,38 +21,8 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
 import { format } from "date-fns";
-
-interface Bundle {
-  id: string;
-  name: string;
-  description: string;
-  slug: string;
-  image_url: string | null;
-  banner_url: string | null;
-  discount_type: "percentage" | "fixed";
-  discount_value: number;
-  bundle_price: number | null;
-  products: Array<{
-    product_id: string;
-    quantity: number;
-    required: boolean;
-  }>;
-  min_tier_required: string | null;
-  points_required: number;
-  status: string;
-  start_date: string | null;
-  end_date: string | null;
-  total_purchases_allowed: number | null;
-  max_purchases_per_user: number | null;
-  current_purchases: number;
-  featured: boolean;
-  badge_text: string | null;
-  badge_color: string | null;
-  terms_conditions: string | null;
-  created_at: string;
-}
+import { Bundle } from "@/types/store";
 
 interface ProductDetails {
   id: string;
@@ -442,7 +410,7 @@ export default function BundlesPage() {
                     <Button
                       className="w-full"
                       disabled={!canBuy}
-                      onClick={() => router.push(`/bundles/${bundle.slug}`)}
+                      onClick={() => router.push(`bundles/${bundle.slug}`)}
                     >
                       {!canBuy ? (
                         <>

@@ -28,6 +28,7 @@ import {
   CheckCircle,
   Eye,
   EyeOff,
+  Gift,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -39,18 +40,21 @@ import {
 } from "@/components/ui/select";
 import { signUpSchema } from "@/types/customer";
 import { businessTypes, cities } from "@/lib/constants";
+import { Alert, AlertDescription } from "../ui/alert";
 
 type SignUpData = z.infer<typeof signUpSchema>;
 
 interface SignUpFormProps {
   onSuccess?: () => void;
+  ref: string | undefined;
 }
 
-export default function SignUpForm({ onSuccess }: SignUpFormProps) {
+export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isBusinessCustomer, setIsBusinessCustomer] = useState(false);
+  const [pendingReferral, setPendingReferral] = useState("");
 
   const form = useForm<SignUpData>({
     resolver: zodResolver(signUpSchema),
@@ -68,8 +72,29 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps) {
       receiveOffers: true,
       receiveNewsletter: true,
       termsAccepted: false,
+      referralCode: pendingReferral || undefined,
     },
   });
+
+  // Set a cookie with referral code if present in URL
+  useState(() => {
+    if (ref) {
+      setPendingReferral(ref);
+      document.cookie = `referral=${ref}; path=/; max-age=${60 * 60 * 24 * 30}`; // Expires in 30 days
+    } else {
+      // Check if referral cookie exists
+      const existingReferral = getReferralFromCookie();
+      if (existingReferral) {
+        setPendingReferral(existingReferral);
+      }
+    }
+  });
+
+  // Get referral code from cookie (if exists)
+  const getReferralFromCookie = () => {
+    const match = document.cookie.match(new RegExp("(^| )referral=([^;]+)"));
+    return match ? match[2] : null;
+  };
 
   const onSubmit = async (data: SignUpData) => {
     setLoading(true);
@@ -96,7 +121,7 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps) {
           <CheckCircle className="w-4 h-4 text-green-500" />
           <span>Account created! Check your email to confirm</span>
         </div>,
-        { id: toastId, duration: 8000 }
+        { id: toastId, duration: 8000 },
       );
 
       if (onSuccess) {
@@ -116,6 +141,17 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Referral Alert */}
+        {pendingReferral && (
+          <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+            <Gift className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertDescription className="text-green-800 dark:text-green-200 text-sm">
+              You were referred by a friend! Complete signup to get{" "}
+              <span className="font-bold">100 bonus points</span> on your first
+              purchase.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Full Name */}
           <FormField

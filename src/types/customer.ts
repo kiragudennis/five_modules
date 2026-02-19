@@ -44,6 +44,7 @@ export const signUpSchema = z
     termsAccepted: z.boolean().refine((val) => val === true, {
       message: "You must accept the terms and conditions",
     }),
+    referralCode: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -63,6 +64,10 @@ export const validateSignUp = z.object({
   businessType: z.string().optional(),
   receiveOffers: z.boolean().default(true),
   receiveNewsletter: z.boolean().default(true),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: "Terms must be accepted",
+  }),
+  referralCode: z.string().optional(),
 });
 
 export type Customer = z.infer<typeof CustomerSchema>;
@@ -206,4 +211,96 @@ export interface SpinResult {
   is_claimed: boolean;
   created_at: string;
   expires_at: string | null;
+}
+
+export interface Challenge {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  trigger_event: string;
+  requirements: any;
+  reward_points: number;
+  reward_tier_upgrade: string | null;
+  reward_details: any;
+  max_rewards_per_user: number | null;
+  max_total_rewards: number | null;
+  current_rewards_count: number;
+  badge_image_url: string | null;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export interface UserChallenge {
+  id: string;
+  challenge_id: string;
+  status: "in_progress" | "completed" | "reward_claimed" | "expired";
+  progress: number;
+  target: number;
+  completed_at: string | null;
+  reward_claimed_at: string | null;
+  loyalty_points_awarded: number;
+  metadata: any;
+  challenge: Challenge;
+}
+
+export interface MarketingStats {
+  bundles: {
+    total: number;
+    active: number;
+    purchases: number;
+    revenue: number;
+    topBundles: Array<{
+      name: string;
+      purchases: number;
+      revenue: number;
+    }>;
+  };
+  spins: {
+    totalGames: number;
+    activeGames: number;
+    totalSpins: number;
+    todaySpins: number;
+    prizesAwarded: {
+      points: number;
+      discounts: number;
+      products: number;
+    };
+    topWinners: Array<{
+      user: string;
+      prize: string;
+      date: string;
+    }>;
+  };
+  challenges: {
+    total: number;
+    active: number;
+    completed: number;
+    referrals: {
+      total: number;
+      completed: number;
+      pending: number;
+    };
+    pointsAwarded: number;
+  };
+  rewards: {
+    total: number;
+    active: number;
+    awarded: number;
+    upcoming: Array<{
+      type: string;
+      count: number;
+      date: string;
+    }>;
+  };
+  loyalty: {
+    totalPoints: number;
+    pointsEarned: number;
+    pointsRedeemed: number;
+    tierDistribution: Array<{
+      tier: string;
+      count: number;
+      color: string;
+    }>;
+  };
 }

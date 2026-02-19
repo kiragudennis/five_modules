@@ -3,15 +3,22 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { secureRatelimit, resend } from "@/lib/limit";
 import { validateSignUp } from "@/types/customer";
+import { checkBotId } from "botid/server";
 
 export async function POST(req: Request) {
   try {
+    const verification = await checkBotId();
+
+    if (verification.isBot) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
     const { success } = await secureRatelimit(req);
 
     if (!success) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -21,7 +28,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid data provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -37,6 +44,7 @@ export async function POST(req: Request) {
       businessType,
       receiveOffers,
       receiveNewsletter,
+      referralCode,
     } = parsed.data;
 
     // Check if user already exists
@@ -49,7 +57,7 @@ export async function POST(req: Request) {
     if (existingUser) {
       return NextResponse.json(
         { error: "User with this email already exists" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -98,6 +106,37 @@ export async function POST(req: Request) {
       throw profileError;
     }
 
+    // Handle referral code if provided
+    if (referralCode) {
+      // Find the referrer
+      const { data: referrerData, error: referrerError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("referral_code", referralCode.toUpperCase())
+        .single();
+
+      if (!referrerError && referrerData) {
+        // Record the referral (pending status)
+        await supabaseAdmin.from("referrals").insert({
+          referrer_id: referrerData.id,
+          referred_email: email,
+          referred_user_id: userId,
+          referral_code: referralCode.toUpperCase(),
+          status: "joined", // They've joined, waiting for first purchase
+          reward_points: 100, // Default points
+          metadata: {
+            joined_at: new Date().toISOString(),
+            signup_data: {
+              full_name: fullName,
+              phone: phone,
+              city: city,
+              is_business: !!businessName,
+            },
+          },
+        });
+      }
+    }
+
     // Send verification email
     await sendVerificationEmail(email, fullName);
 
@@ -111,7 +150,7 @@ export async function POST(req: Request) {
     console.error("Signup error:", error);
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -132,7 +171,7 @@ async function sendVerificationEmail(email: string, name: string) {
       console.error("Magic link generation failed:", error);
       return NextResponse.json(
         { error: "Magic link not generated" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -144,7 +183,7 @@ async function sendVerificationEmail(email: string, name: string) {
     // override redirect_to to your client callback
     url.searchParams.set(
       "redirect_to",
-      `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm-signup`
+      `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm-signup`,
     );
 
     verificationLink = url.toString();
