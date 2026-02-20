@@ -201,6 +201,7 @@ export interface SpinResult {
   prize_value: string;
   prize_details: any;
   coupon_id: string | null;
+  product_name: string | null;
   coupon?: {
     code: string;
     discount_type: string;

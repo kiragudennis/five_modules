@@ -114,7 +114,7 @@ export default function BundleDetailPage() {
     } catch (error: any) {
       console.error("Error fetching bundle:", error);
       toast.error("Could not load bundle");
-      router.push("/bundles");
+      router.back();
     } finally {
       setLoading(false);
     }
@@ -284,7 +284,7 @@ export default function BundleDetailPage() {
   const accessible = canAccess();
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-2 py-8">
       <div className="max-w-6xl mx-auto">
         {/* Back Button */}
         <Button

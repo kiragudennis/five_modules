@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS spin_results (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     game_id UUID REFERENCES spin_games(id) ON DELETE CASCADE,
     spin_id UUID REFERENCES user_spins(id) ON DELETE CASCADE,
+    product_name TEXT, -- For product to be won
     segment_index INTEGER NOT NULL,
     prize_type VARCHAR(50) CHECK (prize_type IN ('points', 'discount', 'product', 'free_shipping', 'bundle_access', 'nothing')),
     prize_value TEXT, -- Points amount, discount %, product ID, etc.
@@ -686,7 +687,7 @@ BEGIN
 END;
 $$;
 
--- Updated function to record spin with coupon generation
+-- Updated function to record spin with coupon generation and SECURITY CHECKS
 CREATE OR REPLACE FUNCTION record_spin(
     p_user_id UUID,
     p_game_id UUID,
@@ -707,78 +708,210 @@ DECLARE
     v_response JSONB;
     v_loyalty_points INTEGER;
     v_current_points INTEGER;
+    v_spins_today INTEGER;
+    v_spin_count INTEGER;
+    v_last_spin_time TIMESTAMP;
+    v_segment_data JSONB;
+    v_valid_segment BOOLEAN;
 BEGIN
-    -- Get game details
-    SELECT * INTO v_game FROM spin_games WHERE id = p_game_id;
+    -- ========== SECURITY VALIDATION CHECKS ==========
     
-    -- Get user's current loyalty points
+    -- 1. Validate game exists and is active
+    SELECT * INTO v_game FROM spin_games 
+    WHERE id = p_game_id AND is_active = true;
+    
+    IF NOT FOUND THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Invalid or inactive game'
+        );
+    END IF;
+
+    -- 2. Check if game is within date range
+    IF v_game.start_date IS NOT NULL AND v_game.start_date > NOW() THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Game has not started yet'
+        );
+    END IF;
+    
+    IF v_game.end_date IS NOT NULL AND v_game.end_date < NOW() THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Game has expired'
+        );
+    END IF;
+
+    -- 3. Validate the segment index is within range
+    IF p_segment_index < 0 OR p_segment_index >= jsonb_array_length(v_game.wheel_config) THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Invalid segment index'
+        );
+    END IF;
+
+    -- 4. Validate that the prize type and value match the wheel config
+    v_segment_data := v_game.wheel_config->p_segment_index;
+    
+    IF v_segment_data->>'type' != p_prize_type THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Prize type mismatch'
+        );
+    END IF;
+    
+    IF v_segment_data->>'value' != p_prize_value THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Prize value mismatch'
+        );
+    END IF;
+
+    -- 5. Get today's spin count for this user/game
+    SELECT COALESCE(spins_used, 0) INTO v_spins_today
+    FROM user_spins 
+    WHERE user_id = p_user_id 
+      AND game_id = p_game_id 
+      AND spin_date = CURRENT_DATE;
+
+    -- 6. Get last spin time for rate limiting
+    SELECT created_at INTO v_last_spin_time
+    FROM spin_results
+    WHERE user_id = p_user_id AND game_id = p_game_id
+    ORDER BY created_at DESC
+    LIMIT 1;
+
+    -- 7. Check rate limiting (prevent rapid-fire spins)
+    IF v_last_spin_time IS NOT NULL AND 
+       EXTRACT(EPOCH FROM (NOW() - v_last_spin_time)) < 2 THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Please wait before spinning again'
+        );
+    END IF;
+
+    -- 8. Get user's current loyalty points
     SELECT points INTO v_current_points 
     FROM loyalty_points 
     WHERE user_id = p_user_id;
-    
-    -- Record spin usage
+
+    -- 9. Validate free spin usage
     IF p_used_points = 0 THEN
-        -- Free spin
-        INSERT INTO user_spins (user_id, game_id, spin_date, spins_used)
-        VALUES (p_user_id, p_game_id, CURRENT_DATE, 1)
-        ON CONFLICT (user_id, game_id, spin_date) 
-        DO UPDATE SET spins_used = user_spins.spins_used + 1
-        RETURNING id INTO v_spin_id;
+        -- Check daily free spin limit
+        IF v_spins_today >= v_game.free_spins_per_day THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Daily free spin limit reached'
+            );
+        END IF;
         
-        -- Update user's daily spin count
-        UPDATE users 
-        SET spins_today = COALESCE(spins_today, 0) + 1,
-            last_spin_date = CURRENT_DATE
-        WHERE id = p_user_id;
+        -- Check total spins per day limit
+        IF v_spins_today >= v_game.max_spins_per_day THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Maximum spins per day reached'
+            );
+        END IF;
+        
+    -- 10. Validate paid spin usage
+    ELSIF p_used_points > 0 THEN
+        -- Check if user has enough points
+        IF v_current_points IS NULL OR v_current_points < p_used_points THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Insufficient loyalty points'
+            );
+        END IF;
+
+        -- Validate points amount matches game setting
+        IF p_used_points != v_game.points_per_spin THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Invalid points amount'
+            );
+        END IF;
+
+        -- Check total spins per day limit for paid spins too
+        IF v_spins_today >= v_game.max_spins_per_day THEN
+            RETURN jsonb_build_object(
+                'success', false, 
+                'error', 'Maximum spins per day reached'
+            );
+        END IF;
+        
     ELSE
-        -- Paid spin (using loyalty points)
-        -- Deduct points using your existing loyalty system
-        UPDATE loyalty_points 
-        SET points = points - p_used_points,
-            points_redeemed = points_redeemed + p_used_points,
-            updated_at = NOW()
-        WHERE user_id = p_user_id
-        RETURNING points INTO v_current_points;
-        
-        -- Record transaction
-        INSERT INTO loyalty_transactions (
-            user_id,
-            points_change,
-            current_points,
-            transaction_type,
-            description,
-            metadata
-        ) VALUES (
-            p_user_id,
-            -p_used_points,
-            v_current_points,
-            'redeemed',
-            'Points used for spin game',
-            jsonb_build_object('game_id', p_game_id)
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 'Invalid spin type'
         );
-        
-        INSERT INTO user_spins (user_id, game_id, spin_date, spins_used, points_used)
-        VALUES (p_user_id, p_game_id, CURRENT_DATE, 1, p_used_points)
-        RETURNING id INTO v_spin_id;
     END IF;
+
+    -- ========== ALL CHECKS PASSED - PROCEED WITH SPIN ==========
+    -- Record spin usage (with proper error handling)
+    BEGIN
+        IF p_used_points = 0 THEN
+            -- Free spin
+            INSERT INTO user_spins (user_id, game_id, spin_date, spins_used)
+            VALUES (p_user_id, p_game_id, CURRENT_DATE, 1)
+            ON CONFLICT (user_id, game_id, spin_date) 
+            DO UPDATE SET spins_used = user_spins.spins_used + 1
+            RETURNING id INTO v_spin_id;
+            
+        ELSE
+            -- Paid spin - deduct points first (in a transaction)
+            UPDATE loyalty_points 
+            SET points = points - p_used_points,
+                points_redeemed = COALESCE(points_redeemed, 0) + p_used_points,
+                updated_at = NOW()
+            WHERE user_id = p_user_id
+            RETURNING points INTO v_current_points;
+            
+            -- Record transaction
+            INSERT INTO loyalty_transactions (
+                user_id,
+                points_change,
+                current_points,
+                transaction_type,
+                description,
+                metadata
+            ) VALUES (
+                p_user_id,
+                -p_used_points,
+                v_current_points,
+                'redeemed',
+                'Points used for spin: ' || v_game.name,
+                jsonb_build_object('game_id', p_game_id, 'game_name', v_game.name)
+            );
+            
+            INSERT INTO user_spins (user_id, game_id, spin_date, spins_used, points_used)
+            VALUES (p_user_id, p_game_id, CURRENT_DATE, 1, p_used_points)
+            RETURNING id INTO v_spin_id;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'error', 'Failed to record spin: ' || SQLERRM
+        );
+    END;
 
     -- Handle prize based on type
     IF p_prize_type = 'discount' THEN
-        -- Create coupon using your existing coupons table
+        -- Create coupon
         v_coupon_id := create_coupon_from_spin(
             p_user_id,
             p_game_id,
             'percentage',
             p_prize_value::NUMERIC,
-            30
+            30  -- 30 days expiry
         );
+        
     ELSIF p_prize_type = 'points' THEN
-        -- Award points using your existing loyalty system
+        -- Award points
         v_loyalty_points := p_prize_value::INTEGER;
         
         UPDATE loyalty_points 
         SET points = points + v_loyalty_points,
-            points_earned = points_earned + v_loyalty_points,
+            points_earned = COALESCE(points_earned, 0) + v_loyalty_points,
             updated_at = NOW()
         WHERE user_id = p_user_id
         RETURNING points INTO v_current_points;
@@ -796,9 +929,15 @@ BEGIN
             v_loyalty_points,
             v_current_points,
             'earned',
-            'Points won from spin game',
-            jsonb_build_object('game_id', p_game_id)
+            'Points won from spin: ' || v_game.name,
+            jsonb_build_object('game_id', p_game_id, 'segment', p_segment_index)
         );
+        
+    ELSIF p_prize_type = 'product' THEN
+        -- For product wins, just capture the product name from the segment
+        -- No points or coupons to generate
+        NULL;
+        
     END IF;
 
     -- Record spin result
@@ -809,6 +948,7 @@ BEGIN
         segment_index,
         prize_type,
         prize_value,
+        product_name,  -- Added product_name column
         coupon_id,
         loyalty_points_awarded,
         expires_at
@@ -819,8 +959,13 @@ BEGIN
         p_segment_index,
         p_prize_type,
         p_prize_value,
+        CASE 
+            WHEN p_prize_type = 'product' THEN 
+                COALESCE(v_segment_data->>'product_name', v_segment_data->>'label')
+            ELSE NULL 
+        END,  -- Store product name from segment
         v_coupon_id,
-        CASE WHEN p_prize_type = 'points' THEN p_prize_value::INTEGER ELSE 0 END,
+        v_loyalty_points,
         CASE 
             WHEN p_prize_type = 'discount' THEN NOW() + INTERVAL '30 days'
             ELSE NULL
@@ -833,11 +978,19 @@ BEGIN
         'spin_id', v_spin_id,
         'result_id', v_result_id,
         'prize_type', p_prize_type,
-        'prize_value', p_prize_value
+        'prize_value', p_prize_value,
+        'prize_label', v_segment_data->>'label'
     );
     
+    -- Add product_name to response for product wins
+    IF p_prize_type = 'product' THEN
+        v_response := v_response || jsonb_build_object(
+            'product_name', COALESCE(v_segment_data->>'product_name', v_segment_data->>'label')
+        );
+    END IF;
+    
     IF v_coupon_id IS NOT NULL THEN
-        -- Get coupon code
+        -- Get coupon details
         v_response := v_response || jsonb_build_object(
             'coupon_id', v_coupon_id,
             'coupon_code', (SELECT code FROM coupons WHERE id = v_coupon_id)
@@ -852,6 +1005,12 @@ BEGIN
     END IF;
 
     RETURN v_response;
+    
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object(
+        'success', false,
+        'error', 'Unexpected error: ' || SQLERRM
+    );
 END;
 $$;
 
@@ -1097,17 +1256,27 @@ BEGIN
             'loyalty_points_awarded', sr.loyalty_points_awarded,
             'is_claimed', sr.is_claimed,
             'created_at', sr.created_at,
-            'coupon', CASE WHEN c.id IS NOT NULL THEN
+            'coupon', CASE WHEN sr.coupon_id IS NOT NULL THEN
                 JSONB_BUILD_OBJECT(
-                    'code', c.code,
-                    'discount_type', c.discount_type,
-                    'discount_value', c.discount_value
+                    'code', sr.code,
+                    'discount_type', sr.discount_type,
+                    'discount_value', sr.discount_value
                 )
             ELSE NULL END
         )
     ) INTO v_recent_spin_results
     FROM (
-        SELECT sr.*, c.id as coupon_id, c.code, c.discount_type, c.discount_value
+        SELECT 
+            sr.id,
+            sr.prize_type,
+            sr.prize_value,
+            sr.loyalty_points_awarded,
+            sr.is_claimed,
+            sr.created_at,
+            sr.coupon_id,
+            c.code,
+            c.discount_type,
+            c.discount_value
         FROM spin_results sr
         LEFT JOIN coupons c ON sr.coupon_id = c.id
         WHERE sr.user_id = p_user_id

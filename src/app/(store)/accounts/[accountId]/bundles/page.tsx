@@ -193,19 +193,20 @@ export default function BundlesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Bundles loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-2 py-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex flex-wrap items-center gap-4 mb-8">
           <Button
             variant="ghost"
             size="sm"
@@ -224,7 +225,7 @@ export default function BundlesPage() {
 
         {/* User Status */}
         <Card className="mb-8">
-          <CardContent className="pt-6">
+          <CardContent className="sm:pt-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-full">
@@ -289,7 +290,7 @@ export default function BundlesPage() {
                     </div>
                   )}
 
-                  <CardContent className="p-6">
+                  <CardContent>
                     {/* Badges */}
                     <div className="flex flex-wrap gap-2 mb-3">
                       {bundle.featured && (
@@ -301,6 +302,7 @@ export default function BundlesPage() {
                             backgroundColor:
                               bundle.badge_color?.split(" ")[0] || "#000",
                           }}
+                          className="dark:text-white"
                         >
                           {bundle.badge_text}
                         </Badge>

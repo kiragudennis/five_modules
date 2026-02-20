@@ -153,6 +153,13 @@ export default function AccountPage() {
           p_user_id: accountId,
         });
 
+      console.log(
+        "Engagement Data:",
+        engagementData,
+        "Error:",
+        engagementError,
+      );
+
       if (engagementError) throw engagementError;
 
       if (engagementData?.success) {
@@ -277,7 +284,9 @@ export default function AccountPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-center md:items-center gap-4 mb-8">
           <div className="flex items-center w-full gap-4">
-            <h1 className="text-3xl font-bold mb-2">Customer Profile</h1>
+            <h1 className="text-3xl font-bold mb-2 truncate">
+              Customer Profile
+            </h1>
             <div className="flex items-center gap-2">
               <Badge
                 variant={profile.role === "admin" ? "default" : "secondary"}
@@ -331,7 +340,7 @@ export default function AccountPage() {
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 sm:gap-2 gap-6">
               <Card>
-                <CardContent className="pt-6">
+                <CardContent className="sm:pt-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary/10 rounded-lg">
                       <ShoppingBag className="h-5 w-5 text-primary" />
@@ -349,7 +358,7 @@ export default function AccountPage() {
               </Card>
 
               <Card>
-                <CardContent className="pt-6">
+                <CardContent className="sm:pt-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-green-100 rounded-lg">
                       <CreditCard className="h-5 w-5 text-green-600" />
@@ -367,7 +376,7 @@ export default function AccountPage() {
               </Card>
 
               <Card>
-                <CardContent className="pt-6">
+                <CardContent className="sm:pt-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-100 rounded-lg">
                       <Clock className="h-5 w-5 text-blue-600" />
@@ -385,7 +394,7 @@ export default function AccountPage() {
               </Card>
 
               <Card>
-                <CardContent className="pt-6">
+                <CardContent className="sm:pt-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 rounded-lg">
                       <CheckCircle className="h-5 w-5 text-purple-600" />
@@ -403,7 +412,13 @@ export default function AccountPage() {
               </Card>
 
               <Card>
-                <CardContent className="pt-6">
+                <CardContent className="sm:pt-6 relative">
+                  <Link
+                    href={`/accounts/${accountId}/loyalty`}
+                    className="absolute top-[-2] right-2 text-xs text-primary hover:underline"
+                  >
+                    View My Points
+                  </Link>
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 rounded-lg">
                       <CheckCircle className="h-5 w-5 text-purple-600" />

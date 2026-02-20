@@ -835,7 +835,7 @@ export default function AdminMarketingPage() {
               {stats.spins.topWinners.map((winner, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between p-3 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg"
+                  className="flex items-center justify-between p-3 rounded-lg"
                 >
                   <div>
                     <p className="font-medium">{winner.user}</p>
@@ -843,7 +843,7 @@ export default function AdminMarketingPage() {
                       Won: {winner.prize}
                     </p>
                   </div>
-                  <Badge variant="outline" className="bg-white">
+                  <Badge variant="outline">
                     {formatDistanceToNow(new Date(winner.date), {
                       addSuffix: true,
                     })}

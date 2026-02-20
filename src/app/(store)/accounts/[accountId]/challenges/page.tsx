@@ -183,19 +183,19 @@ export default function ChallengesPage() {
     switch (status) {
       case "in_progress":
         return (
-          <Badge variant="outline" className="bg-blue-50">
+          <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900">
             In Progress
           </Badge>
         );
       case "completed":
         return (
-          <Badge variant="outline" className="bg-green-50">
+          <Badge variant="outline" className="bg-green-50 dark:bg-green-900">
             Completed
           </Badge>
         );
       case "reward_claimed":
         return (
-          <Badge variant="default" className="bg-green-600">
+          <Badge variant="default" className="bg-green-600 dark:bg-green-700">
             Reward Claimed
           </Badge>
         );
@@ -208,9 +208,10 @@ export default function ChallengesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Challenges loading...</p>
         </div>
       </div>
     );
@@ -220,7 +221,7 @@ export default function ChallengesPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex flex-wrap items-center gap-4 mb-8">
           <Button
             variant="ghost"
             size="sm"
@@ -239,7 +240,7 @@ export default function ChallengesPage() {
 
         {/* Referral Section */}
         <Card className="mb-8 bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-          <CardContent className="pt-6">
+          <CardContent className=":sm:pt-6">
             <div className="flex flex-col md:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-4">
                 <div className="p-4 bg-purple-100 rounded-full">
@@ -315,7 +316,7 @@ export default function ChallengesPage() {
                   key={challenge.id}
                   className="border-2 border-dashed border-primary/50"
                 >
-                  <CardContent className="pt-6">
+                  <CardContent className="sm:pt-6">
                     <div className="flex items-start gap-4">
                       <div className="p-3 bg-primary/10 rounded-full">
                         {getChallengeIcon(challenge.type)}
@@ -382,7 +383,7 @@ export default function ChallengesPage() {
           <div className="space-y-4">
             {userChallenges.map((userChallenge) => (
               <Card key={userChallenge.id}>
-                <CardContent className="pt-6">
+                <CardContent className="sm:pt-6">
                   <div className="flex items-start gap-4">
                     <div className="p-3 bg-muted rounded-full">
                       {getChallengeIcon(userChallenge.challenge.type)}
