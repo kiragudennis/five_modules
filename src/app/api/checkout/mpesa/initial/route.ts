@@ -127,7 +127,7 @@ export async function POST(req: Request) {
   try {
     // 📦 1. Create order with new schema
     const orderItems = items.map((item: any) => ({
-      order_id: orderData.id,
+      order_id: null, // Will be updated after order creation
       product_id: item.id,
       product_name: item.name,
       product_title: item.title,
@@ -151,6 +151,34 @@ export async function POST(req: Request) {
       },
     }));
 
+    let effectiveSubtotal = totals.subtotal;
+    let bundleDiscountAmount = 0;
+
+    // Check if bundle is applied
+    if (metadata?.bundle) {
+      const bundle = metadata.bundle;
+
+      // Calculate original total of bundle items
+      const bundleOriginalTotal =
+        bundle.items?.reduce(
+          (sum: number, item: any) => sum + item.original_price * item.quantity,
+          0,
+        ) || 0;
+
+      // Calculate what customer actually pays for bundle
+      let bundlePrice = bundleOriginalTotal;
+      if (bundle.discount_type === "percentage") {
+        bundlePrice = bundleOriginalTotal * (1 - bundle.discount_value / 100);
+      } else if (bundle.discount_type === "fixed") {
+        bundlePrice = bundleOriginalTotal - bundle.discount_value;
+      }
+
+      bundleDiscountAmount = bundleOriginalTotal - bundlePrice;
+
+      // Adjust subtotal to reflect bundle discount
+      effectiveSubtotal = totals.subtotal - bundleDiscountAmount;
+    }
+
     const orderPayload = {
       // User information
       user_id: user.id,
@@ -161,9 +189,9 @@ export async function POST(req: Request) {
       customer_phone: customer.phone,
 
       // Product referral details
-      referral_source: metadata?.referral.source || "",
-      referred_by: metadata?.referral.referrerId || null,
-      referral_product_id: metadata?.referral.productId || null,
+      referral_source: metadata?.referral?.source || null,
+      referred_by: metadata?.referral?.referrerId || null,
+      referral_product_id: metadata?.referral?.productId || null,
 
       // Shipping Information (flattened)
       shipping_address: shipping.address,
@@ -182,7 +210,7 @@ export async function POST(req: Request) {
       payment_reference: null,
 
       // Order Totals
-      subtotal: totals.subtotal,
+      subtotal: effectiveSubtotal,
       wholesale_savings: totals.wholesaleSavings || 0,
       coupon_discount: totals.couponDiscount || 0,
       installation_cost: totals.installation || 0,
@@ -236,10 +264,22 @@ export async function POST(req: Request) {
       throw orderErr;
     }
 
+    // Update order_id in order items
+    const updatedOrderItems = orderItems.map((item: any) => ({
+      ...item,
+      order_id: orderData.id,
+    }));
+
+    // Remove variant field
+    const finalOrderItems = updatedOrderItems.map((item: any) => {
+      const { variant, ...rest } = item;
+      return rest;
+    });
+
     // 📦 2. Insert order items (snapshot_product_details trigger will populate product details)
     const { error: itemsErr } = await supabaseAdmin
       .from("order_items")
-      .insert(orderItems);
+      .insert(finalOrderItems);
 
     if (itemsErr) {
       console.error("Order items creation error:", itemsErr);

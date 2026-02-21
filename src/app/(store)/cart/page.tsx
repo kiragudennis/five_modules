@@ -223,7 +223,7 @@ export default function CartPage() {
                 return (
                   <div
                     key={bundle.bundleInstanceId}
-                    className="p-6 bg-purple-50/30 dark:bg-purple-950/10"
+                    className="p-2 sm:p-6 bg-purple-50/30 dark:bg-purple-950/10"
                   >
                     {/* Bundle Header */}
                     <div className="mb-4 pb-4 border-b border-purple-200 dark:border-purple-800">
@@ -396,7 +396,7 @@ export default function CartPage() {
 
               {/* Regular Items */}
               {regularItems.map((item) => (
-                <div key={item.product.id} className="p-6">
+                <div key={item.product.id} className="sm:p-6 p-2">
                   <div className="flex flex-col sm:flex-row gap-4">
                     {/* Product Image */}
                     <div className="w-full sm:w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
@@ -524,7 +524,7 @@ export default function CartPage() {
 
         {/* Order Summary - Purely Informational */}
         <div className="space-y-6">
-          <Card className="sticky top-24">
+          <Card>
             <div className="p-6 border-b">
               <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
                 <ShoppingBag className="h-5 w-5" />

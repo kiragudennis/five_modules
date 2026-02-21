@@ -2,25 +2,19 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   CheckCircle,
   Package,
-  ArrowRight,
   FileDown,
   XCircle,
   AlertCircle,
-  BarChart3,
-  Users,
   ShoppingBag,
   Settings,
-  Shield,
   TrendingUp,
-  CreditCard,
   Smartphone,
   Sparkles,
   Trophy,
-  Download,
   Eye,
   Clock,
   MapPin,
@@ -30,6 +24,10 @@ import {
   CreditCard as CreditCardIcon,
   Calendar,
   Hash,
+  Gift,
+  Coins,
+  Layers,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -59,16 +57,15 @@ export default function SuccessPage({
   >("success");
   const [phoneNumber, setPhoneNumber] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
-  const [countdown, setCountdown] = useState(60); // 60 seconds countdown
+  const [countdown, setCountdown] = useState(60);
 
   // Start countdown when payment is initiated successfully
   useEffect(() => {
     if (paymentStatus === "success") {
       const timer = setTimeout(() => {
         window.location.reload();
-      }, 60000); // Reload after 60 seconds
+      }, 60000);
 
-      // Countdown timer for UI feedback
       const countdownInterval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -90,7 +87,6 @@ export default function SuccessPage({
     const fetchOrderDetails = async () => {
       setIsLoading(true);
       try {
-        // Fetch real order details
         const res = await fetch(`/api/orders/${orderId}`);
         if (!res.ok) {
           throw new Error(`Failed to fetch order: ${res.status}`);
@@ -99,14 +95,12 @@ export default function SuccessPage({
 
         setOrderDetails(data);
 
-        // Check if payment is completed based on new statuses
         const isPaid =
           data.payment_status === "completed" ||
           data.status === "completed" ||
           data.status === "processing";
         setPaymentComplete(isPaid);
 
-        // 🎉 Launch epic confetti on success
         if (isPaid) {
           confetti({
             particleCount: 150,
@@ -130,7 +124,6 @@ export default function SuccessPage({
           }, 250);
         }
 
-        // Clear pending order and cart from state
         dispatch({ type: "CLEAR_PENDING_ORDER" });
         dispatch({ type: "CLEAR_CART" });
       } catch (error) {
@@ -144,7 +137,6 @@ export default function SuccessPage({
     if (orderId) {
       fetchOrderDetails();
     } else {
-      // If no orderId, redirect to home
       router.push("/");
     }
   }, [orderId, dispatch, router]);
@@ -163,7 +155,6 @@ export default function SuccessPage({
     }
   }, [paymentComplete]);
 
-  // M-Pesa payment
   const handleMPesaPayment = async () => {
     setPaymentStatus("processing");
 
@@ -187,20 +178,16 @@ export default function SuccessPage({
       });
 
       const data = await res.json();
-      console.log("Data:", data);
 
       if (!res.ok || data.error) {
         setPaymentStatus("error");
         setErrorMessage(data.error || "Failed to initiate M-Pesa payment.");
         toast.error(data.error || "Failed to initiate M-Pesa payment.");
-        console.error("M-Pesa payment error:", data);
         return;
       }
 
-      // Simulate successful payment
       setPaymentStatus("success");
 
-      // they have received an STK push notification
       toast.success(
         "M-Pesa payment initiated successfully! Please complete the payment on your phone.",
       );
@@ -264,6 +251,28 @@ export default function SuccessPage({
   const isOrderPaid = paymentComplete;
   const isPending = orderDetails.payment_status === "pending";
   const isFailed = orderDetails.payment_status === "failed";
+
+  // Check if order contains a bundle
+  const hasBundle = orderDetails.metadata?.bundle;
+  const bundleData = hasBundle ? orderDetails.metadata.bundle : null;
+
+  // Group items by variant for display
+  const groupedItems = orderDetails.items?.reduce((acc: any, item: any) => {
+    const key = item.variant
+      ? `${item.product_id}-${item.variant}`
+      : item.product_id;
+    if (!acc[key]) {
+      acc[key] = {
+        ...item,
+        variant_details: item.variant ? JSON.parse(item.variant) : null,
+      };
+    }
+    return acc;
+  }, {});
+
+  const orderItems = groupedItems
+    ? Object.values(groupedItems)
+    : orderDetails.items || [];
 
   // Format status for display
   const getStatusBadge = () => {
@@ -546,51 +555,131 @@ export default function SuccessPage({
                     </div>
                   </div>
 
+                  {/* Bundle Information */}
+                  {hasBundle && bundleData && (
+                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Gift className="h-5 w-5 text-purple-600" />
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-300">
+                          {bundleData.bundle_name} Bundle
+                        </h3>
+                        <Badge className="bg-purple-200 text-purple-800 border-purple-300 ml-auto">
+                          Bundle Savings
+                        </Badge>
+                      </div>
+                      {bundleData.savings > 0 && (
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">
+                            You Saved:
+                          </span>
+                          <span className="font-bold text-green-600">
+                            {formatCurrency(
+                              bundleData.savings,
+                              orderDetails.currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {bundleData.points_required > 0 && (
+                        <div className="flex items-center gap-1 mt-2 text-sm">
+                          <Coins className="h-4 w-4 text-amber-600" />
+                          <span className="text-amber-600">
+                            {bundleData.points_required} loyalty points used
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <Separator />
 
                   {/* Order Items */}
                   <div>
                     <h3 className="font-medium mb-4">Order Items</h3>
                     <div className="space-y-3">
-                      {orderDetails.items?.map((item: any) => (
+                      {orderItems.map((item: any) => (
                         <div
                           key={item.id}
-                          className="flex justify-between items-center p-3 border rounded-lg hover:bg-muted/50"
+                          className="p-3 border rounded-lg hover:bg-muted/50"
                         >
-                          <div className="flex-1">
-                            <p className="font-medium">
-                              {item.product_title || item.product_name}
-                            </p>
-                            <div className="flex items-center gap-4 mt-1">
-                              <Badge variant="outline" className="text-xs">
-                                Qty: {item.quantity}
-                              </Badge>
-                              {item.has_wholesale &&
-                                item.applied_price === item.wholesale_price && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs bg-blue-50 text-blue-700 border-blue-200"
-                                  >
-                                    Wholesale Price
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">
+                                  {item.product_title || item.product_name}
+                                </p>
+                                {item.variant && (
+                                  <Badge variant="outline" className="text-xs">
+                                    <Layers className="h-3 w-3 mr-1" />
+                                    {item.variant.name || "Variant"}
                                   </Badge>
                                 )}
+                              </div>
+
+                              {/* Variant Details */}
+                              {item.variant && (
+                                <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                                  {Object.entries(item.variant).map(
+                                    ([key, value]) =>
+                                      key !== "name" && (
+                                        <div
+                                          key={key}
+                                          className="flex items-center gap-1"
+                                        >
+                                          <Tag className="h-3 w-3 text-muted-foreground" />
+                                          <span className="text-muted-foreground capitalize">
+                                            {key}:
+                                          </span>
+                                          <span className="font-medium">
+                                            {String(value)}
+                                          </span>
+                                        </div>
+                                      ),
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-4 mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                  Qty: {item.quantity}
+                                </Badge>
+                                {item.has_wholesale &&
+                                  item.applied_price ===
+                                    item.wholesale_price && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-blue-50 text-blue-700 border-blue-200"
+                                    >
+                                      Wholesale Price
+                                    </Badge>
+                                  )}
+                                {item.metadata?.isBundleItem && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs bg-purple-50 text-purple-700 border-purple-200"
+                                  >
+                                    <Gift className="h-3 w-3 mr-1" />
+                                    Bundle Item
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <div>
-                            <p className="font-bold">
-                              {formatCurrency(
-                                item.total_price ||
-                                  item.applied_price * item.quantity,
-                                orderDetails.currency,
-                              )}
-                            </p>
-                            <span className="text-sm text-muted-foreground">
-                              @{" "}
-                              {formatCurrency(
-                                item.applied_price,
-                                orderDetails.currency,
-                              )}
-                            </span>
+                            <div className="text-right">
+                              <p className="font-bold">
+                                {formatCurrency(
+                                  item.total_price ||
+                                    item.applied_price * item.quantity,
+                                  orderDetails.currency,
+                                )}
+                              </p>
+                              <span className="text-sm text-muted-foreground">
+                                @{" "}
+                                {formatCurrency(
+                                  item.applied_price,
+                                  orderDetails.currency,
+                                )}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -627,6 +716,32 @@ export default function SuccessPage({
                             -
                             {formatCurrency(
                               orderDetails.coupon_discount,
+                              orderDetails.currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {orderDetails.loyalty_discount > 0 && (
+                        <div className="flex justify-between text-purple-600">
+                          <span>Loyalty Discount</span>
+                          <span>
+                            -
+                            {formatCurrency(
+                              orderDetails.loyalty_discount,
+                              orderDetails.currency,
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {hasBundle && bundleData?.savings > 0 && (
+                        <div className="flex justify-between text-purple-600">
+                          <span>Bundle Savings</span>
+                          <span>
+                            -
+                            {formatCurrency(
+                              bundleData.savings,
                               orderDetails.currency,
                             )}
                           </span>
@@ -981,7 +1096,7 @@ export default function SuccessPage({
                     </p>
 
                     <div className="space-x-2">
-                      <p className="text-xs text-center ">
+                      <p className="text-xs text-center mb-2 text-muted-foreground">
                         Page will auto-refresh in {countdown} seconds...
                       </p>
 
@@ -1034,7 +1149,6 @@ export default function SuccessPage({
                       <Button
                         type="button"
                         onClick={() => {
-                          // 🚀 redirect back to PayPal checkout flow
                           router.push(
                             `/checkout/processing/retrial?orderId=${orderDetails.id}`,
                           );

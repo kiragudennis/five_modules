@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   try {
     // 📦 1. Create order with new schema
     const orderItems = items.map((item: any) => ({
-      order_id: orderData.id,
+      order_id: null, // Will be updated after order creation
       product_id: item.id,
       product_name: item.name,
       product_title: item.title,
@@ -103,6 +103,34 @@ export async function POST(req: Request) {
       },
     }));
 
+    let effectiveSubtotal = totals.subtotal;
+    let bundleDiscountAmount = 0;
+
+    // Check if bundle is applied
+    if (metadata?.bundle) {
+      const bundle = metadata.bundle;
+
+      // Calculate original total of bundle items
+      const bundleOriginalTotal =
+        bundle.items?.reduce(
+          (sum: number, item: any) => sum + item.original_price * item.quantity,
+          0,
+        ) || 0;
+
+      // Calculate what customer actually pays for bundle
+      let bundlePrice = bundleOriginalTotal;
+      if (bundle.discount_type === "percentage") {
+        bundlePrice = bundleOriginalTotal * (1 - bundle.discount_value / 100);
+      } else if (bundle.discount_type === "fixed") {
+        bundlePrice = bundleOriginalTotal - bundle.discount_value;
+      }
+
+      bundleDiscountAmount = bundleOriginalTotal - bundlePrice;
+
+      // Adjust subtotal to reflect bundle discount
+      effectiveSubtotal = totals.subtotal - bundleDiscountAmount;
+    }
+
     const orderPayload = {
       // User information
       user_id: user.id,
@@ -111,6 +139,11 @@ export async function POST(req: Request) {
       customer_name: `${customer.firstName} ${customer.lastName}`.trim(),
       customer_email: customer.email,
       customer_phone: customer.phone,
+
+      // Product referral details
+      referral_source: metadata?.referral?.source || null,
+      referred_by: metadata?.referral?.referrerId || null,
+      referral_product_id: metadata?.referral?.productId || null,
 
       // Shipping Information (flattened)
       shipping_address: shipping.address,
@@ -183,10 +216,22 @@ export async function POST(req: Request) {
       throw orderErr;
     }
 
+    // Update order_id in order items
+    const updatedOrderItems = orderItems.map((item: any) => ({
+      ...item,
+      order_id: orderData.id,
+    }));
+
+    // Remove variant field for insertion
+    const finalOrderItems = updatedOrderItems.map((item: any) => {
+      const { variant, ...rest } = item;
+      return rest;
+    });
+
     // 📦 2. Insert order items
     const { error: itemsErr } = await supabaseAdmin
       .from("order_items")
-      .insert(orderItems);
+      .insert(finalOrderItems);
 
     if (itemsErr) {
       console.error("Order items creation error:", itemsErr);
@@ -291,69 +336,41 @@ export async function POST(req: Request) {
     const accessToken = tokenData.access_token;
 
     // 📦 6. Create PayPal order with proper line items
-    const purchaseUnits: any[] = [
-      {
-        reference_id: orderData.id,
-        custom_id: orderData.id,
-        amount: {
-          currency_code: orderData.currency || "USD",
-          value: finalAmount.toFixed(2),
-          breakdown: {
-            item_total: {
-              currency_code: orderData.currency || "USD",
-              value: totals.subtotal.toFixed(2),
-            },
-            discount: {
-              currency_code: orderData.currency || "USD",
-              value: (
-                (totals.couponDiscount || 0) +
-                (totals.wholesaleSavings || 0) +
-                (redeemResult.discount_amount || 0)
-              ).toFixed(2),
-            },
-            shipping: {
-              currency_code: orderData.currency || "USD",
-              value: (shipping.cost || 0).toFixed(2),
-            },
-          },
-        },
-        items: items.map((item: any) => ({
-          name: item.title || item.name,
-          unit_amount: {
+    const purchaseUnits = {
+      reference_id: orderData.id,
+      custom_id: orderData.id,
+      amount: {
+        currency_code: orderData.currency || "USD",
+        value: finalAmount.toFixed(2),
+        breakdown: {
+          item_total: {
             currency_code: orderData.currency || "USD",
-            value: item.applied_price.toFixed(2),
+            value: totals.subtotal.toFixed(2),
           },
-          quantity: item.quantity.toString(),
-          category: "PHYSICAL_GOODS", // Or 'DIGITAL_GOODS' if applicable
-        })),
+          discount: {
+            currency_code: orderData.currency || "USD",
+            value: (
+              (totals.couponDiscount || 0) +
+              (totals.wholesaleSavings || 0) +
+              (redeemResult.discount_amount || 0)
+            ).toFixed(2),
+          },
+          shipping: {
+            currency_code: orderData.currency || "USD",
+            value: (shipping.cost || 0).toFixed(2),
+          },
+        },
       },
-    ];
-
-    // Add shipping cost as an item if it's not included in breakdown
-    if (shipping && shipping.cost > 0) {
-      purchaseUnits[0].items.push({
-        name: `${shipping.method} Shipping`,
+      items: items.map((item: any) => ({
+        name: item.title || item.name,
         unit_amount: {
           currency_code: orderData.currency || "USD",
-          value: shipping.cost.toFixed(2),
+          value: item.applied_price.toFixed(2),
         },
-        quantity: "1",
-        category: "SHIPPING",
-      });
-    }
-
-    // Add installation cost as an item if applicable
-    if (services && services?.installation?.cost > 0) {
-      purchaseUnits[0].items.push({
-        name: services.installation.service?.name || "Installation Service",
-        unit_amount: {
-          currency_code: orderData.currency || "USD",
-          value: services.installation.cost.toFixed(2),
-        },
-        quantity: "1",
-        category: "SERVICE",
-      });
-    }
+        quantity: item.quantity.toString(),
+        category: "PHYSICAL_GOODS", // Or 'DIGITAL_GOODS' if applicable
+      })),
+    };
 
     const orderRes = await fetch(`${PAYPAL_BASE_URL}/v2/checkout/orders`, {
       method: "POST",

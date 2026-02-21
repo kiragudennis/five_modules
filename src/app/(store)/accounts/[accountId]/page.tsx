@@ -1049,13 +1049,14 @@ export default function AccountPage() {
                                   Products
                                 </p>
                                 <div className="space-y-1">
-                                  <p className="font-medium">
+                                  <p className="flex items-center font-medium">
                                     {itemsCount} item
-                                    {itemsCount !== 1 ? "s" : ""}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {unitsCount} unit
-                                    {unitsCount !== 1 ? "s" : ""} total
+                                    {itemsCount !== 1 ? "s" : ""} (
+                                    <span className="text-xs text-muted-foreground">
+                                      {unitsCount} unit
+                                      {unitsCount !== 1 ? "s" : ""} total
+                                    </span>
+                                    )
                                   </p>
                                 </div>
                               </div>
