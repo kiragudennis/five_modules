@@ -456,7 +456,7 @@ export default function AccountPage() {
                         <div className="p-2 bg-purple-100 rounded-lg">
                           <Gift className="h-5 w-5 text-purple-600" />
                         </div>
-                        <h3 className="font-semibold">Mistry Bundles</h3>
+                        <h3 className="font-semibold">Mystery Bundles</h3>
                       </div>
                       <p className="text-sm text-muted-foreground mb-2">
                         Special discounted bundles just for you

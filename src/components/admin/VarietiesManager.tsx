@@ -23,9 +23,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Copy, Package, X } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
-import { Variaty, VarietyAttributes } from "@/types/store";
+import { Variaty } from "@/types/store";
 import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "sonner";
+import { varietyOptions } from "@/lib/constants";
 
 interface VarietiesManagerProps {
   disabled?: boolean;
@@ -33,16 +34,6 @@ interface VarietiesManagerProps {
   variaties: Variaty[];
   onVarietiesChange: (variaties: Variaty[]) => void;
 }
-
-const wattageOptions = [5, 10, 20, 30, 50, 100, 150, 200];
-const colorTempOptions = [
-  "2700K (Warm White)",
-  "3000K (Soft White)",
-  "4000K (Cool White)",
-  "5000K (Daylight)",
-  "6500K (Cool Daylight)",
-  "RGB (Multi Color)",
-];
 
 export function VarietiesManager({
   disabled,
@@ -173,7 +164,7 @@ export function VarietiesManager({
                 <TableHead>Price</TableHead>
                 <TableHead>Images</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Attributes</TableHead>
+                <TableHead>Variant</TableHead>
                 <TableHead>Default</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
@@ -220,15 +211,11 @@ export function VarietiesManager({
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1 flex-wrap">
-                      {variety.attributes.wattage && (
-                        <Badge variant="outline">
-                          {variety.attributes.wattage}W
-                        </Badge>
+                      {variety.variety_type && (
+                        <Badge variant="outline">{variety.variety_type}</Badge>
                       )}
-                      {variety.attributes.colorTemp && (
-                        <Badge variant="outline">
-                          {variety.attributes.colorTemp}
-                        </Badge>
+                      {variety.variant_value && (
+                        <Badge variant="outline">{variety.variant_value}</Badge>
                       )}
                     </div>
                   </TableCell>
@@ -313,18 +300,18 @@ function VarietyFormContent({
   onSave,
   onCancel,
 }: VarietyFormContentProps) {
-  const [attributes, setAttributes] = useState<VarietyAttributes>(
-    initialData?.attributes || {
-      wattage: "",
-      colorTemp: "",
-    },
-  );
   const [name, setName] = useState(initialData?.name || "");
   const [sku, setSku] = useState(initialData?.sku || "");
   const [price, setPrice] = useState(initialData?.price || 0);
   const [stock, setStock] = useState(initialData?.stock || 0);
   const [images, setImages] = useState<string[]>(initialData?.images || []);
   const [isDefault, setIsDefault] = useState(initialData?.is_default || false);
+  const [varietyType, setVarietyType] = useState(
+    initialData?.variety_type || "wattage",
+  );
+  const [variantValue, setVariantValue] = useState(
+    initialData?.variant_value || "",
+  );
 
   const isEditing = !!initialData;
 
@@ -346,42 +333,28 @@ function VarietyFormContent({
       price,
       stock,
       images,
-      attributes,
       is_default: isDefault,
+      variantValue,
+      varietyType,
     };
 
     onSave(varietyData);
   };
 
-  // Auto-generate name from attributes
-  useEffect(() => {
-    const parts = [];
-    if (attributes.wattage) parts.push(`${attributes.wattage}W`);
-    if (attributes.colorTemp) {
-      const tempMatch = attributes.colorTemp.match(/(\d+K)/);
-      if (tempMatch) parts.push(tempMatch[0]);
-    }
-    if (parts.length > 0 && !name) {
-      setName(parts.join(" - "));
-    }
-  }, [attributes, name]);
-
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Wattage</label>
+          <label className="text-sm font-medium">Variant</label>
           <Select
-            value={attributes.wattage?.toString()}
-            onValueChange={(value) =>
-              setAttributes({ ...attributes, wattage: parseInt(value) })
-            }
+            value={variantValue}
+            onValueChange={(value) => setVarietyType(value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select wattage" />
+              <SelectValue placeholder="Select variety option" />
             </SelectTrigger>
             <SelectContent>
-              {wattageOptions.map((w) => (
+              {varietyOptions.map((w) => (
                 <SelectItem key={w} value={w.toString()}>
                   {w}W
                 </SelectItem>
@@ -391,24 +364,14 @@ function VarietyFormContent({
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Color Temperature</label>
-          <Select
-            value={attributes.colorTemp?.toString() || ""}
-            onValueChange={(value) =>
-              setAttributes({ ...attributes, colorTemp: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select color temp" />
-            </SelectTrigger>
-            <SelectContent>
-              {colorTempOptions.map((temp) => (
-                <SelectItem key={temp} value={temp}>
-                  {temp}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <label className="text-sm font-medium">Variant Value</label>
+          <Input
+            value={sku}
+            onChange={(e) => setVariantValue(e.target.value)}
+            placeholder="Enter value"
+            className="font-mono"
+            required
+          />
         </div>
       </div>
 

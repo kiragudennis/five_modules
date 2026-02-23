@@ -49,9 +49,9 @@ export default function EditProductPage({
 
   if (isLoading) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           <p className="text-muted-foreground">Loading product...</p>
         </div>
       </div>

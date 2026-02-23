@@ -1,3 +1,5 @@
+-- Variety enum type
+create type variety_type as enum ('wattage, colorTemp, warranty, batteryCapacity, solarPanelWattage', 'dimensions', 'ipRating', 'installationType', 'referralPoints', 'size', 'type');
 -- Create users table
 CREATE TABLE users (
     id uuid primary key,
@@ -70,6 +72,8 @@ CREATE TABLE product_varieties (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id uuid REFERENCES products(id) ON DELETE CASCADE,
     name text NOT NULL, -- e.g., "20W Cool White", "30W Warm White"
+    variety_type variety_type NOT NULL, -- e.g., wattage, colorTemp
+    variant_value text NOT NULL, -- e.g., "20W", "4000K"
     sku text UNIQUE NOT NULL,
     price numeric(10, 2) NOT NULL,
     original_price numeric(10, 2),

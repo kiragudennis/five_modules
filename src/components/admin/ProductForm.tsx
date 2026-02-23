@@ -722,13 +722,15 @@ export default function ProductForm({
                     </FormItem>
                   )}
                 />
-
-                <VarietiesManager
-                  disabled={isSubmitting}
-                  productId={initialData?.id}
-                  variaties={variaties}
-                  onVarietiesChange={setVariaties}
-                />
+                {/* Only add variety if the product exist and has_varieties is true */}
+                {isEditing && (
+                  <VarietiesManager
+                    disabled={isSubmitting}
+                    productId={initialData?.id}
+                    variaties={variaties}
+                    onVarietiesChange={setVariaties}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

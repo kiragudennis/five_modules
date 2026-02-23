@@ -1,7 +1,7 @@
 // components/ProductVarieties.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Variaty } from "@/types/store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,26 @@ import Image from "next/image";
 interface ProductVarietiesProps {
   varieties: Variaty[];
   onVarietyChange: (variety: Variaty) => void;
-  onVarietyImagesChange?: (images: string[]) => void; // Changed to pass all images
+  onVarietyImagesChange?: (images: string[]) => void;
   selectedVarietyId?: string;
 }
+
+// Allowed variety types from the database enum
+const ALLOWED_VARIETY_TYPES = [
+  "wattage",
+  "colorTemp",
+  "warranty",
+  "batteryCapacity",
+  "solarPanelWattage",
+  "dimensions",
+  "ipRating",
+  "installationType",
+  "referralPoints",
+  "size",
+  "type",
+] as const;
+
+type VarietyType = (typeof ALLOWED_VARIETY_TYPES)[number];
 
 export function ProductVarieties({
   varieties,
@@ -29,67 +46,156 @@ export function ProductVarieties({
       "",
   );
 
-  if (!varieties.length) return null;
-
   const selectedVariety = varieties.find((v) => v.id === selectedId);
+
+  useEffect(() => {
+    if (selectedVariety && onVarietyImagesChange && selectedVariety.images) {
+      onVarietyImagesChange(selectedVariety.images);
+    }
+  }, [selectedVariety, onVarietyImagesChange]);
+
+  if (!varieties.length) return null;
 
   const handleSelect = (variety: Variaty) => {
     if (variety.id) {
       setSelectedId(variety.id);
       onVarietyChange(variety);
+    }
+  };
 
-      // Pass all variety images to update the carousel
-      if (
-        onVarietyImagesChange &&
-        variety.images &&
-        variety.images.length > 0
-      ) {
-        onVarietyImagesChange(variety.images);
+  // Group varieties by variety_type
+  const getVarietyGroups = () => {
+    const groups = new Map<string, Set<string>>();
+
+    varieties.forEach((variety) => {
+      if (variety.variety_type && variety.variant_value) {
+        if (!groups.has(variety.variety_type)) {
+          groups.set(variety.variety_type, new Set());
+        }
+        groups.get(variety.variety_type)?.add(variety.variant_value);
       }
-    }
+    });
+
+    return groups;
   };
 
-  // Group varieties by attributes
-  const wattages = [
-    ...new Set(varieties.map((v) => v.attributes.wattage).filter(Boolean)),
-  ];
-  const colorTemps = [
-    ...new Set(varieties.map((v) => v.attributes.colorTemp).filter(Boolean)),
-  ];
+  // Get all unique variety types that have multiple values
+  const getActiveVarietyTypes = (): string[] => {
+    const groups = getVarietyGroups();
+    return Array.from(groups.entries())
+      .filter(([_, values]) => values.size > 1)
+      .map(([type]) => type);
+  };
 
-  const getAvailableOptions = (
-    type: "wattage" | "colorTemp",
+  // Get all values for a specific variety type
+  const getValuesForType = (type: string): string[] => {
+    const values = new Set<string>();
+    varieties.forEach((variety) => {
+      if (variety.variety_type === type && variety.variant_value) {
+        values.add(variety.variant_value);
+      }
+    });
+    return Array.from(values);
+  };
+
+  // Check if a combination is available
+  const isCombinationAvailable = (
+    type: string,
+    value: string,
     currentSelection: Variaty,
-  ) => {
-    // Filter varieties that match the current selection of the other attribute
-    if (type === "wattage") {
-      return varieties
-        .filter(
-          (v) =>
-            !currentSelection.attributes.colorTemp ||
-            v.attributes.colorTemp === currentSelection.attributes.colorTemp,
-        )
-        .map((v) => v.attributes.wattage)
-        .filter(Boolean);
-    } else {
-      return varieties
-        .filter(
-          (v) =>
-            !currentSelection.attributes.wattage ||
-            v.attributes.wattage === currentSelection.attributes.wattage,
-        )
-        .map((v) => v.attributes.colorTemp)
-        .filter(Boolean);
+  ): boolean => {
+    // Build filters based on current selection
+    const filters: Record<string, string> = {};
+
+    // Add all current selection filters except the one we're checking
+    varieties.forEach((variety) => {
+      if (variety.id === currentSelection.id) {
+        if (variety.variety_type && variety.variant_value) {
+          filters[variety.variety_type] = variety.variant_value;
+        }
+      }
+    });
+
+    // Override with the new selection
+    filters[type] = value;
+
+    // Find any variety that matches all filters
+    return varieties.some((variety) => {
+      return Object.entries(filters).every(
+        ([filterType, filterValue]) =>
+          variety.variety_type === filterType &&
+          variety.variant_value === filterValue,
+      );
+    });
+  };
+
+  // Find variety that matches selected options
+  const findMatchingVariety = (
+    selectedType: string,
+    selectedValue: string,
+  ): Variaty | undefined => {
+    const filters: Record<string, string> = {};
+
+    // Start with current selection
+    if (selectedVariety?.variety_type && selectedVariety?.variant_value) {
+      filters[selectedVariety.variety_type] = selectedVariety.variant_value;
+    }
+
+    // Override with the new selection
+    filters[selectedType] = selectedValue;
+
+    // Find a variety that matches all filters
+    return varieties.find((variety) => {
+      return Object.entries(filters).every(
+        ([type, value]) =>
+          variety.variety_type === type && variety.variant_value === value,
+      );
+    });
+  };
+
+  // Format the display name for variety types
+  const formatTypeName = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      wattage: "Wattage",
+      colorTemp: "Color Temperature",
+      warranty: "Warranty",
+      batteryCapacity: "Battery Capacity",
+      solarPanelWattage: "Solar Panel Wattage",
+      dimensions: "Dimensions",
+      ipRating: "IP Rating",
+      installationType: "Installation Type",
+      referralPoints: "Referral Points",
+      size: "Size",
+      type: "Type",
+    };
+
+    return typeMap[type] || type.replace(/([A-Z])/g, " $1").trim();
+  };
+
+  // Format the display value
+  const formatValue = (type: string, value: string): string => {
+    switch (type) {
+      case "wattage":
+      case "solarPanelWattage":
+        return value.includes("W") ? value : `${value}W`;
+      case "batteryCapacity":
+        return value.includes("Ah") ? value : `${value}Ah`;
+      case "referralPoints":
+        return value.includes("pts") ? value : `${value} pts`;
+      case "price":
+        return value.startsWith("KES") ? value : `KES ${value}`;
+      default:
+        return value;
     }
   };
+
+  const activeTypes = getActiveVarietyTypes();
 
   return (
     <div className="space-y-6">
-      {/* Variety Images Preview - Show images for available varieties */}
+      {/* Variety Cards Grid */}
       <div>
-        <label className="text-sm font-medium mb-2 block">
-          Variety Options
-        </label>
+        <label className="text-sm font-medium mb-2 block">Select Variety</label>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {varieties.map((variety) => {
             const isSelected = selectedId === variety.id;
@@ -105,7 +211,9 @@ export function ProductVarieties({
                   isSelected
                     ? "border-amber-500 bg-amber-50 dark:bg-amber-900/20"
                     : "border-gray-200 hover:border-amber-300 dark:border-gray-700",
+                  variety.stock <= 0 && "opacity-50 cursor-not-allowed",
                 )}
+                disabled={variety.stock <= 0}
               >
                 {/* Image */}
                 <div className="aspect-square relative mb-2 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -153,6 +261,19 @@ export function ProductVarieties({
                       ? `${variety.stock} left`
                       : "Out of stock"}
                   </Badge>
+
+                  {/* Show variety type and value in card */}
+                  {variety.variety_type && variety.variant_value && (
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      <span className="block">
+                        {formatTypeName(variety.variety_type)}:{" "}
+                        {formatValue(
+                          variety.variety_type,
+                          variety.variant_value,
+                        )}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </button>
             );
@@ -160,96 +281,55 @@ export function ProductVarieties({
         </div>
       </div>
 
-      {/* Wattage Options */}
-      {wattages.length > 0 && (
-        <div>
-          <label className="text-sm font-medium mb-2 block">Wattage</label>
-          <div className="flex flex-wrap gap-2">
-            {wattages.map((wattage) => {
-              const available = getAvailableOptions(
-                "wattage",
-                selectedVariety!,
-              );
-              const isAvailable = available.includes(wattage);
-              const isSelected =
-                selectedVariety?.attributes.wattage === wattage;
+      {/* Dynamic Filter Buttons for each variety type */}
+      {activeTypes.map((type) => {
+        const values = getValuesForType(type);
 
-              return (
-                <Button
-                  key={String(wattage)}
-                  type="button"
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  className={cn(
-                    "min-w-[60px]",
-                    isSelected && "bg-amber-600 hover:bg-amber-700",
-                    !isAvailable && "opacity-50 cursor-not-allowed",
-                  )}
-                  disabled={!isAvailable}
-                  onClick={() => {
-                    const variety = varieties.find(
-                      (v) =>
-                        v.attributes.wattage === wattage &&
-                        (!selectedVariety?.attributes.colorTemp ||
-                          v.attributes.colorTemp ===
-                            selectedVariety.attributes.colorTemp),
-                    );
-                    if (variety) handleSelect(variety);
-                  }}
-                >
-                  {wattage}W{isSelected && <Check className="ml-1 h-3 w-3" />}
-                </Button>
-              );
-            })}
+        return (
+          <div key={type}>
+            <label className="text-sm font-medium mb-2 block">
+              {formatTypeName(type)}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {values.map((value) => {
+                if (!selectedVariety) return null;
+
+                const isAvailable = isCombinationAvailable(
+                  type,
+                  value,
+                  selectedVariety,
+                );
+                const isSelected =
+                  selectedVariety.variety_type === type &&
+                  selectedVariety.variant_value === value;
+                const displayValue = formatValue(type, value);
+
+                return (
+                  <Button
+                    key={value}
+                    type="button"
+                    variant={isSelected ? "default" : "outline"}
+                    size="sm"
+                    className={cn(
+                      "min-w-[60px]",
+                      isSelected && "bg-amber-600 hover:bg-amber-700",
+                      !isAvailable && "opacity-50 cursor-not-allowed",
+                    )}
+                    disabled={!isAvailable}
+                    onClick={() => {
+                      const variety = findMatchingVariety(type, value);
+                      if (variety) handleSelect(variety);
+                    }}
+                  >
+                    {displayValue}
+                    {isSelected && <Check className="ml-1 h-3 w-3" />}
+                  </Button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Color Temperature Options */}
-      {colorTemps.length > 0 && (
-        <div>
-          <label className="text-sm font-medium mb-2 block">
-            Color Temperature
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {colorTemps.map((temp) => {
-              const available = getAvailableOptions(
-                "colorTemp",
-                selectedVariety!,
-              );
-              const isAvailable = available.includes(temp);
-              const isSelected = selectedVariety?.attributes.colorTemp === temp;
-
-              return (
-                <Button
-                  key={String(temp)}
-                  type="button"
-                  variant={isSelected ? "default" : "outline"}
-                  size="sm"
-                  className={cn(
-                    isSelected && "bg-amber-600 hover:bg-amber-700",
-                    !isAvailable && "opacity-50 cursor-not-allowed",
-                  )}
-                  disabled={!isAvailable}
-                  onClick={() => {
-                    const variety = varieties.find(
-                      (v) =>
-                        v.attributes.colorTemp === temp &&
-                        (!selectedVariety?.attributes.wattage ||
-                          v.attributes.wattage ===
-                            selectedVariety.attributes.wattage),
-                    );
-                    if (variety) handleSelect(variety);
-                  }}
-                >
-                  {temp}
-                  {isSelected && <Check className="ml-1 h-3 w-3" />}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        );
+      })}
 
       {/* Selected Variety Details */}
       {selectedVariety && (
@@ -265,7 +345,6 @@ export function ProductVarieties({
                   className="object-cover"
                   sizes="64px"
                 />
-                {/* Multiple images indicator */}
                 {selectedVariety.images.length > 1 && (
                   <div className="absolute bottom-0 right-0 bg-black/70 text-white text-[8px] px-1 rounded-tl">
                     +{selectedVariety.images.length - 1}
@@ -294,18 +373,32 @@ export function ProductVarieties({
                 </Badge>
               </div>
 
-              {/* Attribute badges */}
-              <div className="flex gap-2 mt-2">
-                {selectedVariety.attributes.wattage && (
-                  <Badge variant="outline" className="border-amber-300">
-                    {selectedVariety.attributes.wattage}W
-                  </Badge>
+              {/* Dynamic badges for variety type and value */}
+              <div className="flex flex-wrap gap-2 mt-2">
+                {selectedVariety.variety_type &&
+                  selectedVariety.variant_value && (
+                    <Badge variant="outline" className="border-amber-300">
+                      {formatTypeName(selectedVariety.variety_type)}:{" "}
+                      {formatValue(
+                        selectedVariety.variety_type,
+                        selectedVariety.variant_value,
+                      )}
+                    </Badge>
+                  )}
+
+                {/* Show additional attributes from the attributes object */}
+                {Object.entries(selectedVariety.attributes).map(
+                  ([key, value]) => (
+                    <Badge
+                      key={key}
+                      variant="outline"
+                      className="border-amber-300"
+                    >
+                      {formatTypeName(key)}: {String(value)}
+                    </Badge>
+                  ),
                 )}
-                {selectedVariety.attributes.colorTemp && (
-                  <Badge variant="outline" className="border-amber-300">
-                    {selectedVariety.attributes.colorTemp}
-                  </Badge>
-                )}
+
                 {selectedVariety.images &&
                   selectedVariety.images.length > 1 && (
                     <Badge

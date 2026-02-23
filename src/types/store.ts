@@ -340,6 +340,8 @@ export const productVarietySchema = z.object({
     .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
     .default({}),
   is_default: z.boolean().default(false),
+  variety_type: z.string().min(1, "Variety type is required"),
+  variant_value: z.string().min(1, "Variant value is required"),
 });
 
 export type Variaty = z.infer<typeof productVarietySchema>;

@@ -457,9 +457,10 @@ export default function AdminMarketingPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading engagements...</p>
         </div>
       </div>
     );
@@ -574,7 +575,7 @@ export default function AdminMarketingPage() {
       {/* Main Feature Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <FeatureCard
-          title="Mistry Bundles"
+          title="Mystery Bundles"
           description="Create product bundles with special discounts"
           icon={Gift}
           href="/admin/marketing/bundles"

@@ -216,7 +216,7 @@ export default function BundlesPage() {
             Back to Profile
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Mistry Bundles</h1>
+            <h1 className="text-3xl font-bold">Mystery Bundles</h1>
             <p className="text-muted-foreground mt-1">
               Curated bundles with exclusive discounts
             </p>

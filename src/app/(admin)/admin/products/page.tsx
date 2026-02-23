@@ -40,6 +40,7 @@ export default function AdminProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedBeltLevel, setSelectedBeltLevel] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { supabase } = useAuth();
 
@@ -55,6 +56,7 @@ export default function AdminProductsPage() {
     }
 
     setProducts(data || []); // Fallback to empty array if data is null
+    setLoading(false);
   }, [supabase]); // Add supabase as dependency
 
   useEffect(() => {
@@ -153,6 +155,17 @@ export default function AdminProductsPage() {
     setSelectedBeltLevel("all");
     setSearchQuery("");
   };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-6 px-2">

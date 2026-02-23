@@ -1,18 +1,5 @@
 // src/lib/constants.ts
 
-export const productCategories = [
-  "led-bulbs",
-  "solar-lights",
-  "security-lights",
-  "smart-lighting",
-  "camera-lights",
-  "decorative-lights",
-  "commercial-lighting",
-  "batteries",
-  "outdoor-lighting",
-  "emergency-lights",
-];
-
 import { CartItem } from "@/types/store";
 import {
   Lightbulb,
@@ -304,6 +291,33 @@ export const featuredCollections = [
     slug: "premium-lighting",
     image: "/collections/premium-lighting.jpg",
   },
+];
+
+export const productCategories = [
+  "led-bulbs",
+  "solar-lights",
+  "security-lights",
+  "smart-lighting",
+  "camera-lights",
+  "decorative-lights",
+  "commercial-lighting",
+  "batteries",
+  "outdoor-lighting",
+  "emergency-lights",
+];
+
+export const varietyOptions = [
+  "wattage",
+  "colorTemp",
+  "warranty",
+  "batteryCapacity",
+  "solarPanelWattage",
+  "dimensions",
+  "ipRating",
+  "installationType",
+  "referralPoints",
+  "size",
+  "type",
 ];
 
 // Enhanced lighting tags
@@ -1051,32 +1065,32 @@ export const getRecommendedInstallations = (cartItems: CartItem[]) => {
   // Add recommendations based on product types
   if (productTypes.has("solar")) {
     recommendations.push(
-      installationOptions.find((s) => s.id === "solar-light")
+      installationOptions.find((s) => s.id === "solar-light"),
     );
   }
 
   if (productTypes.has("security")) {
     recommendations.push(
-      installationOptions.find((s) => s.id === "security-light")
+      installationOptions.find((s) => s.id === "security-light"),
     );
   }
 
   if (productTypes.has("commercial")) {
     recommendations.push(
-      installationOptions.find((s) => s.id === "commercial-lighting")
+      installationOptions.find((s) => s.id === "commercial-lighting"),
     );
   }
 
   if (productTypes.has("emergency")) {
     recommendations.push(
-      installationOptions.find((s) => s.id === "emergency-light")
+      installationOptions.find((s) => s.id === "emergency-light"),
     );
   }
 
   // Always include basic bulb installation as a safe option
   if (recommendations.length === 0 || cartItems.length <= 3) {
     recommendations.push(
-      installationOptions.find((s) => s.id === "basic-bulb")
+      installationOptions.find((s) => s.id === "basic-bulb"),
     );
   }
 
@@ -1086,7 +1100,7 @@ export const getRecommendedInstallations = (cartItems: CartItem[]) => {
 // Get suggested tags for a category
 export function getCustomerTagsForCategory(
   category: string,
-  limit: number = 8
+  limit: number = 8,
 ): string[] {
   const categoryTags = categoryCustomerTagMap[category] || [];
   const allTags = [

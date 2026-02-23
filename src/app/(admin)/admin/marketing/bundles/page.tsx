@@ -237,7 +237,7 @@ export default function AdminBundlesPage() {
     <div className="container mx-auto px-2 py-8">
       <div className="flex sm:flex-row flex-col justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Mistry Bundles</h1>
+          <h1 className="text-3xl font-bold">Mystery Bundles</h1>
           <p className="text-muted-foreground my-2">
             Create and manage product bundles with special discounts
           </p>
