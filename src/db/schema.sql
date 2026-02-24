@@ -79,7 +79,6 @@ CREATE TABLE product_varieties (
     original_price numeric(10, 2),
     stock integer DEFAULT 0,
     images text[] DEFAULT '{}',
-    attributes jsonb NOT NULL DEFAULT '{}', -- Store variant attributes like {wattage: 20, colorTemp: "4000K"}
     is_default boolean DEFAULT false,
     metadata jsonb,
     created_at timestamptz DEFAULT now(),

@@ -34,6 +34,8 @@ import {
   MessageCircle,
   Gift,
   Images,
+  Variable,
+  Space,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart, useStore } from "@/lib/context/StoreContext";
@@ -128,10 +130,8 @@ export default function ProductDetailPage({
   const displaySku = selectedVariety?.sku || product.sku;
 
   // Get attributes for selected variety;
-  const displayAttributes = selectedVariety?.attributes;
-  // get watage or colorTemp;
-  const wattage = displayAttributes?.wattage || product.wattage;
-  const colorTemp = displayAttributes?.colorTemp || product.colorTemperature;
+  const varietyType = selectedVariety?.variety_type;
+  const varietyValue = selectedVariety?.variant_value;
 
   const generateReferralLink = () => {
     const shareUrl = new URL(`${url}/products/${product.slug}`);
@@ -535,12 +535,26 @@ export default function ProductDetailPage({
 
                   {/* Technical Highlights */}
                   <div className="mt-4 sm:mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {wattage && (
+                    {varietyType && (
                       <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
-                        <Zap className="h-5 w-5 text-amber-600 mx-auto mb-1" />
-                        <div className="text-sm font-semibold">{wattage}W</div>
+                        <Variable className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                        <div className="text-sm font-semibold">
+                          {varietyType}
+                        </div>
                         <div className="text-xs text-muted-foreground">
-                          Power
+                          Variant
+                        </div>
+                      </div>
+                    )}
+
+                    {varietyValue && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                        <Space className="h-5 w-5 text-amber-600 mx-auto mb-1" />
+                        <div className="text-sm font-semibold">
+                          {varietyValue}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Variant Value
                         </div>
                       </div>
                     )}
@@ -583,14 +597,15 @@ export default function ProductDetailPage({
                   </div>
 
                   {/* Product Rating */}
-                  {product.rating && product.rating > 0 && (
+                  {Number(product.rating) > 0 && (
                     <div className="flex items-center gap-2 mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                      {`${console.log("Product rating:", product.rating)}`}
                       <div className="flex items-center">
                         {[...Array(5)].map((_, i) => (
                           <Star
                             key={i}
                             className={`h-4 w-4 ${
-                              i < Math.floor(product.rating || 0)
+                              i < Math.floor(Number(product.rating) || 0)
                                 ? "fill-amber-400 text-amber-400"
                                 : "text-gray-300"
                             }`}
@@ -804,22 +819,10 @@ export default function ProductDetailPage({
 
                 {/* Technical Quick View */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  {wattage && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Zap className="h-4 w-4 text-amber-500" />
-                      <span>{wattage} Watts</span>
-                    </div>
-                  )}
                   {product.voltage && (
                     <div className="flex items-center gap-2 text-sm">
                       <Power className="h-4 w-4 text-amber-500" />
                       <span>{product.voltage}</span>
-                    </div>
-                  )}
-                  {colorTemp && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Thermometer className="h-4 w-4 text-amber-500" />
-                      <span>{colorTemp}</span>
                     </div>
                   )}
                   {product.ipRating && (
@@ -1084,11 +1087,6 @@ export default function ProductDetailPage({
               <div className="space-y-3">
                 {[
                   {
-                    label: "Wattage",
-                    value: wattage ? `${wattage} Watts` : "Not specified",
-                    icon: Zap,
-                  },
-                  {
                     label: "Voltage",
                     value: product.voltage || "220-240V",
                     icon: Power,
@@ -1099,11 +1097,6 @@ export default function ProductDetailPage({
                       ? `${product.lumens.toLocaleString()} lm`
                       : "Not specified",
                     icon: Eye,
-                  },
-                  {
-                    label: "Color Temperature",
-                    value: colorTemp || "Warm White (3000K)",
-                    icon: Thermometer,
                   },
                   {
                     label: "IP Rating",
@@ -1274,10 +1267,6 @@ export default function ProductDetailPage({
                                 `BTE-${product.id.substring(0, 8)}`,
                             },
                             {
-                              label: "Wattage",
-                              value: wattage ? `${wattage}W` : "N/A",
-                            },
-                            {
                               label: "Voltage",
                               value: product.voltage || "220-240V",
                             },
@@ -1286,10 +1275,6 @@ export default function ProductDetailPage({
                               value: product.lumens
                                 ? `${product.lumens.toLocaleString()} lm`
                                 : "N/A",
-                            },
-                            {
-                              label: "Color Temperature",
-                              value: colorTemp || "3000K",
                             },
                           ].map((spec, idx) => (
                             <div
@@ -1397,7 +1382,6 @@ export default function ProductDetailPage({
                               `${product.warrantyMonths}-Month Warranty`,
                             product.ipRating &&
                               `Weather Resistant (${product.ipRating})`,
-                            colorTemp && `Natural Light (${colorTemp})`,
                             "Long Lifespan (50,000+ hours)",
                             "Eco Friendly",
                             "Instant On",

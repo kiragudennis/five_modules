@@ -192,10 +192,10 @@ export function ProductVarieties({
   const activeTypes = getActiveVarietyTypes();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 my-4">
       {/* Variety Cards Grid */}
       <div>
-        <label className="text-sm font-medium mb-2 block">Select Variety</label>
+        <label className="text-sm font-medium my-2 block">Select Variety</label>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {varieties.map((variety) => {
             const isSelected = selectedId === variety.id;
@@ -385,19 +385,6 @@ export function ProductVarieties({
                       )}
                     </Badge>
                   )}
-
-                {/* Show additional attributes from the attributes object */}
-                {Object.entries(selectedVariety.attributes).map(
-                  ([key, value]) => (
-                    <Badge
-                      key={key}
-                      variant="outline"
-                      className="border-amber-300"
-                    >
-                      {formatTypeName(key)}: {String(value)}
-                    </Badge>
-                  ),
-                )}
 
                 {selectedVariety.images &&
                   selectedVariety.images.length > 1 && (

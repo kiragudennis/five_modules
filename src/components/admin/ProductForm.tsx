@@ -110,7 +110,6 @@ export default function ProductForm({
 
   // Watch the title field and generate slug automatically
   const titleValue = form.watch("title");
-  console.log("Form Errors:", form.formState.errors);
 
   useEffect(() => {
     if (titleValue && !isEditing) {
@@ -289,10 +288,15 @@ export default function ProductForm({
         product_id: productId,
       }));
 
+      // Remove attributes field if it exists, since it's no longer part of the schema
+      const removedAttributesVarieties = varietiesToInsert.map(
+        ({ attributes, ...variety }) => variety,
+      );
+
       // Insert all varieties
       const { error: insertError } = await supabase
         .from("product_varieties")
-        .insert(varietiesToInsert);
+        .insert(removedAttributesVarieties);
 
       if (insertError) {
         console.error("Error inserting varieties:", insertError);
@@ -727,6 +731,7 @@ export default function ProductForm({
                   <VarietiesManager
                     disabled={isSubmitting}
                     productId={initialData?.id}
+                    productSku={form.watch("sku")}
                     variaties={variaties}
                     onVarietiesChange={setVariaties}
                   />

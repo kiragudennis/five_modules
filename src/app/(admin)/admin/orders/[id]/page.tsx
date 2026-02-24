@@ -144,6 +144,7 @@ export default function AdminOrderDetailPage({
   const [notes, setNotes] = useState("");
   const { supabase } = useAuth();
   const newDate = formatDate(new Date(), "yyyy/MM/dd");
+  const [showFullMetadata, setShowFullMetadata] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -185,7 +186,7 @@ export default function AdminOrderDetailPage({
               metadata,
               created_at
             )
-          `
+          `,
           )
           .eq("id", param.id)
           .single();
@@ -362,7 +363,7 @@ export default function AdminOrderDetailPage({
   const handleCancelOrder = async () => {
     if (
       !confirm(
-        "Are you sure you want to cancel this order? This action cannot be undone."
+        "Are you sure you want to cancel this order? This action cannot be undone.",
       )
     ) {
       return;
@@ -424,7 +425,7 @@ export default function AdminOrderDetailPage({
     order.items?.reduce(
       (sum: number, item: any) =>
         sum + (item.total_price || item.applied_price * item.quantity),
-      0
+      0,
     ) || 0;
 
   return (
@@ -604,7 +605,7 @@ export default function AdminOrderDetailPage({
                               -
                               {formatCurrency(
                                 order.wholesale_savings,
-                                order.currency
+                                order.currency,
                               )}
                             </span>
                           </div>
@@ -619,7 +620,7 @@ export default function AdminOrderDetailPage({
                               -
                               {formatCurrency(
                                 order.coupon_discount,
-                                order.currency
+                                order.currency,
                               )}
                             </span>
                           </div>
@@ -632,7 +633,7 @@ export default function AdminOrderDetailPage({
                           <span>
                             {formatCurrency(
                               order.shipping_total,
-                              order.currency
+                              order.currency,
                             )}
                           </span>
                         </div>
@@ -645,7 +646,7 @@ export default function AdminOrderDetailPage({
                             <span>
                               {formatCurrency(
                                 order.installation_cost,
-                                order.currency
+                                order.currency,
                               )}
                             </span>
                           </div>
@@ -691,7 +692,7 @@ export default function AdminOrderDetailPage({
                           <span>
                             {formatCurrency(
                               order.shipping_total,
-                              order.currency
+                              order.currency,
                             )}
                           </span>
                         </div>
@@ -738,7 +739,7 @@ export default function AdminOrderDetailPage({
                               <span>
                                 {format(
                                   new Date(order.installation_date),
-                                  "PPP"
+                                  "PPP",
                                 )}
                               </span>
                             </div>
@@ -763,139 +764,11 @@ export default function AdminOrderDetailPage({
 
             {/* Items Tab */}
             <TabsContent value="items" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PackageIcon className="h-5 w-5" />
-                    Order Items ({order.items?.length || 0})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {order.items?.map((item: any) => (
-                      <div key={item.id} className="border rounded-lg p-4">
-                        <div className="flex items-start gap-4">
-                          <div className="w-20 h-20 bg-gray-100 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {item.product_image ? (
-                              <img
-                                src={item.product_image}
-                                alt={item.product_title}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Package className="h-8 w-8 text-gray-400" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-medium">
-                                  {item.product_title}
-                                </h4>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Badge variant="outline" className="text-xs">
-                                    SKU: {item.product_sku}
-                                  </Badge>
-                                  {item.product_category && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {item.product_category}
-                                    </Badge>
-                                  )}
-                                  {item.has_wholesale &&
-                                    item.applied_price ===
-                                      item.wholesale_price && (
-                                      <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-                                        Wholesale
-                                      </Badge>
-                                    )}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-bold">
-                                  {formatCurrency(
-                                    item.total_price,
-                                    order.currency
-                                  )}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {formatCurrency(
-                                    item.applied_price,
-                                    order.currency
-                                  )}{" "}
-                                  × {item.quantity}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Unit Price:
-                                </span>
-                                <p>
-                                  {formatCurrency(
-                                    item.unit_price,
-                                    order.currency
-                                  )}
-                                </p>
-                              </div>
-                              {item.has_wholesale && (
-                                <div>
-                                  <span className="text-muted-foreground">
-                                    Wholesale Price:
-                                  </span>
-                                  <p>
-                                    {formatCurrency(
-                                      item.wholesale_price,
-                                      order.currency
-                                    )}
-                                  </p>
-                                </div>
-                              )}
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Applied Price:
-                                </span>
-                                <p className="font-medium">
-                                  {formatCurrency(
-                                    item.applied_price,
-                                    order.currency
-                                  )}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Savings:
-                                </span>
-                                <p className="text-green-600">
-                                  {formatCurrency(
-                                    (item.unit_price - item.applied_price) *
-                                      item.quantity,
-                                    order.currency
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Summary */}
-                    <div className="border-t pt-4 mt-4">
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Items Total</span>
-                        <span>
-                          {formatCurrency(itemsTotal, order.currency)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <EnhancedOrderItems
+                items={order.items}
+                currency={order.currency}
+                metadata={order.metadata}
+              />
             </TabsContent>
 
             {/* Customer Tab */}
@@ -1063,6 +936,19 @@ export default function AdminOrderDetailPage({
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Add Bundle and Referral Info in Customer Tab */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                {order.metadata?.bundle && (
+                  <BundleDetailsCard bundle={order.metadata.bundle} />
+                )}
+                {order.metadata?.referral && (
+                  <ReferralDetailsCard referral={order.metadata.referral} />
+                )}
+                {order.metadata?.loyaltyCode && (
+                  <LoyaltyCodeCard code={order.metadata.loyaltyCode} />
+                )}
+              </div>
             </TabsContent>
 
             {/* Activity Tab */}
@@ -1310,6 +1196,101 @@ export default function AdminOrderDetailPage({
             </CardContent>
           </Card>
 
+          {/* Metadata & Additional Info */}
+          {order.metadata && Object.keys(order.metadata).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Additional Information
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowFullMetadata(!showFullMetadata)}
+                    className="ml-auto"
+                  >
+                    {showFullMetadata ? "Show Less" : "Show All"}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Key Metadata */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {order.metadata.cart_count && (
+                      <div className="bg-muted/50 p-3 rounded-lg">
+                        <p className="text-xs text-muted-foreground">
+                          Cart Items
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {order.metadata.cart_count}
+                        </p>
+                      </div>
+                    )}
+                    {order.metadata.wholesale_applied && (
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-xs text-blue-600">Wholesale</p>
+                        <p className="text-lg font-semibold text-blue-700">
+                          Applied ✓
+                        </p>
+                      </div>
+                    )}
+                    {order.metadata.original_currency &&
+                      order.metadata.original_currency !== "KES" && (
+                        <div className="bg-purple-50 p-3 rounded-lg">
+                          <p className="text-xs text-purple-600">
+                            Original Currency
+                          </p>
+                          <p className="text-lg font-semibold text-purple-700">
+                            {order.metadata.original_currency}
+                          </p>
+                        </div>
+                      )}
+                    {order.referral_source && (
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <p className="text-xs text-green-600">
+                          Referral Source
+                        </p>
+                        <p className="text-lg font-semibold text-green-700 capitalize">
+                          {order.referral_source}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Full Metadata JSON (toggleable) */}
+                  {showFullMetadata && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium mb-2">Raw Metadata</h4>
+                      <pre className="bg-muted p-4 rounded-lg overflow-auto text-xs">
+                        {JSON.stringify(order.metadata, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+
+                  {/* System Info */}
+                  {(order.metadata.user_agent || order.metadata.ip_address) && (
+                    <div className="border-t pt-4 mt-4">
+                      <h4 className="text-sm font-medium mb-2">
+                        System Information
+                      </h4>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        {order.metadata.ip_address && (
+                          <p>IP Address: {order.metadata.ip_address}</p>
+                        )}
+                        {order.metadata.user_agent && (
+                          <p className="truncate">
+                            User Agent: {order.metadata.user_agent}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Order Stats */}
           <Card>
             <CardHeader>
@@ -1328,7 +1309,7 @@ export default function AdminOrderDetailPage({
                 <span className="font-medium">
                   {order.items?.reduce(
                     (sum: number, item: any) => sum + item.quantity,
-                    0
+                    0,
                   ) || 0}
                 </span>
               </div>
@@ -1349,7 +1330,7 @@ export default function AdminOrderDetailPage({
                 <span className="font-medium">
                   {Math.floor(
                     (Date.now() - new Date(order.created_at).getTime()) /
-                      (1000 * 60 * 60 * 24)
+                      (1000 * 60 * 60 * 24),
                   )}{" "}
                   days
                 </span>
@@ -1436,6 +1417,340 @@ function TimelineItem({ title, description, date, icon: Icon, color }: any) {
         </div>
         <p className="text-sm text-muted-foreground mt-1">{description}</p>
       </div>
+    </div>
+  );
+}
+
+// Bundle Details Card Component
+function BundleDetailsCard({ bundle }: { bundle: any }) {
+  if (!bundle) return null;
+
+  return (
+    <Card className="border-amber-200 dark:border-amber-800">
+      <CardHeader className="bg-amber-50 dark:bg-amber-900/20">
+        <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+          <Award className="h-5 w-5" />
+          Bundle Deal Applied
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Bundle Name:</span>
+            <span className="font-medium">{bundle.bundle_name}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Discount Type:</span>
+            <Badge variant="outline" className="border-amber-300">
+              {bundle.discount_type === "percentage"
+                ? `${bundle.discount_value}% Off`
+                : `KES ${bundle.discount_value} Off`}
+            </Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Original Price:</span>
+            <span className="text-muted-foreground line-through">
+              {formatCurrency(bundle.original_total, "KES")}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Discounted Price:</span>
+            <span className="font-bold text-green-600">
+              {formatCurrency(bundle.discounted_total, "KES")}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">You Save:</span>
+            <span className="font-bold text-green-600">
+              {formatCurrency(bundle.savings, "KES")}
+            </span>
+          </div>
+          {bundle.points_required > 0 && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Points Required:</span>
+              <Badge variant="secondary">{bundle.points_required} pts</Badge>
+            </div>
+          )}
+
+          {/* Bundle Items */}
+          {bundle.items && bundle.items.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium mb-2">Bundle Items:</h4>
+              <div className="space-y-2">
+                {bundle.items.map((item: any, index: number) => (
+                  <div key={index} className="text-sm bg-muted/50 p-2 rounded">
+                    <div className="flex justify-between">
+                      <span>{item.product_title || item.name}</span>
+                      <span className="text-muted-foreground">
+                        {item.quantity} × {formatCurrency(item.price, "KES")}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Referral Details Card Component
+function ReferralDetailsCard({ referral }: { referral: any }) {
+  if (!referral) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Percent className="h-5 w-5" />
+          Referral Information
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">Referred By:</span>
+          <span className="font-mono text-sm">{referral.referrerId}</span>
+        </div>
+        {referral.productId && (
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Product ID:</span>
+            <span className="font-mono text-sm">{referral.productId}</span>
+          </div>
+        )}
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">Source:</span>
+          <Badge variant="outline">{referral.source}</Badge>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground">Timestamp:</span>
+          <span className="text-sm">
+            {format(new Date(referral.timestamp), "PPp")}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Loyalty Code Card Component
+function LoyaltyCodeCard({ code }: { code: string }) {
+  if (!code) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Star className="h-5 w-5" />
+          Loyalty Code
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Redeemed Code:</span>
+          <Badge variant="secondary" className="font-mono">
+            {code}
+          </Badge>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Enhanced Items Tab Component
+function EnhancedOrderItems({ items, currency, metadata }: any) {
+  // Group items by bundle if applicable
+  const bundleItems = metadata?.bundle?.items || [];
+  const regularItems = items.filter(
+    (item: any) =>
+      !bundleItems.some(
+        (bItem: any) =>
+          bItem.product_id === item.product_id || bItem.id === item.product_id,
+      ),
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Bundle Items Section */}
+      {metadata?.bundle && bundleItems.length > 0 && (
+        <Card className="border-amber-200">
+          <CardHeader className="bg-amber-50/50">
+            <CardTitle className="flex items-center gap-2 text-amber-700">
+              <Award className="h-5 w-5" />
+              Bundle Items - {metadata.bundle.bundle_name}
+              <Badge className="ml-2 bg-amber-500">Bundle Deal</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-4">
+              {bundleItems.map((item: any, index: number) => (
+                <div
+                  key={index}
+                  className="border rounded-lg p-4 bg-amber-50/30"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-20 h-20 bg-gray-100 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {item.product_image ? (
+                        <img
+                          src={item.product_image}
+                          alt={item.product_title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-8 w-8 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">
+                            {item.product_title || item.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              SKU: {item.sku || "N/A"}
+                            </Badge>
+                            {item.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">
+                            {formatCurrency(
+                              item.price * item.quantity,
+                              currency,
+                            )}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatCurrency(item.price, currency)} ×{" "}
+                            {item.quantity}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Bundle Savings Summary */}
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-green-700">Bundle Savings</p>
+                    <p className="text-sm text-green-600">
+                      {metadata.bundle.discount_type === "percentage"
+                        ? `${metadata.bundle.discount_value}% off bundle`
+                        : `KES ${metadata.bundle.discount_value} off bundle`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground line-through">
+                      Original:{" "}
+                      {formatCurrency(metadata.bundle.original_total, currency)}
+                    </p>
+                    <p className="text-lg font-bold text-green-700">
+                      Save {formatCurrency(metadata.bundle.savings, currency)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Regular Items Section */}
+      {regularItems.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PackageIcon className="h-5 w-5" />
+              {metadata?.bundle ? "Additional Items" : "Order Items"} (
+              {regularItems.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {regularItems.map((item: any) => (
+                <div key={item.id} className="border rounded-lg p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-20 h-20 bg-gray-100 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {item.product_image ? (
+                        <img
+                          src={item.product_image}
+                          alt={item.product_title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-8 w-8 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium">{item.product_title}</h4>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              SKU: {item.product_sku}
+                            </Badge>
+                            {item.product_category && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.product_category}
+                              </Badge>
+                            )}
+                            {item.has_wholesale &&
+                              item.applied_price === item.wholesale_price && (
+                                <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                                  Wholesale
+                                </Badge>
+                              )}
+                            {/* Show variety info if available */}
+                            {item.metadata?.variety && (
+                              <Badge variant="secondary" className="text-xs">
+                                {item.metadata.variety.type}:{" "}
+                                {item.metadata.variety.value}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">
+                            {formatCurrency(item.total_price, currency)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatCurrency(item.applied_price, currency)} ×{" "}
+                            {item.quantity}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Price breakdown for wholesale items */}
+                      {item.has_wholesale &&
+                        item.unit_price !== item.applied_price && (
+                          <div className="mt-2 text-sm bg-blue-50 p-2 rounded">
+                            <span className="text-blue-700">
+                              Wholesale discount applied
+                            </span>
+                            <span className="text-muted-foreground ml-2">
+                              (Regular:{" "}
+                              {formatCurrency(item.unit_price, currency)} →
+                              Wholesale:{" "}
+                              {formatCurrency(item.applied_price, currency)})
+                            </span>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -259,9 +259,9 @@ export default function CheckoutPage() {
       // Adjust cost based on location
       if (country === "Kenya") {
         if (city === "Nairobi") {
-          calculatedCost = method?.cost || 200;
-        } else if (["Mombasa", "Kisumu", "Nakuru"].includes(city)) {
-          calculatedCost = (method?.cost || 200) + 100;
+          calculatedCost = 100;
+        } else if (["Thika", "Muranga", "Karatina, Nyeri"].includes(city)) {
+          calculatedCost = method?.cost;
         } else {
           calculatedCost = (method?.cost || 200) + 200;
         }

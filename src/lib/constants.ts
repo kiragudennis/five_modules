@@ -320,6 +320,83 @@ export const varietyOptions = [
   "type",
 ];
 
+// Helper functions for the variety form
+export const getPlaceholderForType = (type: string): string => {
+  const placeholders: Record<string, string> = {
+    wattage: "e.g., 50, 100, 200",
+    colorTemp: "e.g., Warm White, Cool White, Daylight",
+    warranty: "e.g., 1 year, 2 years, 5 years",
+    batteryCapacity: "e.g., 2000, 3000, 5000",
+    solarPanelWattage: "e.g., 100, 200, 300",
+    dimensions: "e.g., 10x20x30 cm",
+    ipRating: "e.g., IP65, IP67, IP68",
+    installationType: "e.g., Wall mount, Ceiling, Portable",
+    referralPoints: "e.g., 100, 200, 500",
+    size: "e.g., Small, Medium, Large, XL",
+    type: "e.g., Basic, Pro, Premium",
+  };
+  return placeholders[type] || "Enter value";
+};
+
+export const getUnitHint = (type: string): string => {
+  const units: Record<string, string> = {
+    wattage: "W",
+    solarPanelWattage: "W",
+    batteryCapacity: "Ah",
+    referralPoints: "pts",
+    dimensions: "cm",
+  };
+  return units[type] || "";
+};
+
+export const getValueExample = (type: string): string => {
+  const examples: Record<string, string> = {
+    wattage: "Example: 50, 100, 150 (will show as '50W')",
+    colorTemp: "Example: Warm White, Cool White, Daylight",
+    warranty: "Example: 1 year, 2 years, 5 years",
+    batteryCapacity: "Example: 2000, 3000, 5000 (will show as '2000Ah')",
+    solarPanelWattage: "Example: 100, 200, 300 (will show as '100W')",
+    dimensions: "Example: 10x20x30 cm",
+    ipRating: "Example: IP65, IP67, IP68",
+    installationType: "Example: Wall mount, Ceiling, Portable",
+    referralPoints: "Example: 100, 200, 500 (will show as '100 pts')",
+    size: "Example: Small, Medium, Large, XL",
+    type: "Example: Basic, Pro, Premium",
+  };
+  return examples[type] || "Enter the specific value for this variety";
+};
+
+export const formatTypeName = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    wattage: "Wattage",
+    colorTemp: "Color Temperature",
+    warranty: "Warranty",
+    batteryCapacity: "Battery Capacity",
+    solarPanelWattage: "Solar Panel Wattage",
+    dimensions: "Dimensions",
+    ipRating: "IP Rating",
+    installationType: "Installation Type",
+    referralPoints: "Referral Points",
+    size: "Size",
+    type: "Type",
+  };
+  return typeMap[type] || type.replace(/([A-Z])/g, " $1").trim();
+};
+
+export const formatValue = (type: string, value: string): string => {
+  switch (type) {
+    case "wattage":
+    case "solarPanelWattage":
+      return value.includes("W") ? value : `${value}W`;
+    case "batteryCapacity":
+      return value.includes("Ah") ? value : `${value}Ah`;
+    case "referralPoints":
+      return value.includes("pts") ? value : `${value} pts`;
+    default:
+      return value;
+  }
+};
+
 // Enhanced lighting tags
 export const lightingTags = [
   // Energy & Cost

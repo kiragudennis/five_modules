@@ -336,22 +336,12 @@ export const productVarietySchema = z.object({
   wholesale_min_quantity: z.number().min(0).optional().nullable(),
   stock: z.number().int().min(0, "Stock must be 0 or greater"),
   images: z.array(z.string()).default([]),
-  attributes: z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
-    .default({}),
   is_default: z.boolean().default(false),
   variety_type: z.string().min(1, "Variety type is required"),
   variant_value: z.string().min(1, "Variant value is required"),
 });
 
 export type Variaty = z.infer<typeof productVarietySchema>;
-
-export type VarietyAttributes = {
-  wattage?: number;
-  colorTemp?: string;
-  // Add other possible attributes here
-  [key: string]: string | number | boolean | undefined;
-};
 
 // Product schema for lighting products
 export const productSchema = z.object({

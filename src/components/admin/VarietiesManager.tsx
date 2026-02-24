@@ -26,11 +26,20 @@ import { ImageUpload } from "./ImageUpload";
 import { Variaty } from "@/types/store";
 import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "sonner";
-import { varietyOptions } from "@/lib/constants";
+import {
+  formatTypeName,
+  formatValue,
+  getPlaceholderForType,
+  getUnitHint,
+  getValueExample,
+  varietyOptions,
+} from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 interface VarietiesManagerProps {
   disabled?: boolean;
   productId?: string;
+  productSku?: string;
   variaties: Variaty[];
   onVarietiesChange: (variaties: Variaty[]) => void;
 }
@@ -38,6 +47,7 @@ interface VarietiesManagerProps {
 export function VarietiesManager({
   disabled,
   productId,
+  productSku,
   variaties,
   onVarietiesChange,
 }: VarietiesManagerProps) {
@@ -144,6 +154,7 @@ export function VarietiesManager({
           <VarietyFormContent
             key={editingVariety?.id || "new"}
             initialData={editingVariety}
+            productSku={productSku}
             onSave={editingVariety ? handleUpdateVariety : handleAddVariety}
             onCancel={() => {
               setShowForm(false);
@@ -291,17 +302,23 @@ export function VarietiesManager({
 // This is now a div-based form (no <form> tag)
 interface VarietyFormContentProps {
   initialData?: Variaty | null;
+  productSku?: string;
   onSave: (data: any) => void;
   onCancel: () => void;
 }
 
 function VarietyFormContent({
   initialData,
+  productSku,
   onSave,
   onCancel,
 }: VarietyFormContentProps) {
   const [name, setName] = useState(initialData?.name || "");
-  const [sku, setSku] = useState(initialData?.sku || "");
+  const [sku, setSku] = useState(
+    initialData?.sku || productSku
+      ? `${productSku}-${initialData?.variant_value || "VAR"}`
+      : "",
+  );
   const [price, setPrice] = useState(initialData?.price || 0);
   const [stock, setStock] = useState(initialData?.stock || 0);
   const [images, setImages] = useState<string[]>(initialData?.images || []);
@@ -334,8 +351,8 @@ function VarietyFormContent({
       stock,
       images,
       is_default: isDefault,
-      variantValue,
-      varietyType,
+      variant_value: variantValue,
+      variety_type: varietyType,
     };
 
     onSave(varietyData);
@@ -344,36 +361,78 @@ function VarietyFormContent({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
+        {/* Variety Type Selection */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Variant</label>
-          <Select
-            value={variantValue}
-            onValueChange={(value) => setVarietyType(value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select variety option" />
+          <label className="text-sm font-medium">
+            Variety Type <span className="text-red-500">*</span>
+          </label>
+          <Select value={varietyType} onValueChange={setVarietyType}>
+            <SelectTrigger
+              className={!varietyType ? "text-muted-foreground" : ""}
+            >
+              <SelectValue placeholder="Select variety type (e.g., Wattage)" />
             </SelectTrigger>
             <SelectContent>
-              {varietyOptions.map((w) => (
-                <SelectItem key={w} value={w.toString()}>
-                  {w}W
+              {varietyOptions.map((type) => (
+                <SelectItem key={type} value={type}>
+                  <span className="capitalize">
+                    {type.replace(/([A-Z])/g, " $1").trim()}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Choose the type of variation (e.g., wattage, colorTemp, size)
+          </p>
         </div>
 
+        {/* Variant Value Input */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Variant Value</label>
-          <Input
-            value={sku}
-            onChange={(e) => setVariantValue(e.target.value)}
-            placeholder="Enter value"
-            className="font-mono"
-            required
-          />
+          <label className="text-sm font-medium">
+            Variant Value <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <Input
+              value={variantValue}
+              onChange={(e) => setVariantValue(e.target.value)}
+              placeholder={
+                varietyType
+                  ? getPlaceholderForType(varietyType)
+                  : "Enter value (e.g., 50, Cool White, Large)"
+              }
+              className={cn(
+                "font-mono",
+                varietyType && "pr-16", // Make room for unit hint if needed
+              )}
+              required
+            />
+            {/* Show unit hint for certain types */}
+            {varietyType && getUnitHint(varietyType) && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                {getUnitHint(varietyType)}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {getValueExample(varietyType)}
+          </p>
         </div>
       </div>
+
+      {/* Preview of how it will appear */}
+      {varietyType && variantValue && (
+        <div className="mt-2 p-3 bg-muted/50 rounded-lg border">
+          <p className="text-sm font-medium mb-2">Preview:</p>
+          <Badge variant="outline" className="border-amber-300">
+            {formatTypeName(varietyType)}:{" "}
+            {formatValue(varietyType, variantValue)}
+          </Badge>
+          <p className="text-xs text-muted-foreground mt-2">
+            This will appear as a filter option and in the variety card
+          </p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Variety Name</label>
@@ -387,7 +446,7 @@ function VarietyFormContent({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">SKU</label>
+          <label className="text-sm font-medium">SKU </label>
           <Input
             value={sku}
             onChange={(e) => setSku(e.target.value)}
