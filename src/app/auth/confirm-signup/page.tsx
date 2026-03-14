@@ -96,7 +96,7 @@ export default function ConfirmSignupPage() {
         setStatus("success");
         toast.dismiss();
         toast.success(
-          "Email confirmed successfully! Welcome to Blessed Two Electronics!",
+          "Email confirmed successfully! Welcome to Blessed Two Electricals!",
         );
 
         // Small delay to ensure everything is processed

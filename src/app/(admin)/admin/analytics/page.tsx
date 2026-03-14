@@ -90,7 +90,7 @@ export default function AnalyticsPage() {
             pageViews: 0,
             conversionRate: 0,
             avgOrderValue: 0,
-          }
+          },
         );
         setIsLoading(false);
       }
@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
               <span className="font-medium">
                 {stats.totalOrders > 0
                   ? Math.round(
-                      (stats.completedOrders / stats.totalOrders) * 100
+                      (stats.completedOrders / stats.totalOrders) * 100,
                     )
                   : 0}
                 %

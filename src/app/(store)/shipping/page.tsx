@@ -16,18 +16,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shipping & Delivery Nairobi | Blessed Two Electronics",
+  title: "Shipping & Delivery Nairobi | Blessed Two Electricals",
   description:
-    "Fast shipping and delivery options for Blessed Two Electronics lighting products. Same-day Nairobi delivery, upcountry shipping, and professional installation services across Kenya.",
+    "Fast shipping and delivery options for Blessed Two Electricals lighting products. Same-day Nairobi delivery, upcountry shipping, and professional installation services across Kenya.",
   keywords: [
     "shipping Nairobi",
     "delivery Kenya",
     "same-day delivery",
     "lighting delivery",
-    "electronics shipping",
+    "Electricals shipping",
   ],
   openGraph: {
-    title: "Shipping & Delivery | Blessed Two Electronics",
+    title: "Shipping & Delivery | Blessed Two Electricals",
     description:
       "Same-day delivery in Nairobi and nationwide shipping for quality lighting solutions.",
   },
@@ -46,7 +46,7 @@ export default function ShippingPage() {
 
         <p className="text-lg text-muted-foreground text-center mb-10 max-w-3xl mx-auto">
           Fast, reliable delivery of lighting solutions across Kenya from
-          Blessed Two Electronics
+          Blessed Two Electricals
         </p>
 
         {/* Main Shipping Banner */}

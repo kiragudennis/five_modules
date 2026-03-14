@@ -1,4 +1,4 @@
-// app/login/page.tsx - Updated for Blessed Two Electronics
+// app/login/page.tsx - Updated for Blessed Two Electricals
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -93,7 +93,7 @@ export default function LoginPage({
                   <Zap className="w-8 h-8 text-amber-600 dark:text-amber-400" />
                 </div>
                 <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Blessed Two Electronics
+                  Blessed Two Electricals
                 </CardTitle>
                 <CardDescription className="text-gray-600 dark:text-gray-400">
                   Login for faster checkout, order tracking, and exclusive
@@ -144,7 +144,7 @@ export default function LoginPage({
                         <Users className="w-8 h-8 text-amber-600 dark:text-amber-400" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Join Blessed Two Electronics
+                        Join Blessed Two Electricals
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         Create your account for the best lighting shopping
@@ -367,7 +367,7 @@ export default function LoginPage({
               </h4>
               <div className="space-y-3">
                 <p className="text-gray-700 dark:text-gray-300">
-                  <strong>Blessed Two Electronics</strong>
+                  <strong>Blessed Two Electricals</strong>
                   <br />
                   Duruma Road, Nairobi, Kenya
                 </p>

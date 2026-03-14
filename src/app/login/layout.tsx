@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Login | Blessed Two Electronics Nairobi",
+  title: "Login | Blessed Two Electricals Nairobi",
   description:
     "Sign in to access your account, enjoy exclusive coupons, loyalty rewards, daily deals, and premium lighting offers.",
   keywords: [
@@ -15,17 +15,17 @@ export const metadata: Metadata = {
     "premium lighting account",
   ],
   openGraph: {
-    title: "Login | Blessed Two Electronics Nairobi",
+    title: "Login | Blessed Two Electricals Nairobi",
     description:
       "Sign in to access exclusive coupons, loyalty rewards, daily deals, and premium lighting offers with 2-year warranty.",
-    url: "https://www.blessedtwo.com/login",
-    siteName: "Blessed Two Electronics",
+    url: "https://www.blessedtwoelectricals.com/login",
+    siteName: "Blessed Two Electricals",
     images: [
       {
         url: "/og-login.jpg", // You should create this image
         width: 1200,
         height: 630,
-        alt: "Login to Blessed Two Electronics - Exclusive Lighting Offers",
+        alt: "Login to Blessed Two Electricals - Exclusive Lighting Offers",
       },
     ],
     type: "website",
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Login | Blessed Two Electronics",
+    title: "Login | Blessed Two Electricals",
     description:
       "Access exclusive coupons, loyalty rewards & daily lighting deals. Sign in to your account.",
     images: ["/twitter-login.jpg"], // Create this image

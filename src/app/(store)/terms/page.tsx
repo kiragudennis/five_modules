@@ -13,9 +13,9 @@ import {
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Blessed Two Electronics Nairobi",
+  title: "Terms of Service | Blessed Two Electricals Nairobi",
   description:
-    "Terms and conditions for purchasing lighting products from Blessed Two Electronics. Warranty information, installation services, and business customer terms.",
+    "Terms and conditions for purchasing lighting products from Blessed Two Electricals. Warranty information, installation services, and business customer terms.",
   keywords: [
     "terms of service",
     "conditions of sale",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     "business terms",
   ],
   openGraph: {
-    title: "Terms of Service | Blessed Two Electronics",
+    title: "Terms of Service | Blessed Two Electricals",
     description:
       "Terms and conditions for purchasing quality lighting solutions in Nairobi.",
   },
@@ -48,7 +48,7 @@ export default function TermsOfService() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
         <p className="text-lg text-muted-foreground">
-          Blessed Two Electronics - Effective: {currentDate}
+          Blessed Two Electricals - Effective: {currentDate}
         </p>
       </div>
 
@@ -56,11 +56,11 @@ export default function TermsOfService() {
         {/* Introduction */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 p-6 rounded-lg border border-blue-200">
           <h1 className="text-3xl font-bold mb-4 text-blue-900 dark:text-blue-100">
-            Welcome to Blessed Two Electronics
+            Welcome to Blessed Two Electricals
           </h1>
           <p className="text-lg font-medium mb-4">
             These terms govern your use of our website and purchase of lighting
-            solutions from Blessed Two Electronics, your trusted partner for
+            solutions from Blessed Two Electricals, your trusted partner for
             quality illumination since 2010.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -85,7 +85,7 @@ export default function TermsOfService() {
           </h2>
           <p className="text-base leading-relaxed">
             By accessing our website or purchasing products from Blessed Two
-            Electronics, you agree to be bound by these Terms of Service and all
+            Electricals, you agree to be bound by these Terms of Service and all
             applicable laws and regulations in Kenya. If you do not agree with
             any part of these terms, you must not use our website or services.
           </p>
@@ -268,7 +268,7 @@ export default function TermsOfService() {
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold">9. Limitation of Liability</h2>
           <p className="text-base leading-relaxed">
-            Blessed Two Electronics shall not be liable for:
+            Blessed Two Electricals shall not be liable for:
           </p>
           <ul className="list-disc pl-6 space-y-2">
             <li className="text-base leading-relaxed">
@@ -304,7 +304,7 @@ export default function TermsOfService() {
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
               <div>
-                <p className="font-medium">Blessed Two Electronics</p>
+                <p className="font-medium">Blessed Two Electricals</p>
                 <p className="text-sm text-gray-600">
                   Duruma Road, Nairobi
                   <br />
@@ -317,7 +317,7 @@ export default function TermsOfService() {
               <div>
                 <p className="font-medium">General Inquiries</p>
                 <p className="text-sm text-gray-600">
-                  info@blessedtwoelectronics.com
+                  info@blessedtwoelectricals.com
                 </p>
               </div>
             </div>

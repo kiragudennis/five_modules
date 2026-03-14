@@ -2,13 +2,13 @@
 import { Metadata } from "next";
 export const metadata: Metadata = {
   title: {
-    default: "Contact Us | Blessed Two Electronics Nairobi",
+    default: "Contact Us | Blessed Two Electricals Nairobi",
     template: "%s | Contact",
   },
   description:
-    "Get in touch with Blessed Two Electronics for lighting solutions, technical support, bulk orders, and professional installation services in Nairobi and across Kenya.",
+    "Get in touch with Blessed Two Electricals for lighting solutions, technical support, bulk orders, and professional installation services in Nairobi and across Kenya.",
   keywords: [
-    "contact Blessed Two Electronics",
+    "contact Blessed Two Electricals",
     "lighting solutions Nairobi",
     "technical support lighting",
     "bulk order lighting",
@@ -27,12 +27,12 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  authors: [{ name: "Blessed Two Electronics" }],
+  authors: [{ name: "Blessed Two Electricals" }],
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectronics.com/contact",
-    title: "Contact Blessed Two Electronics | Lighting Solutions Nairobi",
+    url: "https://www.blessedtwoelectricals.com/contact",
+    title: "Contact Blessed Two Electricals | Lighting Solutions Nairobi",
     description:
       "Contact our lighting experts for consultations, technical support, and installation services.",
     images: [
@@ -40,13 +40,13 @@ export const metadata: Metadata = {
         url: "/contact/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Contact Blessed Two Electronics",
+        alt: "Contact Blessed Two Electricals",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Contact Blessed Two Electronics",
+    title: "Contact Blessed Two Electricals",
     description: "Get expert lighting advice and support from our team.",
     images: ["/contact/twitter-image.jpg"],
   },

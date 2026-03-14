@@ -3,8 +3,8 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: {
-    default: "Blessed Two Electronics - Quality Lighting Solutions Nairobi",
-    template: "%s | Blessed Two Electronics Nairobi",
+    default: "Blessed Two Electricals - Quality Lighting Solutions Nairobi",
+    template: "%s | Blessed Two Electricals Nairobi",
   },
   description:
     "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, smart lighting systems, and professional installation services. Shop quality electrical products with 2-year warranty and same-day delivery.",
@@ -15,20 +15,20 @@ export const metadata: Metadata = {
     "smart lighting systems",
     "electrical products Nairobi",
     "lighting solutions",
-    "Duruma Road electronics",
+    "Duruma Road Electricals",
     "professional installation",
     "energy saving lights",
     "commercial lighting",
   ],
-  authors: [{ name: "Blessed Two Electronics" }],
-  creator: "Blessed Two Electronics",
-  publisher: "Blessed Two Electronics",
+  authors: [{ name: "Blessed Two Electricals" }],
+  creator: "Blessed Two Electricals",
+  publisher: "Blessed Two Electricals",
   formatDetection: {
     email: false,
     address: false,
     telephone: true,
   },
-  metadataBase: new URL("https://www.blessedtwoelectronics.com"),
+  metadataBase: new URL("https://www.blessedtwoElectricals.com"),
   alternates: {
     canonical: "/",
     languages: {
@@ -38,27 +38,27 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectronics.com",
-    title: "Blessed Two Electronics - Premium Lighting Solutions",
+    url: "https://www.blessedtwoelectricals.com",
+    title: "Blessed Two Electricals - Premium Lighting Solutions",
     description:
       "Your trusted partner for quality lighting solutions in Nairobi. LED bulbs, solar systems, security lights, and professional installation.",
-    siteName: "Blessed Two Electronics",
+    siteName: "Blessed Two Electricals",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Blessed Two Electronics - Lighting Solutions",
+        alt: "Blessed Two Electricals - Lighting Solutions",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Blessed Two Electronics - Quality Lighting Nairobi",
+    title: "Blessed Two Electricals - Quality Lighting Nairobi",
     description:
       "LED bulbs, solar lighting, security systems & professional installation in Nairobi.",
     images: ["/twitter-image.jpg"],
-    creator: "@blessedtwoelectronics",
+    creator: "@blessedtwoElectricals",
   },
   robots: {
     index: true,
@@ -71,7 +71,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  category: "electronics",
+  category: "Electricals",
 };
 
 export default function StoreLayout({
@@ -88,10 +88,10 @@ export default function StoreLayout({
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "LocalBusiness",
-            name: "Blessed Two Electronics",
-            image: "https://www.blessedtwoelectronics.com/logo.jpg",
-            "@id": "https://www.blessedtwoelectronics.com",
-            url: "https://www.blessedtwoelectronics.com",
+            name: "Blessed Two Electricals",
+            image: "https://www.blessedtwoelectricals.com/logo.jpg",
+            "@id": "https://www.blessedtwoelectricals.com",
+            url: "https://www.blessedtwoelectricals.com",
             telephone: "+254727833691",
             address: {
               "@type": "PostalAddress",
@@ -131,9 +131,9 @@ export default function StoreLayout({
               "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
             sameAs: [
               "https://www.tiktok.com/@blessed_2_electricals",
-              "https://www.facebook.com/blessedtwoelectronics",
-              "https://www.instagram.com/blessedtwoelectronics",
-              "https://twitter.com/blessedtwoelectronics",
+              "https://www.facebook.com/blessedtwoelectricals",
+              "https://www.instagram.com/blessedtwoelectricals",
+              "https://twitter.com/blessedtwoelectricals",
             ],
           }),
         }}
@@ -146,14 +146,14 @@ export default function StoreLayout({
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "Blessed Two Electronics",
-            url: "https://blessedtwoelectronics.com",
+            name: "Blessed Two Electricals",
+            url: "https://blessedtwoelectricals.com",
             potentialAction: {
               "@type": "SearchAction",
               target: {
                 "@type": "EntryPoint",
                 urlTemplate:
-                  "https://blessedtwoelectronics.com/search?q={search_term_string}",
+                  "https://blessedtwoelectricals.com/search?q={search_term_string}",
               },
               "query-input": "required name=search_term_string",
             },

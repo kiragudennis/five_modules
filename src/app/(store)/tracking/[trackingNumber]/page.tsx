@@ -29,7 +29,7 @@ async function getTrackingData(trackingNumber: string) {
           metadata,
           created_at
         )
-      `
+      `,
       )
       .eq("tracking_number", trackingNumber)
       .order("created_at", { ascending: false });
@@ -63,7 +63,7 @@ async function getTrackingData(trackingNumber: string) {
             description: update.notes || `Status changed to ${update.to}`,
             location: update.location || "Nairobi Warehouse",
             created_at: update.at || new Date().toISOString(),
-          })
+          }),
         );
       }
     }
@@ -102,24 +102,24 @@ export async function generateMetadata({
     const { trackingNumber } = await params;
 
     return {
-      title: `Track Your Order - ${trackingNumber} | Blessed Two Electronics`,
-      description: `Track your Blessed Two Electronics order with tracking number ${trackingNumber}. Get real-time updates on your shipment.`,
+      title: `Track Your Order - ${trackingNumber} | Blessed Two Electricals`,
+      description: `Track your Blessed Two Electricals order with tracking number ${trackingNumber}. Get real-time updates on your shipment.`,
       openGraph: {
         title: `Track Order #${trackingNumber}`,
-        description: `Track your Blessed Two Electronics shipment`,
+        description: `Track your Blessed Two Electricals shipment`,
         type: "website",
-        siteName: "Blessed Two Electronics",
+        siteName: "Blessed Two Electricals",
       },
       twitter: {
         card: "summary",
         title: `Track Order #${trackingNumber}`,
-        description: `Track your Blessed Two Electronics shipment`,
+        description: `Track your Blessed Two Electricals shipment`,
       },
     };
   } catch {
     return {
-      title: "Track Your Order | Blessed Two Electronics",
-      description: "Track your shipment from Blessed Two Electronics",
+      title: "Track Your Order | Blessed Two Electricals",
+      description: "Track your shipment from Blessed Two Electricals",
     };
   }
 }

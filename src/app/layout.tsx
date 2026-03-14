@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Blessed Two Electronics | Quality Lighting Solutions Nairobi",
-    template: "%s | Blessed Two Electronics Nairobi",
+    default: "Blessed Two Electricals | Quality Lighting Solutions Nairobi",
+    template: "%s | Blessed Two Electricals Nairobi",
   },
   description:
     "Nairobi's premier lighting solutions provider. Shop premium LED bulbs, solar lighting, security lights, smart lighting systems, and commercial lighting with 2-year warranty, same-day delivery, and professional installation.",
@@ -42,18 +42,18 @@ export const metadata: Metadata = {
   ],
   authors: [
     {
-      name: "Blessed Two Electronics",
-      url: "https://www.blessedtwoelectronics.com",
+      name: "Blessed Two Electricals",
+      url: "https://www.blessedtwoelectricals.com",
     },
   ],
-  creator: "Blessed Two Electronics",
-  publisher: "Blessed Two Electronics",
+  creator: "Blessed Two Electricals",
+  publisher: "Blessed Two Electricals",
   formatDetection: {
     email: false,
     address: false,
     telephone: true,
   },
-  metadataBase: new URL("https://www.blessedtwoelectronics.com"),
+  metadataBase: new URL("https://www.blessedtwoelectricals.com"),
   alternates: {
     canonical: "/",
     languages: {
@@ -64,9 +64,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectronics.com",
-    siteName: "Blessed Two Electronics",
-    title: "Blessed Two Electronics | Premium Lighting Solutions Nairobi",
+    url: "https://www.blessedtwoelectricals.com",
+    siteName: "Blessed Two Electricals",
+    title: "Blessed Two Electricals | Premium Lighting Solutions Nairobi",
     description:
       "Nairobi's trusted lighting solutions provider offering quality LED bulbs, solar lighting, security systems, and professional installation services.",
     images: [
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Blessed Two Electronics - Quality Lighting Solutions in Nairobi",
+        alt: "Blessed Two Electricals - Quality Lighting Solutions in Nairobi",
       },
       {
         url: "/og-image-products.jpg",
@@ -86,7 +86,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Blessed Two Electronics | Lighting Solutions Nairobi",
+    title: "Blessed Two Electricals | Lighting Solutions Nairobi",
     description:
       "Quality lighting solutions with 2-year warranty, same-day delivery, and professional installation in Nairobi.",
     creator: "@blessedtwo",
@@ -104,13 +104,13 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  category: "Electronics & Lighting",
+  category: "Electricals & Lighting",
   other: {
     "theme-color": "#1e40af",
     "msapplication-TileColor": "#1e40af",
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "Blessed Two Electronics",
+    "apple-mobile-web-app-title": "Blessed Two Electricals",
   },
 };
 

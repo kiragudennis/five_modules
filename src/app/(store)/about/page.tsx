@@ -30,7 +30,7 @@ export default function AboutPageContent() {
 
   const faqs = [
     {
-      question: "Where is Blessed Two Electronics located?",
+      question: "Where is Blessed Two Electricals located?",
       answer:
         "We are located at Duruma Road, Nairobi, Kenya. Our showroom is easily accessible and we offer same-day delivery across Nairobi.",
     },
@@ -103,10 +103,10 @@ export default function AboutPageContent() {
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "AboutPage",
-            name: "About Blessed Two Electronics",
+            name: "About Blessed Two Electricals",
             description:
               "Nairobi's premier lighting solutions provider since 2018",
-            url: "https://blessedtwoelectronics.com/about",
+            url: "https://blessedtwoelectricals.com/about",
             breadcrumb: {
               "@type": "BreadcrumbList",
               itemListElement: [
@@ -114,13 +114,13 @@ export default function AboutPageContent() {
                   "@type": "ListItem",
                   position: 1,
                   name: "Home",
-                  item: "https://blessedtwoelectronics.com",
+                  item: "https://blessedtwoelectricals.com",
                 },
                 {
                   "@type": "ListItem",
                   position: 2,
                   name: "About",
-                  item: "https://blessedtwoelectronics.com/about",
+                  item: "https://blessedtwoelectricals.com/about",
                 },
               ],
             },
@@ -134,16 +134,16 @@ export default function AboutPageContent() {
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: "Blessed Two Electronics",
+            name: "Blessed Two Electricals",
             description:
               "Leading lighting solutions provider in Nairobi offering LED bulbs, solar lighting, security lights, and professional installation services.",
-            url: "https://blessedtwoelectronics.com",
-            logo: "https://blessedtwoelectronics.com/logo.png",
+            url: "https://blessedtwoelectricals.com",
+            logo: "https://blessedtwoelectricals.com/logo.png",
             foundingDate: "2018",
             founders: [
               {
                 "@type": "Person",
-                name: "Founder of Blessed Two Electronics",
+                name: "Founder of Blessed Two Electricals",
               },
             ],
             address: {
@@ -162,9 +162,9 @@ export default function AboutPageContent() {
             },
             sameAs: [
               "https://www.tiktok.com/@blessed_2_electricals",
-              "https://www.facebook.com/blessedtwoelectronics",
-              "https://www.instagram.com/blessedtwoelectronics",
-              "https://twitter.com/blessedtwoelectronics",
+              "https://www.facebook.com/blessedtwoelectricals",
+              "https://www.instagram.com/blessedtwoelectricals",
+              "https://twitter.com/blessedtwoelectricals",
             ],
           }),
         }}
@@ -194,7 +194,7 @@ export default function AboutPageContent() {
         </h1>
 
         <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 leading-relaxed">
-          At <strong className="text-blue-600">Blessed Two Electronics</strong>{" "}
+          At <strong className="text-blue-600">Blessed Two Electricals</strong>{" "}
           on Duruma Road, we specialize in premium lighting solutions that
           combine <strong>energy efficiency</strong>,{" "}
           <strong>smart technology</strong>, and exceptional{" "}
@@ -220,6 +220,26 @@ export default function AboutPageContent() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Faq */}
+      <section className="mb-20">
+        <h2 className="text-2xl font-bold text-center mb-12 text-gray-900 dark:text-white">
+          Frequently Asked Questions
+        </h2>
+        <div className="max-w-4xl mx-auto space-y-6">
+          {faqs.map((faq, index) => (
+            <div
+              key={index}
+              className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+            >
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                {faq.question}
+              </h3>
+              <p className="text-gray-600 dark:text-gray-300">{faq.answer}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -395,7 +415,7 @@ export default function AboutPageContent() {
       {/* Why Choose Us */}
       <section className="mb-20">
         <h2 className="text-2xl font-bold text-center mb-12 text-gray-900 dark:text-white">
-          Why Choose Blessed Two Electronics
+          Why Choose Blessed Two Electricals
         </h2>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
@@ -482,7 +502,7 @@ export default function AboutPageContent() {
                       Location
                     </div>
                     <div className="text-gray-700 dark:text-gray-300 text-sm">
-                      Blessed Two Electronics, Duruma Road, Nairobi
+                      Blessed Two Electricals, Duruma Road, Nairobi
                     </div>
                   </div>
                 </div>
@@ -531,7 +551,7 @@ export default function AboutPageContent() {
                     className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
                   >
                     <Link
-                      href="https://wa.me/254727833691?text=Hello%20Blessed%20Two%20Electronics,%20I%20need%20help%20with%20lighting%20solutions"
+                      href="https://wa.me/254727833691?text=Hello%20Blessed%20Two%20Electricals,%20I%20need%20help%20with%20lighting%20solutions"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -560,7 +580,7 @@ export default function AboutPageContent() {
         </h2>
         <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-8">
           Join thousands of satisfied customers who trust Blessed Two
-          Electronics for quality lighting solutions that save energy, reduce
+          Electricals for quality lighting solutions that save energy, reduce
           costs, and enhance your living or working environment.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">

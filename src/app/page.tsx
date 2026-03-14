@@ -1,4 +1,4 @@
-// Landing page for Blessed Two Electronics
+// Landing page for Blessed Two Electricals
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -208,7 +208,7 @@ function TestimonialsSection() {
       name: "Samuel Kamau",
       role: "Hardware Store Owner, Kitengela",
       content:
-        "Blessed Two Electronics has the best solar lights in Nairobi. Their products are durable and customer service is exceptional. My business has grown 40% since partnering with them.",
+        "Blessed Two Electricals has the best solar lights in Nairobi. Their products are durable and customer service is exceptional. My business has grown 40% since partnering with them.",
       rating: 5,
     },
     {
@@ -460,7 +460,7 @@ function CouponSection({ coupons }: { coupons: Coupon[] }) {
                   <ShieldCheck className="h-5 w-5" />
                   <p className="text-sm font-medium">
                     🚀 Hurry! These coupons are exclusive to Blessed Two
-                    Electronics customers
+                    Electricals customers
                   </p>
                 </div>
               </div>
@@ -803,7 +803,7 @@ export default async function Home() {
           <AnimatedSection animation="fadeUp" spacing="none" once>
             <div className="text-center mb-8 sm:mb-12">
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
-                Why Choose Blessed Two Electronics
+                Why Choose Blessed Two Electricals
               </h2>
               <p className="text-muted-foreground sm:text-lg max-w-2xl mx-auto">
                 The trusted lighting partner for Nairobi homes and businesses
@@ -873,7 +873,7 @@ export default async function Home() {
                   <Mail className="w-8 h-8 mx-auto mb-2" />
                   <h4 className="font-bold mb-1">Email Us</h4>
                   <p className="text-sm opacity-90">
-                    info@blessedtwoelectronics.com
+                    info@blessedtwoElectricals.com
                   </p>
                   <p className="text-sm opacity-80">Quick Response</p>
                 </div>

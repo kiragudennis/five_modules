@@ -1511,7 +1511,7 @@ export default function ProductDetailPage({
                         Warranty
                       </h4>
                       <p className="text-gray-700 dark:text-gray-300">
-                        All Blessed Two Electronics products come with a
+                        All Blessed Two Electricals products come with a
                         comprehensive {product.warrantyMonths || 24}-month
                         warranty covering manufacturing defects and premature
                         failures.

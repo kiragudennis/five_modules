@@ -98,8 +98,8 @@ export default function ReturnsPageContent() {
             "@type": "WebPage",
             name: "Returns & Refunds Policy",
             description:
-              "Comprehensive returns and refunds policy for Blessed Two Electronics lighting products",
-            url: "https://www.blessedtwoelectronics.com/returns",
+              "Comprehensive returns and refunds policy for Blessed Two electricals lighting products",
+            url: "https://www.blessedtwoelectricals.com/returns",
             breadcrumb: {
               "@type": "BreadcrumbList",
               itemListElement: [
@@ -107,13 +107,13 @@ export default function ReturnsPageContent() {
                   "@type": "ListItem",
                   position: 1,
                   name: "Home",
-                  item: "https://www.blessedtwoelectronics.com",
+                  item: "https://www.blessedtwoelectricals.com",
                 },
                 {
                   "@type": "ListItem",
                   position: 2,
                   name: "Returns Policy",
-                  item: "https://www.blessedtwoelectronics.com/returns",
+                  item: "https://www.blessedtwoelectricals.com/returns",
                 },
               ],
             },
@@ -127,8 +127,8 @@ export default function ReturnsPageContent() {
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "MerchantReturnPolicy",
-            name: "Blessed Two Electronics Return Policy",
-            description: "Returns policy for lighting products and electronics",
+            name: "Blessed Two Electricals Return Policy",
+            description: "Returns policy for lighting products and electricals",
             returnPolicyCategory: "MerchantReturnFiniteReturnWindow",
             merchantReturnDays: 7,
             returnMethod: ["ReturnInStore", "ReturnByMail"],
@@ -150,7 +150,7 @@ export default function ReturnsPageContent() {
           Returns, Refunds & Exchange Policy
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 leading-relaxed">
-          Your satisfaction is our priority at Blessed Two Electronics. We stand
+          Your satisfaction is our priority at Blessed Two electricals. We stand
           behind our lighting solutions with comprehensive warranty coverage and
           hassle-free return procedures.
         </p>
@@ -167,7 +167,7 @@ export default function ReturnsPageContent() {
               2-Year Comprehensive Warranty on All Products
             </h2>
             <p className="text-lg opacity-95 max-w-3xl">
-              At Blessed Two Electronics, we stand by our products. Every
+              At Blessed Two electricals, we stand by our products. Every
               lighting solution comes with a comprehensive 2-year warranty for
               complete peace of mind and long-term reliability.
             </p>
@@ -192,7 +192,7 @@ export default function ReturnsPageContent() {
           {/* Return Guidelines */}
           <section className="mb-12">
             <h2 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">
-              Lighting & Electronics Return Guidelines
+              Lighting & electricals Return Guidelines
             </h2>
 
             <div className="space-y-8">
@@ -402,6 +402,30 @@ export default function ReturnsPageContent() {
                       </div>
                     );
                   })}
+                </div>
+                {/* return faqs */}
+                <div className="mt-8 pt-8 border-t border-purple-200">
+                  <h4 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
+                    Frequently Asked Questions
+                  </h4>
+                  <div className="space-y-4">
+                    {faqs.map((faq, index) => (
+                      <div
+                        key={index}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                      >
+                        <div className="flex items-start gap-3 mb-2">
+                          <HelpCircle className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                          <h5 className="font-medium text-gray-900 dark:text-white">
+                            {faq.question}
+                          </h5>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300">
+                          {faq.answer}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -704,7 +728,7 @@ export default function ReturnsPageContent() {
                       Email Support
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      support@blessedtwoelectronics.com
+                      support@blessedtwoelectricals.com
                     </div>
                   </div>
                 </div>
@@ -730,7 +754,7 @@ export default function ReturnsPageContent() {
           Quality Lighting, Guaranteed
         </h3>
         <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8">
-          At Blessed Two Electronics, we're committed to providing top-quality
+          At Blessed Two electricals, we're committed to providing top-quality
           lighting solutions backed by excellent customer service and
           comprehensive warranty coverage.
         </p>

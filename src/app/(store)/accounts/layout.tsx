@@ -2,11 +2,11 @@ import { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: {
-    default: "My Account | Blessed Two Electronics",
+    default: "My Account | Blessed Two Electricals",
     template: "%s | My Account",
   },
   description:
-    "Manage your account, view orders, track loyalty points, and update preferences at Blessed Two Electronics.",
+    "Manage your account, view orders, track loyalty points, and update preferences at Blessed Two Electricals.",
   keywords: [
     "customer account",
     "order history",
@@ -26,12 +26,12 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  authors: [{ name: "Blessed Two Electronics" }],
+  authors: [{ name: "Blessed Two Electricals" }],
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectronics.com/accounts",
-    title: "My Account | Blessed Two Electronics",
+    url: "https://www.blessedtwoelectricals.com/accounts",
+    title: "My Account | Blessed Two Electricals",
     description: "Manage your lighting purchases, orders, and loyalty rewards.",
   },
   alternates: {

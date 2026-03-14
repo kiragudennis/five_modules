@@ -41,7 +41,7 @@ export default function ContactPage() {
               Let's Light Up Your Life
             </h1>
             <p className="text-xl md:text-2xl opacity-90 mb-8 max-w-3xl mx-auto">
-              Kenya's Premier Electronics & Lighting Solutions Provider
+              Kenya's Premier electricals & Lighting Solutions Provider
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
@@ -76,7 +76,7 @@ export default function ContactPage() {
                 Get Expert Advice
               </CardTitle>
               <CardDescription className="text-lg">
-                Tell us about your lighting or electronics needs
+                Tell us about your lighting or electricals needs
               </CardDescription>
             </CardHeader>
             <ContactForm />
@@ -171,13 +171,13 @@ export default function ContactPage() {
                 </div>
                 <div className="space-y-2">
                   <p className="text-lg font-medium text-blue-600 dark:text-blue-400">
-                    sales@blessedtwoelectronics.com
+                    sales@blessedtwoelectricals.com
                   </p>
                   <p className="text-sm text-muted-foreground">
                     For product inquiries & orders
                   </p>
                   <p className="text-lg font-medium text-green-600 dark:text-green-400">
-                    support@blessedtwoelectronics.com
+                    support@blessedtwoelectricals.com
                   </p>
                   <p className="text-sm text-muted-foreground">
                     For technical support & installations
@@ -267,7 +267,7 @@ export default function ContactPage() {
               What We Specialize In
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Comprehensive electronics and lighting solutions for every need
+              Comprehensive electricals and lighting solutions for every need
             </p>
           </div>
 
@@ -300,7 +300,7 @@ export default function ContactPage() {
               {
                 icon: Home,
                 title: "Home Appliances",
-                description: "Energy-efficient appliances, kitchen electronics",
+                description: "Energy-efficient appliances, kitchen electricals",
                 color: "from-purple-500 to-pink-500",
               },
               {
@@ -346,7 +346,7 @@ export default function ContactPage() {
         <div className="mb-20">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Why Choose Blessed Two Electronics?
+              Why Choose Blessed Two electricals?
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
               We bring light and power to homes and businesses across Kenya
@@ -538,7 +538,7 @@ export default function ContactPage() {
               </h2>
               <p className="text-xl opacity-90 mb-8">
                 Join thousands of satisfied customers who trust Blessed Two for
-                quality electronics
+                quality electricals
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button
@@ -555,7 +555,7 @@ export default function ContactPage() {
                   className="border-2 border-white hover:bg-white/10 font-bold px-8 py-6 text-lg"
                 >
                   <Link
-                    href="https://wa.me/254727833691?text=Hi%20Blessed%20Two%20Electronics,%20I'm%20interested%20in%20your%20products%20and%20would%20like%20to%20get%20a%20quotation."
+                    href="https://wa.me/254727833691?text=Hi%20Blessed%20Two%20electricals,%20I'm%20interested%20in%20your%20products%20and%20would%20like%20to%20get%20a%20quotation."
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center"

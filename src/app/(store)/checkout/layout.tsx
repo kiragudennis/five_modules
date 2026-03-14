@@ -2,11 +2,11 @@
 import { Metadata } from "next";
 export const metadata: Metadata = {
   title: {
-    default: "Checkout | Blessed Two Electronics",
+    default: "Checkout | Blessed Two Electricals",
     template: "%s | Checkout",
   },
   description:
-    "Secure checkout process for Blessed Two Electronics lighting products. Multiple payment options including M-Pesa, credit cards, and Lipa Pole Pole financing.",
+    "Secure checkout process for Blessed Two Electricals lighting products. Multiple payment options including M-Pesa, credit cards, and Lipa Pole Pole financing.",
   keywords: [
     "checkout lighting products",
     "secure payment Nairobi",
@@ -24,12 +24,12 @@ export const metadata: Metadata = {
       noimageindex: true,
     },
   },
-  authors: [{ name: "Blessed Two Electronics" }],
+  authors: [{ name: "Blessed Two Electricals" }],
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectronics.com/checkout",
-    title: "Checkout | Blessed Two Electronics",
+    url: "https://www.blessedtwoelectricals.com/checkout",
+    title: "Checkout | Blessed Two Electricals",
     description:
       "Complete your lighting purchase securely with multiple payment options.",
   },

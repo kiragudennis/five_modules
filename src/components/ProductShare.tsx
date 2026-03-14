@@ -45,9 +45,9 @@ export default function ProductShare({ product, url }: ProductShareProps) {
   if (!url) return null;
 
   const referralPoints = product.referral_points || 100;
-  const shareText = `🌟 Earn ${referralPoints} Points! 🌟\n\n${product.title} - Only ${product.price} KES at Blessed Two Electronics!\n\nShare this link and earn ${referralPoints} loyalty points when friends make their first purchase! 🚀\n\n`;
+  const shareText = `🌟 Earn ${referralPoints} Points! 🌟\n\n${product.title} - Only ${product.price} KES at Blessed Two Electricals!\n\nShare this link and earn ${referralPoints} loyalty points when friends make their first purchase! 🚀\n\n`;
 
-  const whatsappText = `🌟 *Earn ${referralPoints} Points!* 🌟\n\n*${product.title}*\nOnly *${product.price} KES* at Blessed Two Electronics!\n\n🔗 ${url}\n\nShare with friends and earn ${referralPoints} loyalty points when they make their first purchase! 🎁`;
+  const whatsappText = `🌟 *Earn ${referralPoints} Points!* 🌟\n\n*${product.title}*\nOnly *${product.price} KES* at Blessed Two Electricals!\n\n🔗 ${url}\n\nShare with friends and earn ${referralPoints} loyalty points when they make their first purchase! 🎁`;
 
   const shareOptions: ShareOption[] = [
     {
@@ -55,7 +55,7 @@ export default function ProductShare({ product, url }: ProductShareProps) {
       Icon: FacebookIcon,
       props: {
         quote: shareText,
-        hashtag: "#BlessedTwoElectronics #LightingDeals",
+        hashtag: "#BlessedTwoElectricals #LightingDeals",
       },
       label: "Share on Facebook",
     },
@@ -64,7 +64,7 @@ export default function ProductShare({ product, url }: ProductShareProps) {
       Icon: TwitterIcon,
       props: {
         title: shareText,
-        hashtags: ["Lighting", "Electronics", "Deals", "Nairobi"].concat(
+        hashtags: ["Lighting", "Electricals", "Deals", "Nairobi"].concat(
           product.tags || [],
         ),
       },

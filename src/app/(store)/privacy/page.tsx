@@ -16,18 +16,18 @@ import {
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Blessed Two Electronics Nairobi",
+  title: "Privacy Policy | Blessed Two Electricals Nairobi",
   description:
-    "Privacy policy for Blessed Two Electronics. Learn how we collect, use, and protect your personal information when you shop for lighting solutions in Kenya.",
+    "Privacy policy for Blessed Two Electricals. Learn how we collect, use, and protect your personal information when you shop for lighting solutions in Kenya.",
   keywords: [
     "privacy policy",
     "data protection Kenya",
     "GDPR compliance",
     "customer data privacy",
-    "electronics privacy",
+    "electricals privacy",
   ],
   openGraph: {
-    title: "Privacy Policy | Blessed Two Electronics",
+    title: "Privacy Policy | Blessed Two Electricals",
     description:
       "Our commitment to protecting your personal information and ensuring data security.",
   },
@@ -51,7 +51,7 @@ export default function PrivacyPolicy() {
         </div>
         <h1 className="text-4xl font-bold mb-4">Privacy Policy</h1>
         <p className="text-lg text-muted-foreground">
-          Blessed Two Electronics - Last Updated: {currentDate}
+          Blessed Two Electricals - Last Updated: {currentDate}
         </p>
       </div>
 
@@ -59,7 +59,7 @@ export default function PrivacyPolicy() {
         {/* Introduction */}
         <div className="bg-blue-50 dark:bg-blue-950/20 p-6 rounded-lg border border-blue-200">
           <h1 className="text-3xl font-bold mb-4 text-blue-900 dark:text-blue-100">
-            Your Privacy Matters at Blessed Two Electronics
+            Your Privacy Matters at Blessed Two Electricals
           </h1>
           <p className="text-lg font-medium mb-4">
             We are committed to protecting your privacy and ensuring the
@@ -287,7 +287,7 @@ export default function PrivacyPolicy() {
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-600" />
               <div>
-                <p className="font-medium">Blessed Two Electronics</p>
+                <p className="font-medium">Blessed Two electricals</p>
                 <p className="text-sm text-gray-600">
                   Duruma Road, Nairobi
                   <br />
@@ -300,7 +300,7 @@ export default function PrivacyPolicy() {
               <div>
                 <p className="font-medium">Email</p>
                 <p className="text-sm text-gray-600">
-                  privacy@blessedtwoelectronics.co.ke
+                  privacy@blessedtwoelectricals.co.ke
                 </p>
               </div>
             </div>

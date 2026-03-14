@@ -2,9 +2,9 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Loyalty Rewards Program | Blessed Two Electronics",
+  title: "Loyalty Rewards Program | Blessed Two Electricals",
   description:
-    "Earn loyalty points with every purchase at Blessed Two Electronics. Redeem points for discounts on lighting products, get exclusive offers, and enjoy tier benefits.",
+    "Earn loyalty points with every purchase at Blessed Two Electricals. Redeem points for discounts on lighting products, get exclusive offers, and enjoy tier benefits.",
   keywords: [
     "loyalty program lighting",
     "reward points Nairobi",
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     "points redemption",
   ],
   openGraph: {
-    title: "Loyalty Rewards Program | Blessed Two Electronics",
+    title: "Loyalty Rewards Program | Blessed Two Electricals",
     description:
       "Earn and redeem points for discounts on quality lighting solutions.",
   },
@@ -80,14 +80,14 @@ export default function LoyaltyPage({
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "LoyaltyProgram",
-            name: "Blessed Two Electronics Loyalty Rewards",
+            name: "Blessed Two Electricals Loyalty Rewards",
             description: "Customer loyalty program for lighting products",
             provider: {
               "@type": "LocalBusiness",
-              name: "Blessed Two Electronics",
+              name: "Blessed Two Electricals",
             },
             programName: "Lighting Rewards Program",
-            termsOfService: "https://www.blessedtwoelectronics.com/terms",
+            termsOfService: "https://www.blessedtwoelectricals.com/terms",
           }),
         }}
       />

@@ -2,11 +2,11 @@
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About Blessed Two Electronics | Nairobi's Premier Lighting Solutions",
+  title: "About Blessed Two Electricals | Nairobi's Premier Lighting Solutions",
   description:
-    "Discover Blessed Two Electronics - Nairobi's leading lighting solutions provider since 2018. Premium LED bulbs, solar lighting, security systems & professional installation services at Duruma Road.",
+    "Discover Blessed Two Electricals - Nairobi's leading lighting solutions provider since 2018. Premium LED bulbs, solar lighting, security systems & professional installation services at Duruma Road.",
   keywords: [
-    "About Blessed Two Electronics",
+    "About Blessed Two Electricals",
     "lighting company Nairobi",
     "LED lighting experts",
     "solar lighting solutions",
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     "electric lighting solutions Kenya",
   ],
   openGraph: {
-    title: "About Blessed Two Electronics | Quality Lighting Nairobi",
+    title: "About Blessed Two Electricals | Quality Lighting Nairobi",
     description:
       "Nairobi's premier lighting destination providing energy-efficient lighting solutions since 2018.",
     images: [
@@ -23,13 +23,13 @@ export const metadata: Metadata = {
         url: "/about/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "About Blessed Two Electronics - Lighting Experts Nairobi",
+        alt: "About Blessed Two Electricals - Lighting Experts Nairobi",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "About Blessed Two Electronics",
+    title: "About Blessed Two Electricals",
     description:
       "Your trusted partner for quality lighting solutions in Nairobi since 2018.",
     images: ["/about/twitter-image.jpg"],

@@ -217,7 +217,7 @@ export default async function ProductPage({
     sku: product.sku,
     brand: {
       "@type": "Brand",
-      name: "Blessed Two Electronics",
+      name: "Blessed Two Electricals",
     },
     offers: {
       "@type": "Offer",

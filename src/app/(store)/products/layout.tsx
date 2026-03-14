@@ -1,12 +1,9 @@
 // app/products/layout.tsx
 import { Metadata } from "next";
-import { Inter } from "next/font/google";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: {
-    default: "Lighting Products | Blessed Two Electronics Nairobi",
+    default: "Lighting Products | Blessed Two Electricals Nairobi",
     template: "%s | Lighting Products",
   },
   description:
@@ -32,12 +29,12 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  authors: [{ name: "Blessed Two Electronics" }],
+  authors: [{ name: "Blessed Two Electricals" }],
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectronics.com/products",
-    title: "Lighting Products | Blessed Two Electronics",
+    url: "https://www.blessedtwoelectricals.com/products",
+    title: "Lighting Products | Blessed Two Electricals",
     description:
       "Complete range of quality lighting solutions for homes, businesses, and industries in Nairobi.",
     images: [
@@ -45,13 +42,13 @@ export const metadata: Metadata = {
         url: "/products/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Lighting Products Collection - Blessed Two Electronics",
+        alt: "Lighting Products Collection - Blessed Two Electricals",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lighting Products | Blessed Two Electronics",
+    title: "Lighting Products | Blessed Two Electricals",
     description: "Quality lighting solutions for every need in Nairobi.",
     images: ["/products/twitter-image.jpg"],
   },
@@ -75,8 +72,8 @@ export default function ProductsLayout({
             "@type": "CollectionPage",
             name: "Lighting Products Collection",
             description:
-              "Complete collection of lighting products at Blessed Two Electronics",
-            url: "https://www.blessedtwoelectronics.com/products",
+              "Complete collection of lighting products at Blessed Two Electricals",
+            url: "https://www.blessedtwoelectricals.com/products",
             mainEntity: {
               "@type": "ItemList",
               itemListElement: [
@@ -86,7 +83,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "LED Bulbs",
-                    url: "https://www.blessedtwoelectronics.com/category/led-bulbs",
+                    url: "https://www.blessedtwoelectricals.com/category/led-bulbs",
                   },
                 },
                 {
@@ -95,7 +92,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "Solar Lighting",
-                    url: "https://www.blessedtwoelectronics.com/category/solar-lighting",
+                    url: "https://www.blessedtwoelectricals.com/category/solar-lighting",
                   },
                 },
                 {
@@ -104,7 +101,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "Security Lights",
-                    url: "https://www.blessedtwoelectronics.com/category/security-lights",
+                    url: "https://www.blessedtwoelectricals.com/category/security-lights",
                   },
                 },
                 {
@@ -113,7 +110,7 @@ export default function ProductsLayout({
                   item: {
                     "@type": "Product",
                     name: "Smart Lighting",
-                    url: "https://www.blessedtwoelectronics.com/category/smart-lighting",
+                    url: "https://www.blessedtwoelectricals.com/category/smart-lighting",
                   },
                 },
               ],

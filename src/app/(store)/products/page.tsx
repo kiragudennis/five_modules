@@ -6,11 +6,7 @@ import {
   Filter,
   Sparkles,
   X,
-  ShoppingCart,
-  Check,
-  Sun,
   Lightbulb,
-  Star,
   Bolt,
   Clock,
   Tag,
@@ -25,13 +21,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -359,7 +348,7 @@ export default function ProductsPage({
                 className="bg-amber-50 text-amber-700 border-amber-200"
               >
                 <Sparkles className="w-3 h-3 mr-1" />
-                Blessed Two Electronics
+                Blessed Two Electricals
               </Badge>
               <Badge variant="secondary" className="text-xs">
                 Duruma Road, Nairobi
