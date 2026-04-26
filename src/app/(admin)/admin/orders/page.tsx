@@ -87,7 +87,7 @@ export default function AdminOrdersPage() {
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // Clear filters
@@ -254,7 +254,7 @@ export default function AdminOrdersPage() {
                   <TableCell>
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(
-                        order.status
+                        order.status,
                       )}`}
                     >
                       {order.status}
@@ -318,7 +318,7 @@ export default function AdminOrdersPage() {
                   >
                     {page}
                   </Button>
-                )
+                ),
               )}
 
               <Button

@@ -18,11 +18,22 @@ import {
   Star,
   Ticket,
   Loader2,
+  ShoppingBag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/lib/context/StoreContext";
 import { useRouter } from "next/navigation";
 import { LoyaltyData, LoyaltyTransaction } from "@/types/store";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 
 const TIER_COLORS: Record<string, string> = {
   bronze: "bg-amber-100 text-amber-800 border-amber-300",
@@ -44,8 +55,40 @@ export default function LoyaltyPage() {
   const [loyaltyData, setLoyaltyData] = useState<LoyaltyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [redeeming, setRedeeming] = useState(false);
+  const [pendingRedemption, setPendingRedemption] = useState<{
+    points: number;
+    discount: number;
+    code: string;
+  } | null>(null);
   const user = profile;
   const router = useRouter();
+  const [redeemDialogOpen, setRedeemDialogOpen] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState(100);
+  const maxRedeemable = Math.floor((loyaltyData?.points || 0) / 100) * 100;
+
+  // Check for existing redemption on mount
+  useEffect(() => {
+    const checkExistingRedemption = () => {
+      const stored = localStorage.getItem("loyalty_redemption");
+      if (stored) {
+        try {
+          const redemption = JSON.parse(stored);
+          if (new Date(redemption.validUntil) > new Date()) {
+            setPendingRedemption({
+              points: redemption.points,
+              discount: redemption.discount,
+              code: redemption.code,
+            });
+          } else {
+            localStorage.removeItem("loyalty_redemption");
+          }
+        } catch (e) {
+          console.error("Error parsing stored redemption:", e);
+        }
+      }
+    };
+    checkExistingRedemption();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -70,62 +113,60 @@ export default function LoyaltyPage() {
     }
   };
 
-  // Update in app/account/loyalty/page.tsx
-  const handleRedeemPoints = async () => {
-    if (!loyaltyData || loyaltyData.points < 100) {
-      toast.error("You need at least 100 points to redeem");
+  const handleOpenRedeemDialog = () => {
+    setPointsToRedeem(Math.min(100, maxRedeemable));
+    setRedeemDialogOpen(true);
+  };
+
+  const handleConfirmRedemption = async () => {
+    if (!loyaltyData || pointsToRedeem < 100) {
+      toast.error("Minimum redemption is 100 points");
       return;
     }
 
-    const pointsToRedeem = Math.floor(loyaltyData.points / 100) * 100; // Redeem in multiples of 100
-    const discountAmount = pointsToRedeem / 10; // 1 point = 0.10 KES
+    const discountAmount = pointsToRedeem / 10;
 
     try {
       setRedeeming(true);
 
-      // Call new function that creates redemption record
       const { data, error } = await supabase.rpc(
         "redeem_loyalty_points_for_checkout",
         {
           p_user_id: user?.id,
           p_points_to_redeem: pointsToRedeem,
-          p_description: "Points redeemed for discount",
+          p_description: `Redeemed ${pointsToRedeem} points for discount`,
         },
       );
 
       if (error) throw error;
 
       if (data.success) {
-        // Store redemption code in localStorage for checkout
+        const redemptionData = {
+          code: data.redemption_code,
+          points: data.points_redeemed,
+          discount: data.discount_amount,
+          validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        };
+
         localStorage.setItem(
           "loyalty_redemption",
-          JSON.stringify({
-            code: data.redemption_code,
-            points: data.points_redeemed,
-            discount: data.discount_amount,
-            validUntil: new Date(
-              Date.now() + 24 * 60 * 60 * 1000,
-            ).toISOString(), // 24 hours
-          }),
+          JSON.stringify(redemptionData),
         );
+        setPendingRedemption({
+          points: data.points_redeemed,
+          discount: data.discount_amount,
+          code: data.redemption_code,
+        });
 
         toast.success(
           `Successfully redeemed ${pointsToRedeem} points for KES ${discountAmount.toFixed(2)} discount!`,
           {
-            description: `Use code: ${data.redemption_code} during checkout`,
-            action: {
-              label: "Go to Checkout",
-              onClick: () => {
-                if (cartItems.length > 0) {
-                  router.push("/checkout");
-                } else {
-                  router.push("/products");
-                }
-              },
-            },
+            description: `Code: ${data.redemption_code}`,
           },
         );
-        fetchLoyaltyData(); // Refresh data
+
+        fetchLoyaltyData();
+        setRedeemDialogOpen(false);
       } else {
         toast.error(data.message);
       }
@@ -135,6 +176,29 @@ export default function LoyaltyPage() {
     } finally {
       setRedeeming(false);
     }
+  };
+
+  const handleContinueToCheckout = () => {
+    if (cartItems.length === 0) {
+      toast.error("Your cart is empty", {
+        description: "Add items to your cart before checking out",
+        action: {
+          label: "Browse Products",
+          onClick: () => router.push("/products"),
+        },
+      });
+      return;
+    }
+    router.push("/checkout");
+  };
+
+  const handleClearRedemption = () => {
+    localStorage.removeItem("loyalty_redemption");
+    setPendingRedemption(null);
+    toast.info("Redemption cancelled", {
+      description: "Your points have been restored",
+    });
+    fetchLoyaltyData(); // Refresh to show restored points
   };
 
   if (!user) {
@@ -176,6 +240,15 @@ export default function LoyaltyPage() {
     ? (loyaltyData.points / loyaltyData.nextTier.minPoints) * 100
     : 100;
 
+  // Calculate available points (points - pending redemption)
+  const availablePoints = pendingRedemption
+    ? loyaltyData.points
+    : loyaltyData.points;
+  const displayPoints = pendingRedemption
+    ? loyaltyData.points // Show actual database points
+    : loyaltyData.points;
+  const redeemablePoints = Math.floor(displayPoints / 100) * 100;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
@@ -215,14 +288,19 @@ export default function LoyaltyPage() {
                     <h3 className="font-semibold mb-2">Your Points</h3>
                     <div className="flex items-baseline gap-2">
                       <span className="text-4xl font-bold">
-                        {loyaltyData.points.toLocaleString()}
+                        {displayPoints.toLocaleString()}
                       </span>
                       <span className="text-muted-foreground">points</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Worth KES {loyaltyData.pointsValue.toFixed(2)} in
-                      discounts
+                      Worth KES {(displayPoints / 10).toFixed(2)} in discounts
                     </p>
+                    {pendingRedemption && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        ⚡ {pendingRedemption.points} points pending redemption
+                        (KES {pendingRedemption.discount.toFixed(2)} discount)
+                      </p>
+                    )}
                   </div>
 
                   {loyaltyData.nextTier && (
@@ -230,8 +308,7 @@ export default function LoyaltyPage() {
                       <div className="flex justify-between text-sm mb-1">
                         <span>Progress to {loyaltyData.nextTier.name}</span>
                         <span>
-                          {loyaltyData.points} /{" "}
-                          {loyaltyData.nextTier.minPoints}
+                          {displayPoints} / {loyaltyData.nextTier.minPoints}
                         </span>
                       </div>
                       <Progress
@@ -334,7 +411,7 @@ export default function LoyaltyPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Current Value</p>
                   <p className="text-2xl font-bold">
-                    KES {loyaltyData.pointsValue.toFixed(2)}
+                    KES {(displayPoints / 10).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -342,62 +419,130 @@ export default function LoyaltyPage() {
           </Card>
         </div>
 
-        {/* Redeem Points */}
+        {/* Redeem Points Card - UPDATED with Continue to Checkout */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Gift className="h-5 w-5" />
-              Redeem Points
+              {pendingRedemption ? "Redemption Ready!" : "Redeem Points"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-6 rounded-lg">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div>
-                  <h3 className="font-semibold mb-2">
-                    Turn Points into Savings
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    Redeem 100 points for KES 10 discount. Your points never
-                    expire!
-                  </p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="bg-primary/20 px-2 py-1 rounded">
-                      100 pts = KES 10
+              {pendingRedemption ? (
+                // Show active redemption state
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge className="bg-green-100 text-green-800 border-green-300">
+                        Discount Ready
+                      </Badge>
                     </div>
-                    <div className="bg-primary/20 px-2 py-1 rounded">
-                      500 pts = KES 50
+                    <h3 className="font-semibold mb-2">
+                      You have an active discount!
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      You've redeemed {pendingRedemption.points} points for a
+                      KES {pendingRedemption.discount.toFixed(2)} discount.
+                    </p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="bg-white/50 px-2 py-1 rounded">
+                        Code: {pendingRedemption.code}
+                      </div>
+                      <div className="bg-white/50 px-2 py-1 rounded">
+                        Valid for 24 hours
+                      </div>
                     </div>
-                    <div className="bg-primary/20 px-2 py-1 rounded">
-                      1000 pts = KES 100
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearRedemption}
+                      className="mt-4 text-red-600 hover:text-red-700"
+                    >
+                      Cancel Redemption
+                    </Button>
+                  </div>
+                  <div className="text-center space-y-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Discount Amount
+                      </p>
+                      <p className="text-3xl font-bold text-green-600">
+                        KES {pendingRedemption.discount.toFixed(2)}
+                      </p>
+                    </div>
+                    <Button
+                      size="lg"
+                      onClick={handleContinueToCheckout}
+                      className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
+                    >
+                      <ShoppingBag className="h-4 w-4 mr-2" />
+                      Continue to Checkout
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // No active redemption - show redeem UI
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div>
+                    <h3 className="font-semibold mb-2">
+                      Turn Points into Savings
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      Redeem 100 points for KES 10 discount. Your points never
+                      expire!
+                    </p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="bg-primary/20 px-2 py-1 rounded">
+                        100 pts = KES 10
+                      </div>
+                      <div className="bg-primary/20 px-2 py-1 rounded">
+                        500 pts = KES 50
+                      </div>
+                      <div className="bg-primary/20 px-2 py-1 rounded">
+                        1000 pts = KES 100
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <p className="text-sm text-muted-foreground">
+                        Available to redeem
+                      </p>
+                      <p className="text-3xl font-bold">
+                        {redeemablePoints.toLocaleString()} pts
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                      <Button
+                        size="lg"
+                        onClick={handleOpenRedeemDialog}
+                        disabled={loyaltyData.points < 100 || redeeming}
+                      >
+                        {redeeming ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          "Redeem Points"
+                        )}
+                      </Button>
+
+                      {/* Continue to checkout */}
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        onClick={handleContinueToCheckout}
+                        className="ml-4"
+                      >
+                        <ShoppingBag className="h-4 w-4 mr-2" />
+                        Checkout
+                      </Button>
                     </div>
                   </div>
                 </div>
-                <div className="text-center">
-                  <div className="mb-4">
-                    <p className="text-sm text-muted-foreground">
-                      Available to redeem
-                    </p>
-                    <p className="text-3xl font-bold">
-                      {Math.floor(loyaltyData.points / 100) * 100} pts
-                    </p>
-                  </div>
-                  <Button
-                    size="lg"
-                    onClick={handleRedeemPoints}
-                    disabled={loyaltyData.points < 100 || redeeming}
-                  >
-                    {redeeming ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Redeem Now"
-                    )}
-                  </Button>
-                </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -476,6 +621,92 @@ export default function LoyaltyPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Redeem Dialog */}
+      <Dialog open={redeemDialogOpen} onOpenChange={setRedeemDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Redeem Loyalty Points</DialogTitle>
+            <DialogDescription>
+              Choose how many points to redeem.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Points to Redeem</span>
+                <span className="text-muted-foreground">
+                  Max: {maxRedeemable.toLocaleString()} pts
+                </span>
+              </div>
+              <div className="flex gap-4 items-center">
+                <Input
+                  type="number"
+                  value={pointsToRedeem}
+                  onChange={(e) => {
+                    let val = parseInt(e.target.value) || 0;
+                    val = Math.floor(val / 100) * 100;
+                    val = Math.min(val, maxRedeemable);
+                    val = Math.max(val, 100);
+                    setPointsToRedeem(val);
+                  }}
+                  step="100"
+                  className="w-32"
+                />
+                <Slider
+                  value={[pointsToRedeem]}
+                  onValueChange={(val: number[]) => setPointsToRedeem(val[0])}
+                  min={100}
+                  max={maxRedeemable}
+                  step={100}
+                  className="flex-1"
+                />
+              </div>
+            </div>
+
+            <div className="bg-muted p-4 rounded-lg space-y-2">
+              <div className="flex justify-between">
+                <span>Points Redeemed:</span>
+                <span className="font-bold">
+                  {pointsToRedeem.toLocaleString()} pts
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Discount Amount:</span>
+                <span className="font-bold text-green-600">
+                  KES {(pointsToRedeem / 10).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Remaining Points:</span>
+                <span>
+                  {(loyaltyData.points - pointsToRedeem).toLocaleString()} pts
+                </span>
+              </div>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              <p>💡 Tip: Redeem only what you need for this order.</p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setRedeemDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmRedemption}
+              disabled={pointsToRedeem < 100}
+            >
+              Confirm Redemption
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

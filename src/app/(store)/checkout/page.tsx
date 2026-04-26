@@ -94,6 +94,8 @@ export default function CheckoutPage() {
     discounted: 0,
     savings: 0,
   });
+  const [loyaltyData, setLoyaltyData] = useState<any>(null);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
 
   // If cart is empty, redirect to products
   useEffect(() => {
@@ -134,18 +136,50 @@ export default function CheckoutPage() {
     formState: { errors },
   } = form;
 
-  // Load loyalty redemption from localStorage
+  // Loyalty fetch
   useEffect(() => {
-    const stored = localStorage.getItem("loyalty_redemption");
-    if (stored) {
-      const redemption = JSON.parse(stored);
-      if (new Date(redemption.validUntil) > new Date()) {
-        setLoyaltyRedemption(redemption);
-      } else {
-        localStorage.removeItem("loyalty_redemption");
+    const loadLoyaltyData = async () => {
+      // Load redemption from localStorage
+      const stored = localStorage.getItem("loyalty_redemption");
+      if (stored) {
+        const redemption = JSON.parse(stored);
+        if (new Date(redemption.validUntil) > new Date()) {
+          setLoyaltyRedemption(redemption);
+
+          // Fetch current user points to show balance
+          if (profile?.id) {
+            await fetchUserLoyaltyPoints();
+          }
+        } else {
+          localStorage.removeItem("loyalty_redemption");
+        }
+      } else if (profile?.id) {
+        // Just fetch points for display
+        await fetchUserLoyaltyPoints();
       }
+    };
+
+    loadLoyaltyData();
+  }, [profile]);
+
+  // Fetch user's current loyalty points
+  const fetchUserLoyaltyPoints = async () => {
+    if (!user?.id) return;
+
+    setLoadingLoyalty(true);
+    try {
+      const { data, error } = await supabase.rpc("get_user_loyalty_summary", {
+        p_user_id: user.id,
+      });
+
+      if (error) throw error;
+      setLoyaltyData(data);
+    } catch (error: any) {
+      console.error("Error fetching loyalty points:", error);
+    } finally {
+      setLoadingLoyalty(false);
     }
-  }, []);
+  };
 
   // Check for pending bundle and apply if valid
   useEffect(() => {
@@ -232,8 +266,16 @@ export default function CheckoutPage() {
     localStorage.removeItem("loyalty_redemption");
     setLoyaltyRedemption(null);
     form.setValue("loyaltyRedemptionCode", "");
+    form.setValue("loyaltyDiscount", 0);
     toast.info("Loyalty discount removed");
+
+    // Refresh points
+    fetchUserLoyaltyPoints();
   };
+
+  const availablePoints = loyaltyData?.points || 0;
+  const redeemablePoints = Math.floor(availablePoints / 100) * 100;
+  const potentialDiscount = redeemablePoints / 10;
 
   useEffect(() => {
     const errorEntries = Object.entries(errors);
@@ -1380,21 +1422,21 @@ export default function CheckoutPage() {
                                   </div>
                                 ) : (
                                   /* No Active Redemption - Show Available Points */
-                                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-xl sm:p-4 p-2">
                                     <div className="flex items-start justify-between">
                                       <div className="flex items-start gap-3">
                                         <div className="mt-1">
-                                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-amber-100 to-yellow-100 dark:from-amber-900 dark:to-yellow-900 flex items-center justify-center">
-                                            <Gift className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                                          </div>
+                                          <Gift className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                                         </div>
                                         <div className="flex-1">
-                                          <div className="flex items-center gap-2 mb-1">
+                                          <div className="flex flex-wrap items-center gap-2 mb-1">
                                             <Badge
                                               variant="outline"
                                               className="bg-white/50 dark:bg-gray-900/50"
                                             >
-                                              Available Points
+                                              {loyaltyRedemption
+                                                ? "Discount Applied"
+                                                : "Loyalty Rewards"}
                                             </Badge>
                                             {applyingLoyalty && (
                                               <Badge className="bg-blue-500">
@@ -1402,133 +1444,207 @@ export default function CheckoutPage() {
                                                 Applying...
                                               </Badge>
                                             )}
+                                            <Button
+                                              type="button"
+                                              variant="link"
+                                              size="sm"
+                                              onClick={() =>
+                                                router.push(
+                                                  `/accounts/${profile?.id}/loyalty`,
+                                                )
+                                              }
+                                              className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                                            >
+                                              Redeem or Earn More
+                                            </Button>
                                           </div>
 
                                           <div className="space-y-2">
-                                            {/* Points Summary */}
-                                            <div className="flex flex-wrap items-center gap-4">
-                                              <div>
-                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                  Your Balance
-                                                </p>
-                                                <div className="flex items-baseline gap-1">
-                                                  <span className="text-2xl font-bold text-amber-700 dark:text-amber-300">
-                                                    {loyaltyRedemption?.points?.toLocaleString() ||
-                                                      0}
-                                                  </span>
-                                                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                                                    points
-                                                  </span>
-                                                </div>
-                                              </div>
-
-                                              <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
-
-                                              <div>
-                                                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                  Available to Redeem
-                                                </p>
-                                                <div className="flex items-baseline gap-1">
-                                                  <span className="text-xl font-bold text-green-700 dark:text-green-300">
-                                                    KES{" "}
-                                                    {(
-                                                      (Math.floor(
-                                                        (loyaltyRedemption?.points ||
-                                                          0) / 100,
-                                                      ) *
-                                                        100) /
-                                                      10
-                                                    ).toFixed(2)}
-                                                  </span>
-                                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                    (
-                                                    {Math.floor(
-                                                      (loyaltyRedemption?.points ||
-                                                        0) / 100,
-                                                    ) * 100}{" "}
-                                                    points)
-                                                  </span>
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            {/* Error Message */}
-                                            {loyaltyError && (
-                                              <Alert
-                                                variant="destructive"
-                                                className="py-2"
-                                              >
-                                                <AlertCircle className="h-4 w-4" />
-                                                <AlertDescription className="text-sm">
-                                                  {loyaltyError}
-                                                </AlertDescription>
-                                              </Alert>
-                                            )}
-
-                                            {/* Action Buttons */}
-                                            <div className="flex flex-wrap gap-2 pt-2">
-                                              {loyaltyRedemption?.points >=
-                                              100 ? (
-                                                <>
+                                            {loyaltyRedemption ? (
+                                              // Active Redemption State
+                                              <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                  <div>
+                                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                      Discount Applied
+                                                    </p>
+                                                    <div className="flex items-baseline gap-2">
+                                                      <span className="text-2xl font-bold text-green-700 dark:text-green-300">
+                                                        KES{" "}
+                                                        {loyaltyRedemption.discount.toFixed(
+                                                          2,
+                                                        )}
+                                                      </span>
+                                                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                        (
+                                                        {
+                                                          loyaltyRedemption.points
+                                                        }{" "}
+                                                        points)
+                                                      </span>
+                                                    </div>
+                                                  </div>
                                                   <Button
                                                     type="button"
+                                                    variant="ghost"
                                                     size="sm"
-                                                    className="bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600 text-white shadow-sm"
-                                                    onClick={() =>
-                                                      applyLoyaltyRedemption()
+                                                    onClick={
+                                                      removeLoyaltyRedemption
                                                     }
-                                                    disabled={applyingLoyalty}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
                                                   >
-                                                    {applyingLoyalty ? (
-                                                      <>
-                                                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                                                        Applying...
-                                                      </>
+                                                    Remove
+                                                  </Button>
+                                                </div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                  <p>
+                                                    ✓ Discount will be applied
+                                                    at payment
+                                                  </p>
+                                                  <p>
+                                                    ✓ Code:{" "}
+                                                    {loyaltyRedemption.code}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              // No Active Redemption - Show Available Points
+                                              <>
+                                                {/* Points Summary */}
+                                                <div className="flex flex-wrap items-center gap-4">
+                                                  <div>
+                                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                      Your Balance
+                                                    </p>
+                                                    {loadingLoyalty ? (
+                                                      <div className="flex items-center gap-2">
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                        <span className="text-sm">
+                                                          Loading...
+                                                        </span>
+                                                      </div>
                                                     ) : (
-                                                      <>
-                                                        <Sparkles className="h-3 w-3 mr-2" />
-                                                        Apply Points
-                                                      </>
+                                                      <div className="flex items-baseline gap-1">
+                                                        <span className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                                                          {availablePoints.toLocaleString()}
+                                                        </span>
+                                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                          points
+                                                        </span>
+                                                      </div>
                                                     )}
-                                                  </Button>
-                                                  <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                      router.push(
-                                                        "/account/loyalty",
-                                                      )
-                                                    }
-                                                    className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
-                                                  >
-                                                    <Gift className="h-3 w-3 mr-2" />
-                                                    Manage Points
-                                                  </Button>
-                                                </>
-                                              ) : (
-                                                <div className="flex items-center gap-2">
-                                                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                                                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                    Need at least 100 points to
-                                                    redeem. Earn more points
-                                                    with purchases!
-                                                  </span>
-                                                </div>
-                                              )}
-                                            </div>
+                                                  </div>
 
-                                            {/* Quick Info */}
-                                            <div className="grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-500 pt-2">
-                                              <div className="flex items-center gap-1">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                                                <span>100 points = KES 10</span>
-                                              </div>
-                                              <div className="flex items-center gap-1">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                                                <span>Never expires</span>
-                                              </div>
-                                            </div>
+                                                  {availablePoints >= 100 && (
+                                                    <>
+                                                      <div className="h-8 w-px bg-gray-300 dark:bg-gray-700" />
+                                                      <div>
+                                                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                          Could Save
+                                                        </p>
+                                                        <div className="flex items-baseline gap-1">
+                                                          <span className="text-xl font-bold text-green-700 dark:text-green-300">
+                                                            KES{" "}
+                                                            {potentialDiscount.toFixed(
+                                                              2,
+                                                            )}
+                                                          </span>
+                                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                            (
+                                                            {redeemablePoints.toLocaleString()}{" "}
+                                                            pts)
+                                                          </span>
+                                                        </div>
+                                                      </div>
+                                                    </>
+                                                  )}
+                                                </div>
+
+                                                {/* Error Message */}
+                                                {loyaltyError && (
+                                                  <Alert
+                                                    variant="destructive"
+                                                    className="py-2"
+                                                  >
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    <AlertDescription className="text-sm">
+                                                      {loyaltyError}
+                                                    </AlertDescription>
+                                                  </Alert>
+                                                )}
+
+                                                {/* Action Buttons */}
+                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                  {availablePoints >= 100 ? (
+                                                    <>
+                                                      <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        className="bg-gradient-to-r from-amber-600 to-yellow-500 hover:from-amber-700 hover:to-yellow-600 text-white shadow-sm"
+                                                        onClick={() =>
+                                                          router.push(
+                                                            `/accounts/${profile?.id}/loyalty`,
+                                                          )
+                                                        }
+                                                      >
+                                                        <Sparkles className="h-3 w-3 mr-2" />
+                                                        Redeem Points
+                                                      </Button>
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                          router.push(
+                                                            `/accounts/${profile?.id}/loyalty`,
+                                                          )
+                                                        }
+                                                        className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                                                      >
+                                                        <Gift className="h-3 w-3 mr-2" />
+                                                        View Details
+                                                      </Button>
+                                                    </>
+                                                  ) : (
+                                                    <div className="w-full">
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                          router.push(
+                                                            `/accounts/${profile?.id}/loyalty`,
+                                                          )
+                                                        }
+                                                        className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                                                      >
+                                                        <Sparkles className="h-3 w-3 mr-2" />
+                                                        Earn More Points
+                                                      </Button>
+                                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                        {availablePoints > 0
+                                                          ? `Need ${100 - availablePoints} more points to redeem. Each purchase earns points!`
+                                                          : "Start earning points with your first purchase!"}
+                                                      </p>
+                                                    </div>
+                                                  )}
+                                                </div>
+
+                                                {/* Quick Info */}
+                                                <div className="grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-gray-500 pt-2">
+                                                  <div className="flex items-center gap-1">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                                                    <span>
+                                                      100 points = KES 10
+                                                    </span>
+                                                  </div>
+                                                  <div className="flex items-center gap-1">
+                                                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                                    <span>Never expires</span>
+                                                  </div>
+                                                </div>
+                                              </>
+                                            )}
                                           </div>
                                         </div>
                                       </div>
