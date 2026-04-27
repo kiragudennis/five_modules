@@ -124,7 +124,10 @@ export default function PaymentPage() {
       const data = await res.json();
 
       class MpesaError extends Error {
-        constructor(message: string, public code?: string) {
+        constructor(
+          message: string,
+          public code?: string,
+        ) {
           super(message);
           this.name = "MpesaError";
         }
@@ -137,23 +140,44 @@ export default function PaymentPage() {
       // Simulate successful payment
       setPaymentStatus("success");
 
-      // Received an STK push notification
-      toast.success(
-        "M-Pesa STK Push sent! Check your phone to complete payment."
-      );
-
       const { orderId: confirmedOrderId, data: mpesaResponse } = data;
+
+      const fullyPaidByLoyalty = mpesaResponse?.fullyPaidByLoyalty || false;
+      // Check if loyalcode was used and clean localStorage if so
+      const loyaltyPointsUsed = mpesaResponse?.loyaltyPointsUsed || 0;
+      const loyaltyDiscountAmount = mpesaResponse?.loyaltyDiscountAmount || 0;
+
+      if (loyaltyPointsUsed > 0) {
+        localStorage.removeItem("loyaltyRedemptionCode");
+        toast.success(
+          `Loyalty points applied! You used ${loyaltyPointsUsed} points for a ${loyaltyDiscountAmount} discount.`,
+        );
+      }
+
+      if (fullyPaidByLoyalty) {
+        toast.success(
+          mpesaResponse.message ||
+            "Your loyalty points covered the entire order! No payment needed.",
+        );
+        router.push(`/checkout/success?orderId=${confirmedOrderId}`);
+        return;
+      }
 
       if (mpesaResponse?.CustomerMessage) {
         toast.info(mpesaResponse.CustomerMessage);
       }
+
+      // Received an STK push notification
+      toast.success(
+        "M-Pesa STK Push sent! Check your phone to complete payment.",
+      );
 
       router.push(`/checkout/success?orderId=${confirmedOrderId}`);
     } catch (error) {
       console.error("Payment error:", error);
       setPaymentStatus("error");
       setErrorMessage(
-        "There was an error processing your M-Pesa payment. Please try again."
+        "There was an error processing your M-Pesa payment. Please try again.",
       );
       toast.error("Failed. Please try again.", {
         duration: 5000,
@@ -396,7 +420,7 @@ export default function PaymentPage() {
                               Pay{" "}
                               {formatCurrency(
                                 orderData.totals?.total || 0,
-                                "KES"
+                                "KES",
                               )}{" "}
                               with M-Pesa
                             </>
@@ -474,7 +498,7 @@ export default function PaymentPage() {
                               Pay{" "}
                               {formatCurrency(
                                 orderData.totals?.total || 0,
-                                "KES"
+                                "KES",
                               )}{" "}
                               with PayPal
                             </>
@@ -526,8 +550,8 @@ export default function PaymentPage() {
                           {orderData.shipping?.method === "express"
                             ? "Same-Day Express"
                             : orderData.shipping?.method === "pickup"
-                            ? "Store Pickup"
-                            : "Standard Delivery"}
+                              ? "Store Pickup"
+                              : "Standard Delivery"}
                         </p>
                       </div>
                       <div>
@@ -560,7 +584,7 @@ export default function PaymentPage() {
                           <p className="font-medium">
                             {formatCurrency(
                               orderData.services.installation.cost,
-                              "KES"
+                              "KES",
                             )}
                           </p>
                         </div>
@@ -624,7 +648,7 @@ export default function PaymentPage() {
                           <p className="font-medium">
                             {formatCurrency(
                               item.applied_price * item.quantity,
-                              "KES"
+                              "KES",
                             )}
                           </p>
                           {item.has_wholesale &&
@@ -634,7 +658,7 @@ export default function PaymentPage() {
                                 {formatCurrency(
                                   (item.price - item.applied_price) *
                                     item.quantity,
-                                  "KES"
+                                  "KES",
                                 )}
                               </p>
                             )}
@@ -663,7 +687,7 @@ export default function PaymentPage() {
                           -
                           {formatCurrency(
                             orderData.totals.wholesaleSavings,
-                            "KES"
+                            "KES",
                           )}
                         </span>
                       </div>
@@ -702,7 +726,7 @@ export default function PaymentPage() {
                         <span className="font-medium">
                           {formatCurrency(
                             orderData.services.installation.cost,
-                            "KES"
+                            "KES",
                           )}
                         </span>
                       </div>

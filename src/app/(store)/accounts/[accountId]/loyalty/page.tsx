@@ -104,6 +104,7 @@ export default function LoyaltyPage() {
       });
 
       if (error) throw error;
+
       setLoyaltyData(data);
     } catch (error: any) {
       console.error("Error fetching loyalty data:", error);
@@ -472,9 +473,9 @@ export default function LoyaltyPage() {
                       </p>
                     </div>
                     <Button
-                      size="lg"
+                      size="sm"
                       onClick={handleContinueToCheckout}
-                      className="bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
+                      className="mt-4 bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
                     >
                       <ShoppingBag className="h-4 w-4 mr-2" />
                       Continue to Checkout
@@ -567,9 +568,9 @@ export default function LoyaltyPage() {
                   (transaction: LoyaltyTransaction, index: number) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between hover:bg-gray-50 rounded-lg"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 w-[80%]">
                         <div
                           className={`
                         h-8 w-8 rounded-full flex items-center justify-center

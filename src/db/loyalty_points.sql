@@ -67,6 +67,8 @@ DECLARE
     points_to_next_tier integer;
     recent_transactions json;
     available_points integer;
+    total_earned integer;
+    total_redeemed integer;
     result json;
 BEGIN
     -- Check if user exists
@@ -84,8 +86,8 @@ BEGIN
     
     IF NOT FOUND THEN
         -- Create default record
-        INSERT INTO loyalty_points (user_id, tier)
-        VALUES (p_user_id, 'bronze')
+        INSERT INTO loyalty_points (user_id, tier, points, points_earned, points_redeemed)
+        VALUES (p_user_id, 'bronze', 0, 0, 0)
         ON CONFLICT (user_id) DO UPDATE SET updated_at = now()
         RETURNING * INTO loyalty_record;
     END IF;
@@ -105,52 +107,57 @@ BEGIN
     -- Get next tier
     SELECT * INTO next_tier
     FROM loyalty_tiers
-    WHERE min_points > user_tier.min_points
+    WHERE min_points > COALESCE(user_tier.min_points, 0)
     ORDER BY min_points
     LIMIT 1;
     
     -- Calculate points to next tier
     IF next_tier.tier IS NOT NULL THEN
-        points_to_next_tier := GREATEST(next_tier.min_points - loyalty_record.points, 0);
+        points_to_next_tier := GREATEST(next_tier.min_points - COALESCE(loyalty_record.points, 0), 0);
     ELSE
         points_to_next_tier := 0;
     END IF;
     
     -- Calculate available points for redemption (only multiples of 100)
-    available_points := FLOOR(loyalty_record.points / 100) * 100;
+    available_points := FLOOR(COALESCE(loyalty_record.points, 0) / 100) * 100;
     
-    -- Get recent transactions (safe query even if table doesn't have data)
-    BEGIN
-        SELECT COALESCE(json_agg(
-            json_build_object(
-                'date', created_at,
-                'type', transaction_type,
-                'points', ABS(points_change),
-                'description', description,
-                'order_number', (
-                    SELECT order_number 
-                    FROM orders 
-                    WHERE id = loyalty_transactions.order_id
+    -- Get recent transactions - FIXED VERSION
+    -- First, check if there are any transactions
+    IF EXISTS (SELECT 1 FROM loyalty_transactions WHERE user_id = p_user_id) THEN
+        -- Build JSON array manually to avoid nested aggregation issues
+        SELECT COALESCE(
+            json_agg(
+                json_build_object(
+                    'date', t.created_at,
+                    'type', t.transaction_type,
+                    'points', ABS(t.points_change),
+                    'description', t.description,
+                    'order_number', o.order_number
                 )
-            ) ORDER BY created_at DESC
-        ), '[]'::json) INTO recent_transactions
+            ),
+            '[]'::json
+        ) INTO recent_transactions
         FROM (
             SELECT *
             FROM loyalty_transactions
             WHERE user_id = p_user_id
             ORDER BY created_at DESC
             LIMIT 10
-        ) AS recent_tx;
-    EXCEPTION
-        WHEN others THEN
-            recent_transactions := '[]'::json;
-    END;
+        ) t
+        LEFT JOIN orders o ON t.order_id = o.id;
+    ELSE
+        recent_transactions := '[]'::json;
+    END IF;
+    
+    -- Use points_earned and points_redeemed from loyalty_points table
+    total_earned := COALESCE(loyalty_record.points_earned, 0);
+    total_redeemed := COALESCE(loyalty_record.points_redeemed, 0);
     
     -- Build result
     result := json_build_object(
         'points', COALESCE(loyalty_record.points, 0),
         'availableForRedemption', available_points,
-        'redemptionRate', 0.1, -- 1 point = 0.10 KES
+        'redemptionRate', 0.1,
         'maxDiscount', (available_points / 10.0),
         'tier', COALESCE(loyalty_record.tier, 'bronze'),
         'tierDetails', json_build_object(
@@ -170,9 +177,9 @@ BEGIN
             )
         ELSE NULL END,
         'recentTransactions', recent_transactions,
-        'pointsValue', (COALESCE(loyalty_record.points, 0) / 10.0), -- 1 point = 0.10 KES
-        'totalEarned', COALESCE(loyalty_record.points_earned, 0),
-        'totalRedeemed', COALESCE(loyalty_record.points_redeemed, 0),
+        'pointsValue', (COALESCE(loyalty_record.points, 0) / 10.0),
+        'totalEarned', total_earned,
+        'totalRedeemed', total_redeemed,
         'success', true
     );
     
@@ -241,6 +248,16 @@ CREATE INDEX idx_loyalty_redemptions_user_id ON loyalty_redemptions(user_id);
 CREATE INDEX idx_loyalty_redemptions_order_id ON loyalty_redemptions(order_id);
 CREATE INDEX idx_loyalty_redemptions_status ON loyalty_redemptions(status);
 
+-- Add valid_until column if it doesn't exist
+ALTER TABLE loyalty_redemptions 
+ADD COLUMN IF NOT EXISTS valid_until timestamptz DEFAULT (now() + interval '24 hours');
+
+-- Update existing rows
+UPDATE loyalty_redemptions 
+SET valid_until = created_at + interval '24 hours'
+WHERE valid_until IS NULL;
+
+
 -- Function to redeem loyalty points for checkout (with order reservation)
 CREATE OR REPLACE FUNCTION redeem_loyalty_points_for_checkout(
     p_user_id uuid,
@@ -255,6 +272,7 @@ DECLARE
     loyalty_record RECORD;
     discount_amount numeric(10,2);
     redemption_code text;
+    redemption_id uuid; 
     result json;
 BEGIN
     -- Validate input
@@ -320,11 +338,11 @@ BEGIN
 END;
 $$;
 
--- Update function to accept user_id parameter for additional verification
+-- Updated apply_loyalty_redemption_to_order function with correct column names
 CREATE OR REPLACE FUNCTION apply_loyalty_redemption_to_order(
     p_order_id uuid,
     p_redemption_code text,
-    p_user_id uuid DEFAULT NULL  -- Optional parameter for additional verification
+    p_user_id uuid DEFAULT NULL
 )
 RETURNS json
 LANGUAGE plpgsql
@@ -334,6 +352,11 @@ DECLARE
     redemption_record RECORD;
     order_record RECORD;
     loyalty_record RECORD;
+    actual_discount NUMERIC;
+    remaining_total NUMERIC;
+    points_to_deduct integer;
+    points_returned integer;
+    discount_ratio numeric;
     result json;
 BEGIN
     -- Get redemption record
@@ -341,6 +364,7 @@ BEGIN
     FROM loyalty_redemptions
     WHERE metadata->>'redemption_code' = p_redemption_code
       AND status = 'pending'
+      AND valid_until > NOW()
     FOR UPDATE;
     
     IF NOT FOUND THEN
@@ -363,15 +387,7 @@ BEGIN
         );
     END IF;
     
-    -- Optional: Additional verification if p_user_id is provided
-    IF p_user_id IS NOT NULL AND redemption_record.user_id != p_user_id THEN
-        RETURN json_build_object(
-            'success', false, 
-            'message', 'Redemption code does not belong to this user'
-        );
-    END IF;
-    
-    -- Verify user matches (from redemption record vs order)
+    -- Verify user matches
     IF redemption_record.user_id != order_record.user_id THEN
         RETURN json_build_object(
             'success', false, 
@@ -379,35 +395,49 @@ BEGIN
         );
     END IF;
     
+    -- Calculate remaining order total BEFORE loyalty discount
+    remaining_total := COALESCE(order_record.subtotal, 0) + 
+                       COALESCE(order_record.shipping_total, 0) + 
+                       COALESCE(order_record.installation_cost, 0) - 
+                       COALESCE(order_record.coupon_discount, 0);
+    
+    -- Cap discount at remaining total (can't discount below zero)
+    actual_discount := LEAST(redemption_record.discount_amount, remaining_total);
+    
     -- Get loyalty points
     SELECT * INTO loyalty_record
     FROM loyalty_points
     WHERE user_id = redemption_record.user_id
     FOR UPDATE;
     
-    -- Check if still has enough points
+    -- Check if still has enough points - FIXED: Use points_used
     IF loyalty_record.points < redemption_record.points_used THEN
-        -- Update redemption status to expired
         UPDATE loyalty_redemptions
         SET status = 'expired',
-            updated_at = now(),
-            metadata = metadata || jsonb_build_object(
-                'expired_at', now(),
-                'reason', 'Insufficient points'
-            )
+            updated_at = now()
         WHERE id = redemption_record.id;
         
         RETURN json_build_object(
             'success', false, 
-            'message', 'Insufficient points for redemption'
+            'message', format('Insufficient points. Have: %s, Need: %s', loyalty_record.points, redemption_record.points_used)
         );
+    END IF;
+    
+    -- Calculate points to actually deduct (proportional to discount used)
+    IF actual_discount < redemption_record.discount_amount THEN
+        discount_ratio := actual_discount / redemption_record.discount_amount;
+        points_to_deduct := ROUND(redemption_record.points_used * discount_ratio);
+        points_returned := redemption_record.points_used - points_to_deduct;
+    ELSE
+        points_to_deduct := redemption_record.points_used;
+        points_returned := 0;
     END IF;
     
     -- Deduct points from loyalty account
     UPDATE loyalty_points
     SET 
-        points = points - redemption_record.points_used,
-        points_redeemed = points_redeemed + redemption_record.points_used,
+        points = points - points_to_deduct,
+        points_redeemed = COALESCE(points_redeemed, 0) + points_to_deduct,
         updated_at = now()
     WHERE user_id = redemption_record.user_id
     RETURNING * INTO loyalty_record;
@@ -415,12 +445,9 @@ BEGIN
     -- Update order with loyalty discount
     UPDATE orders
     SET 
-        loyalty_points_used = redemption_record.points_used,
-        loyalty_discount = redemption_record.discount_amount,
-        total_amount = GREATEST(0, (
-            subtotal - COALESCE(coupon_discount, 0) - redemption_record.discount_amount + 
-            shipping_total + installation_cost
-        )),
+        loyalty_points_used = points_to_deduct,
+        loyalty_discount = actual_discount,
+        total_amount = GREATEST(0, remaining_total - actual_discount),
         updated_at = now()
     WHERE id = p_order_id
     RETURNING * INTO order_record;
@@ -430,43 +457,100 @@ BEGIN
     SET 
         order_id = p_order_id,
         status = 'applied',
+        used_at = now(),
         updated_at = now(),
-        metadata = metadata || jsonb_build_object(
+        metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
             'applied_at', now(),
             'order_number', order_record.order_number,
-            'final_total', order_record.total_amount
+            'original_discount', redemption_record.discount_amount,
+            'actual_discount_used', actual_discount,
+            'original_points', redemption_record.points_used,
+            'points_used', points_to_deduct,
+            'points_returned', points_returned,
+            'remaining_total', order_record.total_amount
         )
     WHERE id = redemption_record.id;
     
-    -- Create loyalty transaction
-    INSERT INTO loyalty_transactions (
-        user_id,
-        order_id,
-        points_change,
-        current_points,
-        transaction_type,
-        description,
-        metadata
-    ) VALUES (
-        redemption_record.user_id,
-        p_order_id,
-        -redemption_record.points_used,
-        loyalty_record.points,
-        'redeemed',
-        'Points redeemed for order #' || order_record.order_number,
-        json_build_object(
-            'redemption_id', redemption_record.id,
-            'discount_amount', redemption_record.discount_amount,
-            'order_number', order_record.order_number
-        )
-    );
+    -- Create loyalty transaction if table exists
+    BEGIN
+        INSERT INTO loyalty_transactions (
+            user_id,
+            order_id,
+            points_change,
+            current_points,
+            transaction_type,
+            description,
+            metadata
+        ) VALUES (
+            redemption_record.user_id,
+            p_order_id,
+            -points_to_deduct,
+            loyalty_record.points,
+            'redeemed',
+            CASE 
+                WHEN points_returned > 0 
+                THEN format('Redeemed %s points (worth KES %s) for order #%s. %s points returned to balance.', 
+                           points_to_deduct, actual_discount, order_record.order_number, points_returned)
+                ELSE format('Redeemed %s points for KES %s discount on order #%s', 
+                           points_to_deduct, actual_discount, order_record.order_number)
+            END,
+            jsonb_build_object(
+                'redemption_id', redemption_record.id,
+                'original_discount_amount', redemption_record.discount_amount,
+                'actual_discount_used', actual_discount,
+                'original_points', redemption_record.points_used,
+                'points_used', points_to_deduct,
+                'points_returned', points_returned
+            )
+        );
+    EXCEPTION WHEN OTHERS THEN
+        RAISE NOTICE 'Could not create loyalty transaction: %', SQLERRM;
+    END;
+    
+    -- Create notification for partial redemption
+    IF points_returned > 0 THEN
+        BEGIN
+            INSERT INTO notifications (user_id, type, title, message, metadata)
+            VALUES (
+                redemption_record.user_id,
+                'loyalty_partial_redeem',
+                'Partial Points Redemption',
+                format('You redeemed %s points, but only needed %s points (KES %s) for your order. %s points have been returned to your balance.', 
+                       redemption_record.points_used, 
+                       points_to_deduct,
+                       actual_discount,
+                       points_returned),
+                jsonb_build_object(
+                    'redemption_id', redemption_record.id,
+                    'order_id', p_order_id,
+                    'order_number', order_record.order_number,
+                    'points_requested', redemption_record.points_used,
+                    'points_used', points_to_deduct,
+                    'points_returned', points_returned,
+                    'discount_requested', redemption_record.discount_amount,
+                    'discount_used', actual_discount
+                )
+            );
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Could not create notification: %', SQLERRM;
+        END;
+    END IF;
     
     result := json_build_object(
         'success', true,
-        'discount_amount', redemption_record.discount_amount,
-        'points_redeemed', redemption_record.points_used,
+        'discount_amount', actual_discount,
+        'points_used', points_to_deduct,
+        'points_returned', points_returned,
+        'original_discount_requested', redemption_record.discount_amount,
+        'original_points_requested', redemption_record.points_used,
         'new_total', order_record.total_amount,
-        'message', 'Loyalty discount applied successfully'
+        'was_partial', (points_returned > 0),
+        'message', CASE 
+            WHEN points_returned > 0 
+            THEN format('Used %s points (KES %s) - %s points returned to your balance', 
+                       points_to_deduct, actual_discount, points_returned)
+            ELSE 'Loyalty discount applied successfully'
+        END
     );
     
     RETURN result;

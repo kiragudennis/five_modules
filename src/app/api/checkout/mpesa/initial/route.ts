@@ -213,6 +213,8 @@ export async function POST(req: Request) {
       subtotal: effectiveSubtotal,
       wholesale_savings: totals.wholesaleSavings || 0,
       coupon_discount: totals.couponDiscount || 0,
+      loyalty_points_used: totals.loyaltyPointsUsed || 0,
+      loyalty_discount: totals.loyaltyDiscount || 0,
       installation_cost: totals.installation || 0,
       total_amount: totals.total,
       currency: "KES", // Converted to KES for M-Pesa
@@ -325,11 +327,23 @@ export async function POST(req: Request) {
       amountKES = Math.max(1, amountKES - couponResult.discount_amount); // Ensure positive amount
     }
 
-    // 📦 3. APPLY POINTS IF PROVIDED
+    // 📦 APPLY POINTS IF PROVIDED
     let redeemResult = null;
+    let loyaltyDiscountAmount = 0;
+    let loyaltyPointsUsed = 0;
+
     if (loyaltyCode) {
       try {
-        // Call the PostgreSQL function to apply coupon
+        // First, get the current order total BEFORE applying loyalty discount
+        const { data: currentOrder, error: orderError } = await supabaseAdmin
+          .from("orders")
+          .select("total_amount")
+          .eq("id", orderData.id)
+          .single();
+
+        if (orderError) throw orderError;
+
+        // Call the PostgreSQL function to apply loyalty redemption
         const { data: redeemData, error: redeemError } =
           await supabaseAdmin.rpc("apply_loyalty_redemption_to_order", {
             p_order_id: orderData.id,
@@ -342,22 +356,122 @@ export async function POST(req: Request) {
             "Redeem application failed, continuing without redeeming:",
             redeemError.message,
           );
-          // Continue without redeem - order already created
         } else {
           redeemResult = redeemData;
+
+          if (redeemData?.success) {
+            loyaltyDiscountAmount = redeemData.discount_amount;
+            loyaltyPointsUsed = redeemData.points_used;
+
+            // Check if discount covers the entire order
+            const remainingTotal =
+              currentOrder.total_amount - loyaltyDiscountAmount;
+
+            if (remainingTotal <= 0) {
+              // Order is fully paid by loyalty points
+              console.log("Order fully covered by loyalty points!");
+
+              // Update order status to completed/paid
+              const { data, error } = await supabaseAdmin
+                .from("orders")
+                .update({
+                  payment_status: "completed",
+                  status: "processing",
+                  paid_at: new Date().toISOString(),
+                  loyalty_discount: loyaltyDiscountAmount,
+                  loyalty_points_used: loyaltyPointsUsed,
+                  total_amount: 0, // Set to 0 since fully covered
+                  metadata: {
+                    ...orderData.metadata,
+                    fully_paid_by_loyalty: true,
+                    original_total: currentOrder.total_amount,
+                    loyalty_redemption_result: redeemData,
+                  },
+                })
+                .eq("id", orderData.id);
+
+              if (error) {
+                console.error(
+                  "Error updating order after loyalty redemption:",
+                  error,
+                );
+                throw error;
+              }
+
+              // Return success without M-Pesa payment
+              return NextResponse.json(
+                {
+                  orderId: orderData.id,
+                  orderNumber: orderData.order_number,
+                  fullyPaidByLoyalty: true,
+                  loyaltyPointsUsed: loyaltyPointsUsed,
+                  discountAmount: loyaltyDiscountAmount,
+                  message:
+                    "Order fully paid using loyalty points! No payment required.",
+                },
+                { status: 200 },
+              );
+            }
+          }
         }
       } catch (redeemErr) {
         console.warn(
           "Redeem application error, continuing without redeeming:",
           redeemErr,
         );
-        // Continue without redeem
       }
     }
 
+    // Calculate the final amount for M-Pesa
+    let mpesaAmount = amountKES;
+
     if (redeemResult && redeemResult.success) {
       // Update amountKES with loyalty discount
-      amountKES = Math.max(1, amountKES - redeemResult.discount_amount);
+      mpesaAmount = Math.max(0, amountKES - redeemResult.discount_amount);
+    }
+
+    // Check if the amount is zero or too low for M-Pesa
+    if (mpesaAmount <= 0) {
+      // Order is fully paid by loyalty points + other discounts
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          payment_status: "completed",
+          status: "completed",
+          paid_at: new Date().toISOString(),
+          total_amount: 0,
+          metadata: {
+            ...orderData.metadata,
+            fully_paid_by_loyalty: true,
+            loyalty_discount_applied: loyaltyDiscountAmount,
+          },
+        })
+        .eq("id", orderData.id);
+
+      return NextResponse.json(
+        {
+          orderId: orderData.id,
+          orderNumber: orderData.order_number,
+          fullyPaidByLoyalty: true,
+          loyaltyPointsUsed: loyaltyPointsUsed,
+          discountAmount: loyaltyDiscountAmount,
+          message: "Order fully paid using loyalty points!",
+        },
+        { status: 200 },
+      );
+    }
+
+    // M-Pesa minimum amount check (usually 1 KES minimum)
+    if (mpesaAmount < 1) {
+      return NextResponse.json(
+        {
+          error: "Payment amount too low",
+          details:
+            "Order total after discounts is less than the minimum payment amount",
+          amount: mpesaAmount,
+        },
+        { status: 400 },
+      );
     }
 
     // 📦 3. Initiate M-Pesa payment
@@ -416,6 +530,8 @@ export async function POST(req: Request) {
         orderId: orderData.id,
         orderNumber: orderData.order_number,
         mpesa: mpesaData,
+        loyaltyPointsUsed: loyaltyPointsUsed,
+        loyaltyDiscountAmount: loyaltyDiscountAmount,
         message: "Order created successfully. Please complete payment.",
       },
       { status: 200 },

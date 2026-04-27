@@ -61,7 +61,7 @@ export default function SuccessPage({
 
   // Start countdown when payment is initiated successfully
   useEffect(() => {
-    if (paymentStatus === "success") {
+    if (!paymentStatus) {
       const timer = setTimeout(() => {
         window.location.reload();
       }, 60000);
@@ -81,7 +81,7 @@ export default function SuccessPage({
         clearInterval(countdownInterval);
       };
     }
-  }, [paymentStatus]);
+  }, [paymentStatus, orderDetails]);
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -591,6 +591,122 @@ export default function SuccessPage({
                     </div>
                   )}
 
+                  {/* Loyalty Redemption Information */}
+                  {orderDetails.metadata?.loyalty_redemption_result && (
+                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="h-8 w-8 rounded-full bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
+                          <Gift className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-300">
+                          Loyalty Points Redemption
+                        </h3>
+                        {orderDetails.metadata.loyalty_redemption_result
+                          .was_partial && (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 ml-auto">
+                            Partial Redemption
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        {/* Main Message */}
+                        <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+                          <p className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                            {
+                              orderDetails.metadata.loyalty_redemption_result
+                                .message
+                            }
+                          </p>
+                        </div>
+
+                        {/* Points Breakdown */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Coins className="h-4 w-4 text-amber-600" />
+                              <span className="text-xs text-muted-foreground">
+                                Points Used
+                              </span>
+                            </div>
+                            <p className="text-lg font-bold text-purple-700">
+                              {orderDetails.metadata.loyalty_redemption_result.points_used?.toLocaleString()}
+                            </p>
+                          </div>
+
+                          <div className="bg-white/50 dark:bg-gray-900/50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Sparkles className="h-4 w-4 text-green-600" />
+                              <span className="text-xs text-muted-foreground">
+                                Discount Applied
+                              </span>
+                            </div>
+                            <p className="text-lg font-bold text-green-600">
+                              {formatCurrency(
+                                orderDetails.metadata.loyalty_redemption_result
+                                  .discount_amount,
+                                orderDetails.currency,
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Partial Redemption Details */}
+                        {orderDetails.metadata.loyalty_redemption_result
+                          .was_partial && (
+                          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                              <div>
+                                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                  Points Returned to Balance
+                                </p>
+                                <p className="text-sm text-amber-700 dark:text-amber-400">
+                                  {orderDetails.metadata.loyalty_redemption_result.points_returned?.toLocaleString()}{" "}
+                                  points (worth{" "}
+                                  {formatCurrency(
+                                    orderDetails.metadata
+                                      .loyalty_redemption_result
+                                      .points_returned / 10,
+                                    orderDetails.currency,
+                                  )}
+                                  ) have been returned to your loyalty balance.
+                                </p>
+                                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                                  You requested{" "}
+                                  {orderDetails.metadata.loyalty_redemption_result.original_points_requested?.toLocaleString()}{" "}
+                                  points (worth{" "}
+                                  {formatCurrency(
+                                    orderDetails.metadata
+                                      .loyalty_redemption_result
+                                      .original_discount_requested,
+                                    orderDetails.currency,
+                                  )}
+                                  ), but only needed{" "}
+                                  {orderDetails.metadata.loyalty_redemption_result.points_used?.toLocaleString()}{" "}
+                                  points for this order.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Fully Paid by Loyalty */}
+                        {orderDetails.metadata.fully_paid_by_loyalty && (
+                          <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                            <div className="flex items-center gap-2">
+                              <Trophy className="h-5 w-5 text-green-600" />
+                              <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                                🎉 This order was completely paid for using
+                                loyalty points!
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <Separator />
 
                   {/* Order Items */}
@@ -724,7 +840,16 @@ export default function SuccessPage({
 
                       {orderDetails.loyalty_discount > 0 && (
                         <div className="flex justify-between text-purple-600">
-                          <span>Loyalty Discount</span>
+                          <div className="flex items-center gap-1">
+                            <span>Loyalty Discount</span>
+                            {orderDetails.loyalty_points_used > 0 && (
+                              <span className="text-xs text-purple-500">
+                                (
+                                {orderDetails.loyalty_points_used.toLocaleString()}{" "}
+                                points)
+                              </span>
+                            )}
+                          </div>
                           <span>
                             -
                             {formatCurrency(
@@ -1344,6 +1469,67 @@ export default function SuccessPage({
               </div>
             </CardContent>
           </Card>
+
+          {/* Loyalty summary card to the sidebar (next steps section) */}
+          {orderDetails.metadata?.loyalty_redemption_result && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Gift className="h-5 w-5 text-purple-600" />
+                  <h3 className="font-bold">Loyalty Savings</h3>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+                    <p className="text-2xl font-bold text-purple-700">
+                      {formatCurrency(
+                        orderDetails.metadata.loyalty_redemption_result
+                          .discount_amount,
+                        orderDetails.currency,
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Saved with loyalty points
+                    </p>
+                  </div>
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Points Used:</span>
+                    <span className="font-medium">
+                      {orderDetails.metadata.loyalty_redemption_result.points_used?.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {orderDetails.metadata.loyalty_redemption_result
+                    .points_returned > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Points Returned:
+                      </span>
+                      <span className="font-medium text-green-600">
+                        +
+                        {orderDetails.metadata.loyalty_redemption_result.points_returned?.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      router.push(`/accounts/${orderDetails.user_id}/loyalty`)
+                    }
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    View Your Points Balance
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

@@ -120,6 +120,7 @@ export default function CheckoutPage() {
       shippingMethod: "standard",
       paymentMethod: "mpesa",
       couponCode: "",
+      loyaltyRedemptionCode: "",
       installationRequired: false,
       specialInstructions: "",
     },
@@ -141,6 +142,7 @@ export default function CheckoutPage() {
     const loadLoyaltyData = async () => {
       // Load redemption from localStorage
       const stored = localStorage.getItem("loyalty_redemption");
+      console.log("Loaded loyalty redemption from localStorage:", stored);
       if (stored) {
         const redemption = JSON.parse(stored);
         if (new Date(redemption.validUntil) > new Date()) {
@@ -164,15 +166,16 @@ export default function CheckoutPage() {
 
   // Fetch user's current loyalty points
   const fetchUserLoyaltyPoints = async () => {
-    if (!user?.id) return;
+    if (!profile?.id) return;
 
     setLoadingLoyalty(true);
     try {
       const { data, error } = await supabase.rpc("get_user_loyalty_summary", {
-        p_user_id: user.id,
+        p_user_id: profile.id,
       });
 
       if (error) throw error;
+      console.log("Fetched loyalty data:", data);
       setLoyaltyData(data);
     } catch (error: any) {
       console.error("Error fetching loyalty points:", error);
@@ -570,8 +573,18 @@ export default function CheckoutPage() {
   // Form submission handler
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
-
     try {
+      // First, apply loyalty redemption to set the form value
+      if (loyaltyRedemption && !form.getValues("loyaltyRedemptionCode")) {
+        await applyLoyaltyRedemption();
+      }
+
+      // Wait a tick for the form value to be set
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Get the loyalty code from form values
+      const loyaltyCode = form.getValues("loyaltyRedemptionCode");
+
       // Get referral data from localStorage for items in cart
       const itemsWithReferral = cartItems.map((item) => {
         // Check for referral for this specific product
@@ -697,7 +710,7 @@ export default function CheckoutPage() {
           : null,
 
         // Redeemed code
-        loyaltyCode: values.loyaltyRedemptionCode,
+        loyaltyCode: loyaltyCode || null,
 
         // Financial breakdown
         totals: {
@@ -706,6 +719,8 @@ export default function CheckoutPage() {
           shipping: shippingCost,
           installation: installationCost,
           couponDiscount: couponDiscount,
+          loyaltyDiscount: loyaltyRedemption?.discount || 0, // ← Add this
+          loyaltyPointsUsed: loyaltyRedemption?.points || 0, // ← Add this
           total: orderTotal,
         },
 
@@ -1407,6 +1422,24 @@ export default function CheckoutPage() {
                                               order total
                                             </p>
                                           </div>
+                                          {/* In the loyalty section */}
+                                          {loyaltyRedemption &&
+                                            loyaltyRedemption.discount >=
+                                              orderTotal && (
+                                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                                                <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                                  <Sparkles className="h-4 w-4" />
+                                                  <span className="text-sm font-medium">
+                                                    Your loyalty points cover
+                                                    the full amount!
+                                                  </span>
+                                                </div>
+                                                <p className="text-xs text-green-600 dark:text-green-500 mt-1">
+                                                  No payment needed - you're all
+                                                  set!
+                                                </p>
+                                              </div>
+                                            )}
                                         </div>
                                       </div>
                                       <Button
@@ -1421,7 +1454,6 @@ export default function CheckoutPage() {
                                     </div>
                                   </div>
                                 ) : (
-                                  /* No Active Redemption - Show Available Points */
                                   <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border border-amber-200 dark:border-amber-800 rounded-xl sm:p-4 p-2">
                                     <div className="flex items-start justify-between">
                                       <div className="flex items-start gap-3">
@@ -1461,7 +1493,6 @@ export default function CheckoutPage() {
 
                                           <div className="space-y-2">
                                             {loyaltyRedemption ? (
-                                              // Active Redemption State
                                               <div className="space-y-3">
                                                 <div className="flex items-center justify-between">
                                                   <div>
@@ -1508,7 +1539,6 @@ export default function CheckoutPage() {
                                                 </div>
                                               </div>
                                             ) : (
-                                              // No Active Redemption - Show Available Points
                                               <>
                                                 {/* Points Summary */}
                                                 <div className="flex flex-wrap items-center gap-4">
