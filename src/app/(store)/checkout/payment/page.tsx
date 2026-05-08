@@ -12,20 +12,13 @@ import {
   CreditCard,
   Lock,
   Phone,
-  ArrowRight,
   Info,
   Zap,
   Truck,
   Package,
-  Calendar,
   Clock,
-  MapPin,
-  Sparkles,
   ShieldCheck,
-  Loader2,
   Gift,
-  Users,
-  Sun,
   Battery,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -197,13 +190,19 @@ export default function PaymentPage() {
           <div className="mb-8">
             <div className="flex flex-col sm:flex-row items-center justify-between mb-6">
               <div>
-                <Link
-                  href="/checkout"
-                  className="flex items-center text-amber-700 hover:text-amber-800 font-medium mb-2"
+                <Button
+                  onClick={() => {
+                    router.push("/checkout");
+                    dispatch({ type: "CLEAR_PENDING_ORDER" });
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  className="px-2 py-1"
                 >
                   <ChevronLeft className="h-4 w-4 mr-1" />
                   Back to Checkout
-                </Link>
+                </Button>
+
                 <h1 className="text-2xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
                   Complete Your Secure Payment
                 </h1>

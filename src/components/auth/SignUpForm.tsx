@@ -1,11 +1,12 @@
 // components/auth/SignUpForm.tsx
 // @ts-nocheck
+
 "use client";
 
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +50,13 @@ interface SignUpFormProps {
   ref: string | undefined;
 }
 
+// Helper function - defined outside component
+const getReferralFromCookie = (): string | null => {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^| )referral=([^;]+)"));
+  return match ? match[2] : null;
+};
+
 export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -72,36 +80,30 @@ export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
       receiveOffers: true,
       receiveNewsletter: true,
       termsAccepted: false,
-      referralCode: pendingReferral || undefined,
+      referralCode: "",
     },
   });
 
-  // Set a cookie with referral code if present in URL
-  useState(() => {
+  // Use useEffect instead of useState for side effects
+  useEffect(() => {
     if (ref) {
       setPendingReferral(ref);
-      document.cookie = `referral=${ref}; path=/; max-age=${60 * 60 * 24 * 30}`; // Expires in 30 days
+      document.cookie = `referral=${ref}; path=/; max-age=${60 * 60 * 24 * 30}`;
+      form.setValue("referralCode", ref);
     } else {
-      // Check if referral cookie exists
       const existingReferral = getReferralFromCookie();
       if (existingReferral) {
         setPendingReferral(existingReferral);
+        form.setValue("referralCode", existingReferral);
       }
     }
-  });
-
-  // Get referral code from cookie (if exists)
-  const getReferralFromCookie = () => {
-    const match = document.cookie.match(new RegExp("(^| )referral=([^;]+)"));
-    return match ? match[2] : null;
-  };
+  }, [ref, form]);
 
   const onSubmit = async (data: SignUpData) => {
     setLoading(true);
     const toastId = toast.loading("Creating your account...");
 
     try {
-      // Call the API endpoint to create account
       const response = await fetch("/api/auth/signup", {
         method: "POST",
         headers: {
@@ -128,7 +130,6 @@ export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
         onSuccess();
       }
 
-      // Reset form
       form.reset();
     } catch (err: any) {
       toast.error(err.message || "Signup failed", { id: toastId });
@@ -152,6 +153,7 @@ export default function SignUpForm({ onSuccess, ref }: SignUpFormProps) {
             </AlertDescription>
           </Alert>
         )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Full Name */}
           <FormField
