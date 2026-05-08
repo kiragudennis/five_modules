@@ -65,6 +65,19 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { ProductVarieties } from "./ProductVarieties";
 
+type ActiveDeal = {
+  id: string;
+  name: string;
+  deal_type: string;
+  status: "scheduled" | "active" | "ended";
+  deal_price: number;
+  original_price: number;
+  stock_total: number;
+  stock_claimed: number;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
 export default function ProductDetailPage({
   product,
   relatedProducts,
@@ -79,7 +92,7 @@ export default function ProductDetailPage({
   const [quantity, setQuantity] = useState(1);
   const [showVideo, setShowVideo] = useState(false);
   const { totalItems } = useCart();
-  const { profile } = useAuth();
+  const { profile, supabase } = useAuth();
   const router = useRouter();
   const [url, setUrl] = useState(
     typeof window !== "undefined" ? window.location.origin : "",
@@ -97,6 +110,9 @@ export default function ProductDetailPage({
   const [showingVarietyImages, setShowingVarietyImages] = useState(
     !!selectedVariety?.images?.length,
   );
+  const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null);
+  const [claimTicker, setClaimTicker] = useState<string[]>([]);
+  const [dealSecondsLeft, setDealSecondsLeft] = useState(0);
 
   const handleVarietyChange = (variety: Variaty) => {
     setSelectedVariety(variety);
@@ -128,6 +144,8 @@ export default function ProductDetailPage({
     selectedVariety?.wholesale_min_quantity || product.wholesale_min_quantity;
   const displayStock = selectedVariety?.stock || product.stock;
   const displaySku = selectedVariety?.sku || product.sku;
+  const effectivePrice =
+    activeDeal?.status === "active" ? activeDeal.deal_price : displayPrice;
 
   // Get attributes for selected variety;
   const varietyType = selectedVariety?.variety_type;
@@ -215,6 +233,55 @@ export default function ProductDetailPage({
   }, [product.id, profile?.id]);
 
   useEffect(() => {
+    const loadActiveDeal = async () => {
+      const { data: dealData } = await supabase
+        .from("deals")
+        .select("*")
+        .eq("product_slug", product.slug)
+        .in("status", ["active", "scheduled"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!dealData) {
+        setActiveDeal(null);
+        setClaimTicker([]);
+        return;
+      }
+
+      setActiveDeal(dealData as ActiveDeal);
+      if (dealData.ends_at) {
+        setDealSecondsLeft(
+          Math.max(
+            0,
+            Math.floor((new Date(dealData.ends_at).getTime() - Date.now()) / 1000),
+          ),
+        );
+      }
+
+      const { data: claims } = await supabase
+        .from("deal_claims")
+        .select("users:user_id(full_name,email)")
+        .eq("deal_id", dealData.id)
+        .order("created_at", { ascending: false })
+        .limit(8);
+
+      setClaimTicker(
+        (claims || []).map(
+          (c: any) => c.users?.full_name || c.users?.email || "Customer",
+        ),
+      );
+    };
+
+    void loadActiveDeal();
+    const id = setInterval(() => {
+      void loadActiveDeal();
+      setDealSecondsLeft((prev) => Math.max(0, prev - 2));
+    }, 2500);
+    return () => clearInterval(id);
+  }, [product.slug, supabase]);
+
+  useEffect(() => {
     if (!api) return;
 
     const updateIndex = () => {
@@ -274,6 +341,22 @@ export default function ProductDetailPage({
         ((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100,
       )
     : 0;
+  const dealStockPct = activeDeal?.stock_total
+    ? Math.round(((activeDeal.stock_claimed || 0) / activeDeal.stock_total) * 100)
+    : 0;
+
+  const handleClaimDeal = async () => {
+    if (!activeDeal || !profile?.id) return;
+    await supabase.from("deal_claims").insert({
+      deal_id: activeDeal.id,
+      user_id: profile.id,
+    });
+    await supabase
+      .from("deals")
+      .update({ stock_claimed: (activeDeal.stock_claimed || 0) + 1 })
+      .eq("id", activeDeal.id);
+    toast.success("Deal claimed.");
+  };
 
   // Get category details
   const categoryDetails = lightingCategories.find(
@@ -802,7 +885,7 @@ export default function ProductDetailPage({
                 {/* Price Display */}
                 <div className="flex items-baseline gap-3 mb-4">
                   <span className="text-3xl font-bold text-amber-600">
-                    {formatCurrency(displayPrice, product.currency)}
+                    {formatCurrency(effectivePrice, product.currency)}
                   </span>
 
                   {displayOriginalPrice && (
@@ -816,6 +899,39 @@ export default function ProductDetailPage({
                     </div>
                   )}
                 </div>
+
+                {activeDeal?.status === "active" && (
+                  <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="font-semibold text-red-700">
+                      {activeDeal.name} is live
+                    </p>
+                    <p className="text-xs text-red-600">
+                      Countdown:{" "}
+                      {Math.floor(dealSecondsLeft / 60)
+                        .toString()
+                        .padStart(2, "0")}
+                      :
+                      {(dealSecondsLeft % 60).toString().padStart(2, "0")}
+                    </p>
+                    <div className="mt-2">
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span>Stock depletion</span>
+                        <span>{dealStockPct}%</span>
+                      </div>
+                      <div className="h-2 rounded bg-red-100">
+                        <div
+                          className="h-2 rounded bg-red-500"
+                          style={{ width: `${dealStockPct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-red-700">
+                      {claimTicker.length > 0
+                        ? `${claimTicker.join(" • ")} claimed this deal`
+                        : "No claims yet"}
+                    </p>
+                  </div>
+                )}
 
                 {/* Technical Quick View */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
@@ -1030,7 +1146,11 @@ export default function ProductDetailPage({
 
                 <Button
                   disabled={displayStock === 0 || isAddingToCart}
-                  onClick={() => handleAddToCart(product)}
+                  onClick={() =>
+                    activeDeal?.status === "active"
+                      ? void handleClaimDeal()
+                      : handleAddToCart(product)
+                  }
                   className="w-full h-12 text-lg bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white"
                 >
                   {isAddingToCart ? (
@@ -1041,7 +1161,11 @@ export default function ProductDetailPage({
                   ) : (
                     <>
                       <ShoppingCart className="h-5 w-5 mr-2" />
-                      {displayStock === 0 ? "Out of Stock" : "Add to Cart"}
+                      {displayStock === 0
+                        ? "Out of Stock"
+                        : activeDeal?.status === "active"
+                          ? "Claim Deal"
+                          : "Add to Cart"}
                     </>
                   )}
                 </Button>

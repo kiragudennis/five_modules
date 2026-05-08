@@ -46,6 +46,7 @@ import {
   ShoppingBag,
   Star,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -619,6 +620,16 @@ export default function AdminChallengesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/challenges/${challenge.id}/leaderboard`}>
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={`/challenges/${challenge.id}/live`} target="_blank">
+                          <Target className="h-4 w-4" />
+                        </Link>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

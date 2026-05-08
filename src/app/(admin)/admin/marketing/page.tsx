@@ -28,6 +28,9 @@ import {
   Clock,
   ArrowRight,
   Loader2,
+  MonitorPlay,
+  Ticket,
+  Flame,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -905,7 +908,7 @@ export default function AdminMarketingPage() {
       {/* Quick Actions */}
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
           <Button
             variant="outline"
             className="h-auto py-4 flex flex-col items-center gap-2"
@@ -939,6 +942,30 @@ export default function AdminMarketingPage() {
           >
             <Award className="h-6 w-6" />
             <span>New Reward</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => router.push("/admin/live")}
+          >
+            <MonitorPlay className="h-6 w-6" />
+            <span>Live Control Room</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => router.push("/admin/draws/create")}
+          >
+            <Ticket className="h-6 w-6" />
+            <span>New Draw</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-2"
+            onClick={() => router.push("/admin/deals/create")}
+          >
+            <Flame className="h-6 w-6" />
+            <span>New Deal</span>
           </Button>
         </div>
       </div>

@@ -448,7 +448,7 @@ export default function AccountPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {/* Mistry Bundles */}
                   <Link href={`/accounts/${accountId}/bundles`}>
                     <div className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all cursor-pointer">
@@ -547,6 +547,24 @@ export default function AccountPage() {
                             {engagement.anniversary_days} days with us
                           </Badge>
                         )}
+                    </div>
+                  </Link>
+
+                  {/* Draws */}
+                  <Link href={`/accounts/${accountId}/draws`}>
+                    <div className="p-4 border rounded-lg hover:border-primary hover:shadow-md transition-all cursor-pointer">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-cyan-100 rounded-lg">
+                          <Ticket className="h-5 w-5 text-cyan-700" />
+                        </div>
+                        <h3 className="font-semibold">Draws</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        View your entries, countdowns, and live draw events.
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        My draw entries
+                      </Badge>
                     </div>
                   </Link>
                 </div>
