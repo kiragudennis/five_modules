@@ -1,6 +1,6 @@
-# Blessed Two Electronics - E-Commerce
+# E-Commerce
 
-A full-featured e-commerce platform for WorldSamma martial arts academy, built with modern web technologies.
+A full-featured e-commerce platform built with modern web technologies.
 
 ## Features
 
@@ -285,3 +285,45 @@ This project is licensed under the MIT License.
 - [PayPal](https://developer.paypal.com/)
 - [M-Pesa](https://developer.safaricom.co.ke/)
 - [Vercel](https://vercel.com/)
+
+## Phase 8: Production Deployment Checklist
+
+### Pre-deployment
+- [ ] All database migrations applied (bundle_live.sql, spinning_wheel_advanced.sql, etc.)
+- [ ] Redis instance provisioned (Upstash or self-hosted)
+- [ ] WebSocket server configured for production (wss://)
+- [ ] Environment variables set on hosting platform
+- [ ] CORS configured for WebSocket connections
+
+### Module Verification
+- [ ] Phase 1: Points Service - Admin can set conversion rate, points flow works across all modules
+- [ ] Phase 2: Bundles - Live stream exclusives, mystery reveal, broadcast screen
+- [ ] Phase 3: Spinning Wheel - Multi-game, real-time leaderboard, live ticker
+- [ ] Phase 4: Challenges - All 7 types, team challenges, "Catch Them" feature
+- [ ] Phase 5: Draws - Multi-phase draw show, winner management, auto-redraw
+- [ ] Phase 6: Deals - BOGO, free gifts, mystery deals, urgency states
+- [ ] Phase 7: Live Display - WebSocket connections, OBS URLs, admin controls
+
+### Performance Testing
+- [ ] WebSocket handles 500+ concurrent connections
+- [ ] Redis pub/sub works across multiple server instances
+- [ ] Supabase Realtime limits not exceeded
+- [ ] Broadcast pages load in < 2 seconds
+
+### OBS Compatibility
+- [ ] All `/live/*` URLs work as OBS Browser Sources
+- [ ] Transparent backgrounds option available
+- [ ] Auto-refresh on scene activation works
+- [ ] Custom CSS hiding options functional
+
+### Monitoring Setup
+- [ ] WebSocket connection logs
+- [ ] Redis pub/sub monitoring
+- [ ] Supabase realtime usage tracking
+- [ ] Error tracking (Sentry integration)
+
+### Go-Live
+- [ ] Full backup of database before deployment
+- [ ] Feature flags ready for rollback
+- [ ] Documentation updated for streamers/hosts
+- [ ] 24-hour monitoring window scheduled

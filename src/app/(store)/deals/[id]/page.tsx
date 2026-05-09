@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 type Deal = {
   id: string;
@@ -53,6 +54,19 @@ export default function DealDetailPage() {
   useEffect(() => {
     void load();
   }, [id]);
+
+  useSupabaseRealtime({
+    supabase,
+    channelName: `deal-detail-${id}`,
+    tables: [
+      { table: "deals", filter: `id=eq.${id}` },
+      { table: "deal_claims", filter: `deal_id=eq.${id}` },
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(id),
+  });
 
   const stockLeft = useMemo(() => {
     if (!deal) return 0;

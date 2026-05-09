@@ -43,6 +43,7 @@ import {
   Package,
   Crown,
   Coins,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -58,6 +59,15 @@ export default function AdminBundlesPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [tiers, setTiers] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [liveConfig, setLiveConfig] = useState({
+    bundle_type: "mystery" as "mystery" | "tiered" | "build_your_own",
+    mystery_reveal_mode: "manual" as "manual" | "after_purchase",
+    total_value_ksh: null as number | null,
+    is_live_stream_only: false,
+    is_stream_active: false,
+    is_mystery_revealed: false,
+    live_stock_total: 0,
+  });
 
   // Get create param from URL to open dialog in create mode
   useEffect(() => {
@@ -145,6 +155,7 @@ export default function AdminBundlesPage() {
       };
 
       let error;
+      let savedBundleId = editingBundle.id;
       if (editingBundle.id) {
         // Update existing bundle
         ({ error } = await supabase
@@ -155,12 +166,30 @@ export default function AdminBundlesPage() {
         // Create new bundle
         bundleData.created_by = profile?.id;
         bundleData.current_purchases = 0;
-        ({ error } = await supabase
+        const insertResult = await supabase
           .from("mistry_bundles")
-          .insert([bundleData]));
+          .insert([bundleData])
+          .select("id")
+          .single();
+        error = insertResult.error;
+        savedBundleId = insertResult.data?.id;
       }
 
       if (error) throw error;
+
+      if (savedBundleId) {
+        const { error: liveError } = await supabase.from("bundle_live_config").upsert(
+          {
+            bundle_id: savedBundleId,
+            ...liveConfig,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "bundle_id" },
+        );
+        if (liveError) {
+          toast.warning("Bundle saved but live config was not updated.");
+        }
+      }
 
       toast.success(
         `Bundle ${editingBundle.id ? "updated" : "created"} successfully`,
@@ -174,6 +203,37 @@ export default function AdminBundlesPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const loadLiveConfig = async (bundleId: string) => {
+    const { data } = await supabase
+      .from("bundle_live_config")
+      .select("*")
+      .eq("bundle_id", bundleId)
+      .maybeSingle();
+
+    if (!data) {
+      setLiveConfig({
+        bundle_type: "mystery",
+        mystery_reveal_mode: "manual",
+        total_value_ksh: null,
+        is_live_stream_only: false,
+        is_stream_active: false,
+        is_mystery_revealed: false,
+        live_stock_total: 0,
+      });
+      return;
+    }
+
+    setLiveConfig({
+      bundle_type: data.bundle_type || "mystery",
+      mystery_reveal_mode: data.mystery_reveal_mode || "manual",
+      total_value_ksh: data.total_value_ksh || null,
+      is_live_stream_only: data.is_live_stream_only || false,
+      is_stream_active: data.is_stream_active || false,
+      is_mystery_revealed: data.is_mystery_revealed || false,
+      live_stock_total: data.live_stock_total || 0,
+    });
   };
 
   const handleDeleteBundle = async (id: string) => {
@@ -248,7 +308,20 @@ export default function AdminBundlesPage() {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingBundle({ products: [] })}>
+            <Button
+              onClick={() => {
+                setEditingBundle({ products: [] });
+                setLiveConfig({
+                  bundle_type: "mystery",
+                  mystery_reveal_mode: "manual",
+                  total_value_ksh: null,
+                  is_live_stream_only: false,
+                  is_stream_active: false,
+                  is_mystery_revealed: false,
+                  live_stock_total: 0,
+                });
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Create Bundle
             </Button>
@@ -656,6 +729,118 @@ export default function AdminBundlesPage() {
                   </div>
                 </div>
 
+                {/* Advanced Bundle Mode */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Advanced Live Settings</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Bundle Type</Label>
+                      <Select
+                        value={liveConfig.bundle_type}
+                        onValueChange={(
+                          value: "mystery" | "tiered" | "build_your_own",
+                        ) => setLiveConfig((prev) => ({ ...prev, bundle_type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="mystery">Mystery Bundle</SelectItem>
+                          <SelectItem value="tiered">Tiered Bundle</SelectItem>
+                          <SelectItem value="build_your_own">Build Your Own</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Mystery Reveal Mode</Label>
+                      <Select
+                        value={liveConfig.mystery_reveal_mode}
+                        onValueChange={(value: "manual" | "after_purchase") =>
+                          setLiveConfig((prev) => ({
+                            ...prev,
+                            mystery_reveal_mode: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">Manual Reveal (Live)</SelectItem>
+                          <SelectItem value="after_purchase">After Purchase</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Total Value (KSH)</Label>
+                      <Input
+                        type="number"
+                        value={liveConfig.total_value_ksh || ""}
+                        onChange={(e) =>
+                          setLiveConfig((prev) => ({
+                            ...prev,
+                            total_value_ksh: Number(e.target.value) || null,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Live Stock Total</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={liveConfig.live_stock_total}
+                        onChange={(e) =>
+                          setLiveConfig((prev) => ({
+                            ...prev,
+                            live_stock_total: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={liveConfig.is_live_stream_only}
+                        onCheckedChange={(checked) =>
+                          setLiveConfig((prev) => ({
+                            ...prev,
+                            is_live_stream_only: checked,
+                          }))
+                        }
+                      />
+                      <Label>Live Stream Only</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={liveConfig.is_stream_active}
+                        onCheckedChange={(checked) =>
+                          setLiveConfig((prev) => ({
+                            ...prev,
+                            is_stream_active: checked,
+                          }))
+                        }
+                      />
+                      <Label>Stream Active</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={liveConfig.is_mystery_revealed}
+                        onCheckedChange={(checked) =>
+                          setLiveConfig((prev) => ({
+                            ...prev,
+                            is_mystery_revealed: checked,
+                          }))
+                        }
+                      />
+                      <Label>Mystery Revealed</Label>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Terms and Conditions */}
                 <div className="space-y-2">
                   <Label htmlFor="terms">Terms & Conditions</Label>
@@ -820,11 +1005,17 @@ export default function AdminBundlesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button asChild variant="ghost" size="sm">
+                        <Link href={`/bundles/live/${bundle.id}`} target="_blank">
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
+                        onClick={async () => {
                           setEditingBundle(bundle);
+                          await loadLiveConfig(bundle.id);
                           setDialogOpen(true);
                         }}
                       >

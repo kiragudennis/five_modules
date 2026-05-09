@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { useAuth } from "@/lib/context/AuthContext";
 
 type WheelSegment = {
@@ -79,6 +80,25 @@ export default function SpinGameDetailPage() {
   useEffect(() => {
     void load();
   }, [gameId, profile?.id]);
+
+  useSupabaseRealtime({
+    supabase,
+    channelName: `spin-game-${gameId}-${profile?.id || "anon"}`,
+    tables: [
+      { table: "spin_games", filter: `id=eq.${gameId}` },
+      { table: "spin_results", filter: `game_id=eq.${gameId}` },
+      ...(profile?.id
+        ? [
+            { table: "user_spins", filter: `user_id=eq.${profile.id}` },
+            { table: "loyalty_points", filter: `user_id=eq.${profile.id}` },
+          ]
+        : []),
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(gameId && profile?.id),
+  });
 
   const doSpin = async (usePoints: boolean) => {
     if (!game || !profile || spinning || game.is_locked) return;

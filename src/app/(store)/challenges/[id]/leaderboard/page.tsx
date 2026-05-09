@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { usePolling } from "@/hooks/usePolling";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 type Row = {
   user_id: string;
@@ -34,6 +35,18 @@ export default function ChallengeLeaderboardPage() {
     void load();
   }, [id]);
   usePolling(load, { intervalMs: 2500 });
+  useSupabaseRealtime({
+    supabase,
+    channelName: `challenge-leaderboard-${id}`,
+    tables: [
+      { table: "challenge_scores", filter: `challenge_id=eq.${id}` },
+      { table: "challenges", filter: `id=eq.${id}` },
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(id),
+  });
 
   const rankMovement = useMemo(() => {
     const next = new Map<string, "up" | "down" | "flat">();

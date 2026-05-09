@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { usePolling } from "@/hooks/usePolling";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { LiveDisplayShell } from "@/components/live/live-display-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +55,18 @@ export default function DrawLivePage() {
   }, [drawId]);
 
   usePolling(load, { intervalMs: 2500 });
+  useSupabaseRealtime({
+    supabase,
+    channelName: `draw-live-${drawId}`,
+    tables: [
+      { table: "draws", filter: `id=eq.${drawId}` },
+      { table: "draw_entries", filter: `draw_id=eq.${drawId}` },
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(drawId),
+  });
 
   const ticker = useMemo(
     () =>

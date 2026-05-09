@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { PointsService } from "@/lib/services/points-service";
 
 const TIER_COLORS: Record<string, string> = {
   bronze: "bg-amber-100 text-amber-800 border-amber-300",
@@ -64,7 +65,10 @@ export default function LoyaltyPage() {
   const router = useRouter();
   const [redeemDialogOpen, setRedeemDialogOpen] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(100);
-  const maxRedeemable = Math.floor((loyaltyData?.points || 0) / 100) * 100;
+  const [pointsPerKsh, setPointsPerKsh] = useState(10);
+  const [minRedeemPoints, setMinRedeemPoints] = useState(100);
+  const maxRedeemable =
+    Math.floor((loyaltyData?.points || 0) / minRedeemPoints) * minRedeemPoints;
 
   // Check for existing redemption on mount
   useEffect(() => {
@@ -99,6 +103,9 @@ export default function LoyaltyPage() {
   const fetchLoyaltyData = async () => {
     try {
       setLoading(true);
+      const cfg = await PointsService.getConfig(supabase);
+      setPointsPerKsh(cfg.pointsPerKsh);
+      setMinRedeemPoints(cfg.minRedeemPoints);
       const { data, error } = await supabase.rpc("get_user_loyalty_summary", {
         p_user_id: user?.id,
       });
@@ -115,31 +122,27 @@ export default function LoyaltyPage() {
   };
 
   const handleOpenRedeemDialog = () => {
-    setPointsToRedeem(Math.min(100, maxRedeemable));
+    setPointsToRedeem(Math.min(minRedeemPoints, maxRedeemable));
     setRedeemDialogOpen(true);
   };
 
   const handleConfirmRedemption = async () => {
-    if (!loyaltyData || pointsToRedeem < 100) {
-      toast.error("Minimum redemption is 100 points");
+    if (!loyaltyData || pointsToRedeem < minRedeemPoints) {
+      toast.error(`Minimum redemption is ${minRedeemPoints} points`);
       return;
     }
 
-    const discountAmount = pointsToRedeem / 10;
+    const discountAmount = pointsToRedeem / pointsPerKsh;
 
     try {
       setRedeeming(true);
 
-      const { data, error } = await supabase.rpc(
-        "redeem_loyalty_points_for_checkout",
-        {
-          p_user_id: user?.id,
-          p_points_to_redeem: pointsToRedeem,
-          p_description: `Redeemed ${pointsToRedeem} points for discount`,
-        },
+      const data = await PointsService.redeemForCheckout(
+        supabase,
+        user!.id,
+        pointsToRedeem,
+        `Redeemed ${pointsToRedeem} points for discount`,
       );
-
-      if (error) throw error;
 
       if (data.success) {
         const redemptionData = {
@@ -248,7 +251,8 @@ export default function LoyaltyPage() {
   const displayPoints = pendingRedemption
     ? loyaltyData.points // Show actual database points
     : loyaltyData.points;
-  const redeemablePoints = Math.floor(displayPoints / 100) * 100;
+  const redeemablePoints =
+    Math.floor(displayPoints / minRedeemPoints) * minRedeemPoints;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -294,7 +298,7 @@ export default function LoyaltyPage() {
                       <span className="text-muted-foreground">points</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Worth KES {(displayPoints / 10).toFixed(2)} in discounts
+                      Worth KES {(displayPoints / pointsPerKsh).toFixed(2)} in discounts
                     </p>
                     {pendingRedemption && (
                       <p className="text-sm text-amber-600 mt-1">
@@ -412,7 +416,7 @@ export default function LoyaltyPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Current Value</p>
                   <p className="text-2xl font-bold">
-                    KES {(displayPoints / 10).toFixed(2)}
+                    KES {(displayPoints / pointsPerKsh).toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -490,18 +494,21 @@ export default function LoyaltyPage() {
                       Turn Points into Savings
                     </h3>
                     <p className="text-muted-foreground mb-4">
-                      Redeem 100 points for KES 10 discount. Your points never
-                      expire!
+                      Redeem points for instant checkout discounts. Your points
+                      never expire!
                     </p>
                     <div className="flex items-center gap-2 text-sm">
                       <div className="bg-primary/20 px-2 py-1 rounded">
-                        100 pts = KES 10
+                        {minRedeemPoints} pts = KES{" "}
+                        {(minRedeemPoints / pointsPerKsh).toFixed(2)}
                       </div>
                       <div className="bg-primary/20 px-2 py-1 rounded">
-                        500 pts = KES 50
+                        {minRedeemPoints * 5} pts = KES{" "}
+                        {((minRedeemPoints * 5) / pointsPerKsh).toFixed(2)}
                       </div>
                       <div className="bg-primary/20 px-2 py-1 rounded">
-                        1000 pts = KES 100
+                        {minRedeemPoints * 10} pts = KES{" "}
+                        {((minRedeemPoints * 10) / pointsPerKsh).toFixed(2)}
                       </div>
                     </div>
                   </div>
@@ -518,7 +525,7 @@ export default function LoyaltyPage() {
                       <Button
                         size="lg"
                         onClick={handleOpenRedeemDialog}
-                        disabled={loyaltyData.points < 100 || redeeming}
+                        disabled={loyaltyData.points < minRedeemPoints || redeeming}
                       >
                         {redeeming ? (
                           <>
@@ -647,20 +654,20 @@ export default function LoyaltyPage() {
                   value={pointsToRedeem}
                   onChange={(e) => {
                     let val = parseInt(e.target.value) || 0;
-                    val = Math.floor(val / 100) * 100;
+                    val = Math.floor(val / minRedeemPoints) * minRedeemPoints;
                     val = Math.min(val, maxRedeemable);
-                    val = Math.max(val, 100);
+                    val = Math.max(val, minRedeemPoints);
                     setPointsToRedeem(val);
                   }}
-                  step="100"
+                  step={minRedeemPoints}
                   className="w-32"
                 />
                 <Slider
                   value={[pointsToRedeem]}
                   onValueChange={(val: number[]) => setPointsToRedeem(val[0])}
-                  min={100}
+                  min={minRedeemPoints}
                   max={maxRedeemable}
-                  step={100}
+                  step={minRedeemPoints}
                   className="flex-1"
                 />
               </div>
@@ -676,7 +683,7 @@ export default function LoyaltyPage() {
               <div className="flex justify-between">
                 <span>Discount Amount:</span>
                 <span className="font-bold text-green-600">
-                  KES {(pointsToRedeem / 10).toFixed(2)}
+                  KES {(pointsToRedeem / pointsPerKsh).toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between text-sm text-muted-foreground">
@@ -701,7 +708,7 @@ export default function LoyaltyPage() {
             </Button>
             <Button
               onClick={handleConfirmRedemption}
-              disabled={pointsToRedeem < 100}
+              disabled={pointsToRedeem < minRedeemPoints}
             >
               Confirm Redemption
             </Button>

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatDistanceToNowStrict } from "date-fns";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 type DrawDetail = {
   id: string;
@@ -60,6 +61,19 @@ export default function DrawDetailPage() {
   useEffect(() => {
     void load();
   }, [drawId, profile?.id]);
+
+  useSupabaseRealtime({
+    supabase,
+    channelName: `draw-detail-${drawId}-${profile?.id || "anon"}`,
+    tables: [
+      { table: "draws", filter: `id=eq.${drawId}` },
+      { table: "draw_entries", filter: `draw_id=eq.${drawId}` },
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(drawId && profile?.id),
+  });
 
   const simulatePurchaseEntry = async () => {
     if (!profile?.id || !draw) return;

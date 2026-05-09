@@ -290,6 +290,19 @@ export interface MistryBundle {
   created_at: string;
 }
 
+export interface BundleLiveConfig {
+  bundle_id: string;
+  bundle_type: "mystery" | "tiered" | "build_your_own";
+  mystery_reveal_mode: "manual" | "after_purchase";
+  total_value_ksh: number | null;
+  is_live_stream_only: boolean;
+  is_stream_active: boolean;
+  is_mystery_revealed: boolean;
+  live_stock_total: number;
+  live_stock_claimed: number;
+  updated_at: string;
+}
+
 export type ShippingZone = "NAIROBI" | "KENYA" | "INTERNATIONAL";
 
 export interface ShippingOptions {

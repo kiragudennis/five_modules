@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Bundle } from "@/types/store";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface ProductDetails {
   id: string;
@@ -53,6 +54,21 @@ export default function BundlesPage() {
     }
     fetchData();
   }, [accountId, profile]);
+
+  useSupabaseRealtime({
+    supabase,
+    channelName: `bundles-list-${String(accountId)}`,
+    tables: [
+      { table: "mistry_bundles" },
+      { table: "bundle_live_config" },
+      { table: "bundle_purchases", filter: `user_id=eq.${String(accountId)}` },
+      { table: "loyalty_points", filter: `user_id=eq.${String(accountId)}` },
+    ],
+    onEvent: () => {
+      void fetchData();
+    },
+    enabled: Boolean(profile?.id && accountId),
+  });
 
   const fetchData = async () => {
     try {
@@ -94,8 +110,21 @@ export default function BundlesPage() {
 
       if (bundlesError) throw bundlesError;
 
+      const bundleIds = (bundlesData || []).map((b: any) => b.id);
+      let liveConfigMap = new Map<string, any>();
+      if (bundleIds.length > 0) {
+        const { data: liveConfigs } = await supabase
+          .from("bundle_live_config")
+          .select(
+            "bundle_id,is_live_stream_only,is_stream_active,bundle_type,is_mystery_revealed",
+          )
+          .in("bundle_id", bundleIds);
+        liveConfigMap = new Map((liveConfigs || []).map((cfg: any) => [cfg.bundle_id, cfg]));
+      }
+
       // Filter bundles based on user's tier and points
       const accessibleBundles = bundlesData.filter((bundle: any) => {
+        const liveConfig = liveConfigMap.get(bundle.id);
         const tierOk =
           !bundle.min_tier_required || bundle.min_tier_required <= userTier;
         const pointsOk =
@@ -105,7 +134,9 @@ export default function BundlesPage() {
           !bundle.end_date || new Date(bundle.end_date) > new Date();
         const notStarted =
           bundle.start_date && new Date(bundle.start_date) > new Date();
-        return tierOk && pointsOk && notExpired && !notStarted;
+        const streamGateOk =
+          !liveConfig?.is_live_stream_only || liveConfig?.is_stream_active;
+        return tierOk && pointsOk && notExpired && !notStarted && streamGateOk;
       });
 
       setBundles(accessibleBundles);

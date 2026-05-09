@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { usePolling } from "@/hooks/usePolling";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { LiveDisplayShell } from "@/components/live/live-display-shell";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -58,6 +59,18 @@ export default function DealLivePage() {
   usePolling(() => setSecondsLeft((prev) => Math.max(0, prev - 1)), {
     intervalMs: 1000,
     runImmediately: false,
+  });
+  useSupabaseRealtime({
+    supabase,
+    channelName: `deal-live-${id}`,
+    tables: [
+      { table: "deals", filter: `id=eq.${id}` },
+      { table: "deal_claims", filter: `deal_id=eq.${id}` },
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(id),
   });
 
   const stockPct = useMemo(() => {

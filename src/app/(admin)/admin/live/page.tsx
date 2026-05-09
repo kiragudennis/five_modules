@@ -76,6 +76,22 @@ export default function AdminLiveSwitcherPage() {
       });
     }
 
+    const { data: bundles } = await supabase
+      .from("mistry_bundles")
+      .select("id,name,status")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    for (const bundle of bundles || []) {
+      next.push({
+        id: bundle.id,
+        name: bundle.name || "Bundle",
+        type: "bundle",
+        href: `/bundles/live/${bundle.id}`,
+        status: bundle.status === "active" ? "active" : "scheduled",
+      });
+    }
+
     setDisplays(next);
     setLoading(false);
   };

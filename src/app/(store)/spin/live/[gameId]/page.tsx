@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { LiveDisplayShell } from "@/components/live/live-display-shell";
 import { usePolling } from "@/hooks/usePolling";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { useAuth } from "@/lib/context/AuthContext";
 
 type SpinLiveResult = {
@@ -55,6 +56,19 @@ export default function SpinLiveDisplayPage() {
   }, [gameId]);
 
   usePolling(loadLiveData, { intervalMs: 2500 });
+  useSupabaseRealtime({
+    supabase,
+    channelName: `spin-live-${gameId}`,
+    tables: [
+      { table: "spin_results", filter: `game_id=eq.${gameId}` },
+      { table: "user_spins", filter: `game_id=eq.${gameId}` },
+      { table: "spin_games", filter: `id=eq.${gameId}` },
+    ],
+    onEvent: () => {
+      void loadLiveData();
+    },
+    enabled: Boolean(gameId),
+  });
 
   const tickerItems = useMemo(
     () =>

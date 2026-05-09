@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { Bundle, Product } from "@/types/store";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface ProductWithDetails extends Product {
   quantity: number;
@@ -43,11 +44,36 @@ export default function BundleDetailPage() {
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [userPurchases, setUserPurchases] = useState(0);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [liveConfig, setLiveConfig] = useState<{
+    is_live_stream_only: boolean;
+    is_stream_active: boolean;
+    bundle_type: "mystery" | "tiered" | "build_your_own";
+    is_mystery_revealed: boolean;
+  } | null>(null);
   const { dispatch } = useStore();
 
   useEffect(() => {
     fetchBundleData();
   }, [slug]);
+
+  useSupabaseRealtime({
+    supabase,
+    channelName: `bundle-detail-${String(slug)}-${profile?.id || "anon"}`,
+    tables: [
+      { table: "mistry_bundles" },
+      { table: "bundle_live_config" },
+      ...(profile?.id
+        ? [
+            { table: "bundle_purchases", filter: `user_id=eq.${profile.id}` },
+            { table: "loyalty_points", filter: `user_id=eq.${profile.id}` },
+          ]
+        : []),
+    ],
+    onEvent: () => {
+      void fetchBundleData();
+    },
+    enabled: Boolean(slug),
+  });
 
   const fetchBundleData = async () => {
     try {
@@ -62,6 +88,15 @@ export default function BundleDetailPage() {
 
       if (bundleError) throw bundleError;
       setBundle(bundleData);
+
+      const { data: liveData } = await supabase
+        .from("bundle_live_config")
+        .select(
+          "is_live_stream_only,is_stream_active,bundle_type,is_mystery_revealed",
+        )
+        .eq("bundle_id", bundleData.id)
+        .maybeSingle();
+      setLiveConfig((liveData || null) as any);
 
       // Get product details
       const productIds = bundleData.products.map((p: any) => p.product_id);
@@ -153,13 +188,17 @@ export default function BundleDetailPage() {
       !bundle.total_purchases_allowed ||
       (bundle.current_purchases || 0) < bundle.total_purchases_allowed;
 
+    const streamGateOk =
+      !liveConfig?.is_live_stream_only || liveConfig?.is_stream_active;
+
     return (
       tierOk &&
       pointsOk &&
       notExpired &&
       started &&
       underUserLimit &&
-      underGlobalLimit
+      underGlobalLimit &&
+      streamGateOk
     );
   };
 
@@ -391,7 +430,15 @@ export default function BundleDetailPage() {
             {/* Products List */}
             <div className="space-y-4">
               <h3 className="font-semibold">What's Included</h3>
-              {products.map((product) => (
+              {liveConfig?.bundle_type === "mystery" &&
+              !liveConfig?.is_mystery_revealed ? (
+                <div className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+                  Mystery contents will be revealed during live drop.
+                </div>
+              ) : null}
+              {(liveConfig?.bundle_type !== "mystery" ||
+                liveConfig?.is_mystery_revealed) &&
+                products.map((product) => (
                 <div
                   key={product.id}
                   className="flex items-center gap-4 p-3 border rounded-lg"

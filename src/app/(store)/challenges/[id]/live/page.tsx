@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { usePolling } from "@/hooks/usePolling";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { LiveDisplayShell } from "@/components/live/live-display-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +55,18 @@ export default function ChallengeLivePage() {
   usePolling(() => setSecondsLeft((prev) => Math.max(0, prev - 1)), {
     intervalMs: 1000,
     runImmediately: false,
+  });
+  useSupabaseRealtime({
+    supabase,
+    channelName: `challenge-live-${id}`,
+    tables: [
+      { table: "challenges", filter: `id=eq.${id}` },
+      { table: "challenge_scores", filter: `challenge_id=eq.${id}` },
+    ],
+    onEvent: () => {
+      void load();
+    },
+    enabled: Boolean(id),
   });
 
   const finalHour = secondsLeft <= 3600;
