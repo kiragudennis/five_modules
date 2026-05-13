@@ -35,7 +35,7 @@ export function useLiveBroadcast(options: UseLiveBroadcastOptions) {
     const [isConnected, setIsConnected] = useState(false);
     const [lastMessage, setLastMessage] = useState<LiveMessage | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     
     const connect = useCallback(() => {
         const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002';
