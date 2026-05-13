@@ -1,3 +1,4 @@
+// This is the main index page for spin games, showing all configured games and their status.
 "use client";
 
 import Link from "next/link";

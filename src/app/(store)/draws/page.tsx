@@ -1,3 +1,4 @@
+// This is the main index page for draws, showing all configured draws and their status.
 "use client";
 
 import Link from "next/link";

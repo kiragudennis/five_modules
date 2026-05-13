@@ -27,11 +27,14 @@ import {
   Sparkles,
   Clock,
   ArrowRight,
-  Loader2,
   MonitorPlay,
   Ticket,
   Flame,
   Settings2,
+  Zap,
+  Trophy,
+  Palette,
+  LayoutDashboard,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -115,7 +118,6 @@ export default function AdminMarketingPage() {
             0,
           );
 
-          // Group purchases by bundle
           const bundleMap = new Map();
           purchases.forEach((p: any) => {
             if (!bundleMap.has(p.bundle_id)) {
@@ -156,7 +158,7 @@ export default function AdminMarketingPage() {
         const activeGames = spinGames.filter((g: any) => g.is_active);
 
         const { data: spins, error: spinsError } = await supabase
-          .from("user_spins")
+          .from("spin_attempts")
           .select("*")
           .gte("created_at", getTimeRangeDate());
 
@@ -167,11 +169,11 @@ export default function AdminMarketingPage() {
           ).length;
 
           const { data: results, error: resultsError } = await supabase
-            .from("spin_results")
+            .from("spin_attempts")
             .select(
               `
               *,
-              user:user_id (full_name, email)
+              profiles:user_id (full_name, email)
             `,
             )
             .gte("created_at", getTimeRangeDate())
@@ -192,7 +194,7 @@ export default function AdminMarketingPage() {
               .filter((r: any) => r.prize_type !== "nothing")
               .slice(0, 5)
               .map((r: any) => ({
-                user: r.user?.full_name || r.user?.email || "Anonymous",
+                user: r.profiles?.full_name || "Anonymous",
                 prize: `${r.prize_type}${r.prize_value ? `: ${r.prize_value}` : ""}`,
                 date: r.created_at,
               }));
@@ -218,25 +220,28 @@ export default function AdminMarketingPage() {
         .select("*");
 
       if (!challengesError && challenges) {
-        const activeChallenges = challenges.filter((c: any) => c.is_active);
+        const activeChallenges = challenges.filter(
+          (c: any) => c.status === "active",
+        );
 
         const { data: userChallenges, error: ucError } = await supabase
-          .from("user_challenges")
+          .from("challenge_participants")
           .select("*")
-          .gte("created_at", getTimeRangeDate());
+          .gte("joined_at", getTimeRangeDate());
 
         if (!ucError && userChallenges) {
           const completed = userChallenges.filter(
-            (uc: any) => uc.status === "completed",
+            (uc: any) => uc.current_score > 0,
           ).length;
           const pointsAwarded = userChallenges.reduce(
-            (sum: number, uc: any) => sum + (uc.loyalty_points_awarded || 0),
+            (sum: number, uc: any) => sum + (uc.current_score || 0),
             0,
           );
 
           const { data: referrals, error: refError } = await supabase
-            .from("referrals")
+            .from("challenge_actions")
             .select("*")
+            .eq("action_type", "referral_completed")
             .gte("created_at", getTimeRangeDate());
 
           if (!refError && referrals) {
@@ -248,62 +253,13 @@ export default function AdminMarketingPage() {
                 completed,
                 referrals: {
                   total: referrals.length,
-                  completed: referrals.filter(
-                    (r: any) => r.status === "completed",
-                  ).length,
-                  pending: referrals.filter(
-                    (r: any) => r.status === "pending" || r.status === "joined",
-                  ).length,
+                  completed: referrals.length,
+                  pending: 0,
                 },
                 pointsAwarded,
               },
             }));
           }
-        }
-      }
-
-      // Fetch rewards stats
-      const { data: rewards, error: rewardsError } = await supabase
-        .from("rewards")
-        .select("*");
-
-      if (!rewardsError && rewards) {
-        const activeRewards = rewards.filter((r: any) => r.is_active);
-
-        const { data: userRewards, error: urError } = await supabase
-          .from("user_rewards")
-          .select("*")
-          .gte("created_at", getTimeRangeDate());
-
-        if (!urError && userRewards) {
-          // Calculate upcoming birthdays for next 7 days
-          const today = new Date();
-          const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-          const { data: birthdays, error: bdError } = await supabase
-            .from("users")
-            .select("id, full_name, created_at")
-            .gte("created_at", today.toISOString())
-            .lte("created_at", nextWeek.toISOString());
-
-          const upcoming = [
-            {
-              type: "birthday",
-              count: birthdays?.length || 0,
-              date: "Next 7 days",
-            },
-            { type: "anniversary", count: 0, date: "This month" },
-          ];
-
-          setStats((prev) => ({
-            ...prev,
-            rewards: {
-              total: rewards.length,
-              active: activeRewards.length,
-              awarded: userRewards.length,
-              upcoming,
-            },
-          }));
         }
       }
 
@@ -350,7 +306,7 @@ export default function AdminMarketingPage() {
         }));
       }
 
-      // Fetch recent activity
+      // Fetch recent orders activity
       const { data: recentOrders, error: ordersError } = await supabase
         .from("orders")
         .select(
@@ -359,8 +315,7 @@ export default function AdminMarketingPage() {
           order_number,
           total_amount,
           created_at,
-          customer_name,
-          metadata
+          customer_name
         `,
         )
         .order("created_at", { ascending: false })
@@ -372,7 +327,6 @@ export default function AdminMarketingPage() {
           description: `New order #${order.order_number} from ${order.customer_name}`,
           amount: order.total_amount,
           time: order.created_at,
-          metadata: order.metadata,
         }));
         setRecentActivity(activity);
       }
@@ -399,30 +353,32 @@ export default function AdminMarketingPage() {
     return date.toISOString();
   };
 
-  const FeatureCard = ({
+  const ModuleCard = ({
     title,
     description,
     icon: Icon,
     href,
-    stats,
+    stats: moduleStats,
     color,
     progress,
   }: any) => (
     <Link href={href} className="block group">
       <Card
-        className={`hover:shadow-lg transition-all duration-300 border-l-4 border-l-${color}-500 overflow-hidden`}
+        className={`hover:shadow-lg transition-all duration-300 border-l-4 border-l-${color}-500 overflow-hidden h-full`}
       >
-        <CardContent>
+        <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div
-              className={`p-3 bg-${color}-100 rounded-lg group-hover:scale-110 transition-transform`}
+              className={`p-3 bg-${color}-100 dark:bg-${color}-950/30 rounded-lg group-hover:scale-110 transition-transform`}
             >
-              <Icon className={`h-6 w-6 text-${color}-600`} />
+              <Icon
+                className={`h-6 w-6 text-${color}-600 dark:text-${color}-400`}
+              />
             </div>
             {progress !== undefined && (
               <Badge
                 variant="outline"
-                className="bg-green-50 dark:bg-green-900"
+                className="bg-green-50 dark:bg-green-950/30"
               >
                 {progress}% conversion
               </Badge>
@@ -434,8 +390,8 @@ export default function AdminMarketingPage() {
           </h3>
           <p className="text-sm text-muted-foreground mb-4">{description}</p>
 
-          <div className="space-y-3">
-            {stats.map((stat: any, i: number) => (
+          <div className="space-y-2">
+            {moduleStats.map((stat: any, i: number) => (
               <div
                 key={i}
                 className="flex justify-between items-center text-sm"
@@ -447,9 +403,7 @@ export default function AdminMarketingPage() {
           </div>
 
           <div className="mt-4 pt-4 border-t flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">
-              Click to manage
-            </span>
+            <span className="text-xs text-muted-foreground">Manage →</span>
             <ArrowRight
               className={`h-4 w-4 text-${color}-500 group-hover:translate-x-1 transition-transform`}
             />
@@ -461,46 +415,48 @@ export default function AdminMarketingPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-2 py-8">
+      <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col justify-center items-center h-64 space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading engagements...</p>
+          <p className="text-muted-foreground">
+            Loading marketing dashboard...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-2 py-8">
+    <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-lg">
-            <Sparkles className="h-6 w-6 text-white" />
+            <LayoutDashboard className="h-6 w-6 text-white" />
           </div>
           <h1 className="text-3xl font-bold">Marketing Dashboard</h1>
         </div>
         <p className="text-muted-foreground">
-          Drive customer engagement and track the success of your marketing
-          campaigns
+          Manage customer engagement campaigns, loyalty programs, and track
+          performance metrics
         </p>
       </div>
 
-      {/* Overall Success Metrics */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-                  Total Revenue
+                  Bundle Revenue
                 </p>
                 <p className="text-2xl font-bold">
                   {formatCurrency(stats.bundles.revenue, "KES")}
                 </p>
               </div>
               <div className="p-3 bg-green-200 dark:bg-green-900 rounded-full">
-                <TrendingUp className="h-5 w-5 text-green-700 dark:text-green-300" />
+                <ShoppingBag className="h-5 w-5 text-green-700 dark:text-green-300" />
               </div>
             </div>
             <p className="text-xs text-green-600 dark:text-green-400 mt-2">
@@ -514,10 +470,12 @@ export default function AdminMarketingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                  Engagement
+                  Total Engagement
                 </p>
                 <p className="text-2xl font-bold">
-                  {stats.spins.totalSpins + stats.challenges.completed}
+                  {(
+                    stats.spins.totalSpins + stats.challenges.completed
+                  ).toLocaleString()}
                 </p>
               </div>
               <div className="p-3 bg-blue-200 dark:bg-blue-900 rounded-full">
@@ -547,8 +505,7 @@ export default function AdminMarketingPage() {
               </div>
             </div>
             <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-              {stats.loyalty.pointsEarned.toLocaleString()} earned •{" "}
-              {stats.loyalty.pointsRedeemed.toLocaleString()} redeemed
+              {stats.loyalty.pointsEarned.toLocaleString()} earned
             </p>
           </CardContent>
         </Card>
@@ -558,34 +515,36 @@ export default function AdminMarketingPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
-                  Referrals
+                  Active Campaigns
                 </p>
                 <p className="text-2xl font-bold">
-                  {stats.challenges.referrals.total}
+                  {stats.bundles.active +
+                    stats.spins.activeGames +
+                    stats.challenges.active}
                 </p>
               </div>
               <div className="p-3 bg-amber-200 dark:bg-amber-900 rounded-full">
-                <Users className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+                <Zap className="h-5 w-5 text-amber-700 dark:text-amber-300" />
               </div>
             </div>
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-              {stats.challenges.referrals.completed} completed •{" "}
-              {stats.challenges.referrals.pending} pending
+              {stats.bundles.active} bundles • {stats.spins.activeGames} spin
+              games
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Feature Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <FeatureCard
+      {/* Main Module Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <ModuleCard
           title="Mystery Bundles"
           description="Create product bundles with special discounts"
           icon={Gift}
           href="/admin/marketing/bundles"
           color="purple"
           progress={
-            stats.bundles.purchases > 0
+            stats.bundles.active > 0
               ? Math.round(
                   (stats.bundles.purchases / stats.bundles.active) * 100,
                 )
@@ -594,11 +553,14 @@ export default function AdminMarketingPage() {
           stats={[
             { label: "Active Bundles", value: stats.bundles.active },
             { label: "Total Sales", value: stats.bundles.purchases },
-            { label: "Revenue", value: formatCurrency(stats.bundles.revenue) },
+            {
+              label: "Revenue",
+              value: formatCurrency(stats.bundles.revenue, "KES"),
+            },
           ]}
         />
 
-        <FeatureCard
+        <ModuleCard
           title="Spin Games"
           description="Engage customers with daily spin wheels"
           icon={RefreshCw}
@@ -613,19 +575,22 @@ export default function AdminMarketingPage() {
           }
           stats={[
             { label: "Active Games", value: stats.spins.activeGames },
-            { label: "Total Spins", value: stats.spins.totalSpins },
+            {
+              label: "Total Spins",
+              value: stats.spins.totalSpins.toLocaleString(),
+            },
             { label: "Today's Spins", value: stats.spins.todaySpins },
           ]}
         />
 
-        <FeatureCard
+        <ModuleCard
           title="Challenges"
-          description="Drive actions with rewards"
-          icon={Target}
+          description="Drive actions with competitive challenges"
+          icon={Trophy}
           href="/admin/marketing/challenges"
           color="orange"
           progress={
-            stats.challenges.completed > 0
+            stats.challenges.active > 0
               ? Math.round(
                   (stats.challenges.completed / stats.challenges.active) * 100,
                 )
@@ -634,45 +599,60 @@ export default function AdminMarketingPage() {
           stats={[
             { label: "Active Challenges", value: stats.challenges.active },
             { label: "Completed", value: stats.challenges.completed },
-            {
-              label: "Points Awarded",
-              value: stats.challenges.pointsAwarded.toLocaleString(),
-            },
+            { label: "Referrals", value: stats.challenges.referrals.total },
           ]}
         />
 
-        <FeatureCard
+        <ModuleCard
+          title="Lucky Draws"
+          description="Run time-limited giveaways"
+          icon={Ticket}
+          href="/admin/marketing/draws"
+          color="blue"
+          stats={[
+            { label: "Active Draws", value: 0 },
+            { label: "Total Entries", value: 0 },
+            { label: "Winners", value: 0 },
+          ]}
+        />
+
+        <ModuleCard
+          title="Flash Deals"
+          description="Create urgency with limited-time offers"
+          icon={Flame}
+          href="/admin/marketing/deals"
+          color="red"
+          stats={[
+            { label: "Active Deals", value: 0 },
+            { label: "Units Sold", value: 0 },
+            { label: "Revenue", value: formatCurrency(0, "KES") },
+          ]}
+        />
+
+        <ModuleCard
           title="Rewards"
           description="Automatic customer rewards"
           icon={Award}
           href="/admin/marketing/rewards"
           color="amber"
-          progress={
-            stats.rewards.awarded > 0
-              ? Math.round((stats.rewards.awarded / stats.rewards.active) * 100)
-              : 0
-          }
           stats={[
             { label: "Active Rewards", value: stats.rewards.active },
             { label: "Awarded", value: stats.rewards.awarded },
             {
-              label: "Upcoming",
-              value: stats.rewards.upcoming.reduce(
-                (sum, r) => sum + r.count,
-                0,
-              ),
+              label: "Points Distributed",
+              value: stats.challenges.pointsAwarded.toLocaleString(),
             },
           ]}
         />
       </div>
 
-      {/* Charts and Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Tier Distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Crown className="h-5 w-5" />
+              <Crown className="h-5 w-5 text-yellow-500" />
               Customer Tier Distribution
             </CardTitle>
             <CardDescription>
@@ -692,8 +672,8 @@ export default function AdminMarketingPage() {
                     fill="#8884d8"
                     paddingAngle={5}
                     dataKey="count"
-                    label={({ tier, percent }) =>
-                      `${tier} ${(percent || 0 * 100).toFixed(0)}%`
+                    label={({ payload, percent }) =>
+                      `${payload?.tier} ${((percent || 0) * 100).toFixed(0)}%`
                     }
                   >
                     {stats.loyalty.tierDistribution.map((entry, index) => (
@@ -783,45 +763,6 @@ export default function AdminMarketingPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Top Bundles */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Top Performing Bundles
-            </CardTitle>
-            <CardDescription>
-              Best selling bundles this {timeRange}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {stats.bundles.topBundles.map((bundle, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm truncate max-w-[150px]">
-                      {bundle.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {bundle.purchases} purchases
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-sm">
-                      {formatCurrency(bundle.revenue)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {stats.bundles.topBundles.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">
-                  No bundle sales yet
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Recent Activity & Winners */}
@@ -840,7 +781,7 @@ export default function AdminMarketingPage() {
               {stats.spins.topWinners.map((winner, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between p-3 rounded-lg"
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
                 >
                   <div>
                     <p className="font-medium">{winner.user}</p>
@@ -856,7 +797,7 @@ export default function AdminMarketingPage() {
                 </div>
               ))}
               {stats.spins.topWinners.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">
+                <p className="text-center text-muted-foreground py-8">
                   No winners yet
                 </p>
               )}
@@ -880,7 +821,7 @@ export default function AdminMarketingPage() {
                   key={i}
                   className="flex items-start gap-3 p-3 border rounded-lg"
                 >
-                  <div className="p-2 bg-green-100 rounded-full">
+                  <div className="p-2 bg-green-100 dark:bg-green-950/30 rounded-full">
                     <ShoppingBag className="h-4 w-4 text-green-600" />
                   </div>
                   <div className="flex-1">
@@ -892,12 +833,12 @@ export default function AdminMarketingPage() {
                     </p>
                   </div>
                   <Badge variant="outline">
-                    {formatCurrency(activity.amount)}
+                    {formatCurrency(activity.amount, "KES")}
                   </Badge>
                 </div>
               ))}
               {recentActivity.length === 0 && (
-                <p className="text-center text-muted-foreground py-4">
+                <p className="text-center text-muted-foreground py-8">
                   No recent activity
                 </p>
               )}
@@ -909,73 +850,79 @@ export default function AdminMarketingPage() {
       {/* Quick Actions */}
       <div className="mt-8">
         <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-8 gap-4">
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/marketing/bundles?create=true")}
-          >
-            <Gift className="h-6 w-6" />
-            <span>New Bundle</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/marketing/spin?create=true")}
-          >
-            <RefreshCw className="h-6 w-6" />
-            <span>New Spin Game</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() =>
-              router.push("/admin/marketing/challenges?create=true")
-            }
-          >
-            <Target className="h-6 w-6" />
-            <span>New Challenge</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/marketing/rewards?create=true")}
-          >
-            <Award className="h-6 w-6" />
-            <span>New Reward</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/live")}
-          >
-            <MonitorPlay className="h-6 w-6" />
-            <span>Live Control Room</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/draws/create")}
-          >
-            <Ticket className="h-6 w-6" />
-            <span>New Draw</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/deals/create")}
-          >
-            <Flame className="h-6 w-6" />
-            <span>New Deal</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center gap-2"
-            onClick={() => router.push("/admin/points")}
-          >
-            <Settings2 className="h-6 w-6" />
-            <span>Points Settings</span>
-          </Button>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <Link href="/admin/marketing/bundles?create=true">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Gift className="h-5 w-5" />
+              <span className="text-xs">New Bundle</span>
+            </Button>
+          </Link>
+          <Link href="/admin/marketing/spin?create=true">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <RefreshCw className="h-5 w-5" />
+              <span className="text-xs">New Spin Game</span>
+            </Button>
+          </Link>
+          <Link href="/admin/marketing/challenges?create=true">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Trophy className="h-5 w-5" />
+              <span className="text-xs">New Challenge</span>
+            </Button>
+          </Link>
+          <Link href="/admin/marketing/draws?create=true">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Ticket className="h-5 w-5" />
+              <span className="text-xs">New Draw</span>
+            </Button>
+          </Link>
+          <Link href="/admin/marketing/deals?create=true">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Flame className="h-5 w-5" />
+              <span className="text-xs">New Deal</span>
+            </Button>
+          </Link>
+          <Link href="/admin/marketing/rewards?create=true">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Award className="h-5 w-5" />
+              <span className="text-xs">New Reward</span>
+            </Button>
+          </Link>
+          <Link href="/admin/live">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <MonitorPlay className="h-5 w-5" />
+              <span className="text-xs">Live Control</span>
+            </Button>
+          </Link>
+          <Link href="/admin/points">
+            <Button
+              variant="outline"
+              className="w-full h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Settings2 className="h-5 w-5" />
+              <span className="text-xs">Points</span>
+            </Button>
+          </Link>
         </div>
       </div>
     </div>

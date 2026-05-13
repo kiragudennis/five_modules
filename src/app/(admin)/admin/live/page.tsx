@@ -1,3 +1,5 @@
+// This is the admin page for switching between live displays for different games during demos.
+// It polls the database for recently active games and shows their status and links to open them on a second monitor.
 "use client";
 
 import Link from "next/link";
@@ -121,7 +123,9 @@ export default function AdminLiveSwitcherPage() {
       </p>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading live displays...</p>
+        <p className="text-sm text-muted-foreground">
+          Loading live displays...
+        </p>
       ) : (
         <div className="grid gap-6">
           {Object.keys(grouped).length === 0 ? (
