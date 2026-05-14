@@ -440,8 +440,9 @@ export default function LiveDashboard() {
             </p>
             <pre className="bg-slate-800 text-white p-3 rounded text-xs overflow-x-auto">
               {`.hide-header .live-header { display: none; }
-.hide-ticker .live-ticker { display: none; }
-.transparent-bg { background: transparent !important; }`}
+                .hide-ticker .live-ticker { display: none; }
+                .transparent-bg { background: transparent !important; }
+                `}
             </pre>
           </div>
         </CardContent>
