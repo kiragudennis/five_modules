@@ -107,7 +107,6 @@ export default function AdminReferralsPage() {
     auto_approve_days: 7,
     tier_upgrade: null,
   });
-
   const [stats, setStats] = useState({
     total: 0,
     completed: 0,
@@ -117,7 +116,6 @@ export default function AdminReferralsPage() {
     pointsAwarded: 0,
     conversionRate: 0,
   });
-
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [shareLink, setShareLink] = useState("");
   const [copied, setCopied] = useState(false);

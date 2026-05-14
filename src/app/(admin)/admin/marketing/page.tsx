@@ -27,17 +27,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Gift,
-  Target,
   RefreshCw,
-  Crown,
   Coins,
   Users,
   TrendingUp,
   ShoppingBag,
   Award,
-  Sparkles,
-  Clock,
-  ArrowRight,
   MonitorPlay,
   Ticket,
   Flame,
@@ -812,7 +807,7 @@ export default function AdminMarketingPage() {
               </Card>
             </Link>
 
-            <Link href="/admin/points" className="group">
+            <Link href="/admin/marketing/points" className="group">
               <Card className="hover:shadow-lg transition-all hover:border-amber-500">
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -1296,7 +1291,7 @@ export default function AdminMarketingPage() {
               <span className="text-xs">New Deal</span>
             </Button>
           </Link>
-          <Link href="/admin/live">
+          <Link href="/admin/marketing/live">
             <Button
               variant="outline"
               className="w-full h-auto py-3 flex flex-col items-center gap-2"
@@ -1305,7 +1300,7 @@ export default function AdminMarketingPage() {
               <span className="text-xs">Live Control</span>
             </Button>
           </Link>
-          <Link href="/admin/points">
+          <Link href="/admin/marketing/points">
             <Button
               variant="outline"
               className="w-full h-auto py-3 flex flex-col items-center gap-2"
