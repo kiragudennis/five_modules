@@ -1,6 +1,3 @@
-DROP FUNCTION bulk_update_order_status(uuid[],text);
-DROP FUNCTION update_notification_sent(uuid[],text,timestamp with time zone);
-
 -- Update verify_admin_access to accept user_id parameter
 CREATE OR REPLACE FUNCTION public.verify_admin_function_access(user_id uuid DEFAULT NULL)
 RETURNS boolean

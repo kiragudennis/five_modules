@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   return (
     <div className="px-2 py-6">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold truncate">Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold truncate">Dashboard</h1>
         <div className="flex gap-4">
           <Button asChild>
             <Link href="/admin/products/new">Add New Product</Link>
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
                 Total Sales
               </p>
               <h3 className="text-2xl font-bold mt-1">
-                KES{stats.totalSales.toLocaleString()}
+                KES{stats?.totalSales?.toLocaleString()}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
                 Completed orders only
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
                 Total Revenue
               </p>
               <h3 className="text-2xl font-bold mt-1">
-                KES{stats.totalRevenue.toLocaleString()}
+                KES{stats?.totalRevenue?.toLocaleString()}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">All orders</p>
             </div>
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
                 Today's Sales
               </p>
               <h3 className="text-2xl font-bold mt-1">
-                KES{stats.todaySales.toLocaleString()}
+                KES{stats?.todaySales?.toLocaleString()}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
                 {stats.todayOrders} orders
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
                 Avg Order Value
               </p>
               <h3 className="text-2xl font-bold mt-1">
-                KES{stats.avgOrderValue.toLocaleString()}
+                KES{stats?.avgOrderValue?.toLocaleString()}
               </h3>
             </div>
             <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">

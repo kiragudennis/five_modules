@@ -1178,3 +1178,15 @@ BEGIN
     );
 END;
 $$;
+
+CREATE POLICY "Allow admin access" ON loyalty_points FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON loyalty_tiers FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON loyalty_transactions FOR ALL 
+USING (public.is_admin());
+
+CREATE POLICY "Allow admin access" ON loyalty_redemptions FOR ALL 
+USING (public.is_admin());

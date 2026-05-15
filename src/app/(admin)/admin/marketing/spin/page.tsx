@@ -1,27 +1,22 @@
-// app/admin/marketing/spin/page.tsx
+// src/app/(admin)/admin/marketing/spin/page.tsx
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, JSX } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -30,1150 +25,1226 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  RefreshCw,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Plus,
-  Edit,
+  Pencil,
   Trash2,
-  Save,
-  X,
-  Loader2,
-  Coins,
-  Ticket,
+  Eye,
+  Trophy,
+  Users,
   Gift,
+  Percent,
+  Truck,
+  Package,
+  Sparkles,
+  Coins,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Palette,
+  Hash,
+  Clock,
+  Calendar,
+  UserPlus,
+  ShoppingBag,
+  Crown,
+  Zap,
+  AlertCircle,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Copy, Eye, Search, Filter, Download } from "lucide-react";
+import { SpinGame, PrizeSegment } from "@/types/spinning_wheel";
 
-interface SpinGame {
-  id: string;
-  name: string;
-  description: string | null;
-  type: "daily" | "weekly" | "special";
-  free_spins_per_day: number;
-  points_per_spin: number;
-  max_spins_per_day: number;
-  wheel_config: Array<{
-    label: string;
-    value: string;
-    type: string;
-    quantity: number;
-    probability: number;
-    color: string;
-    product_name?: string | null;
-  }>;
-  segment_colors: string[];
-  rules: string | null;
-  start_date: string | null;
-  end_date: string | null;
-  is_active: boolean;
-  created_by: string;
-  created_at: string;
-}
+const PRIZE_COLORS = [
+  "#FF6B6B",
+  "#4ECDC4",
+  "#45B7D1",
+  "#96CEB4",
+  "#FFEAA7",
+  "#DDA0DD",
+  "#98D8C8",
+  "#F7DC6F",
+  "#BB8FCE",
+  "#85C1E2",
+];
 
-export default function AdminSpinPage() {
-  const { supabase, profile } = useAuth();
+const GAME_TYPES = [
+  {
+    value: "standard",
+    label: "Standard",
+    icon: <RotateCcw className="h-4 w-4" />,
+    color: "bg-blue-500",
+  },
+  {
+    value: "vip",
+    label: "VIP",
+    icon: <Crown className="h-4 w-4" />,
+    color: "bg-yellow-500",
+  },
+  {
+    value: "new_customer",
+    label: "New Customer",
+    icon: <UserPlus className="h-4 w-4" />,
+    color: "bg-green-500",
+  },
+  {
+    value: "weekend",
+    label: "Weekend Special",
+    icon: <Calendar className="h-4 w-4" />,
+    color: "bg-purple-500",
+  },
+  {
+    value: "flash",
+    label: "Flash Game",
+    icon: <Zap className="h-4 w-4" />,
+    color: "bg-red-500",
+  },
+];
+
+const PRIZE_TYPES = [
+  {
+    value: "points",
+    label: "Points",
+    icon: <Coins className="h-4 w-4" />,
+    placeholder: "points amount",
+    unit: "pts",
+  },
+  {
+    value: "discount",
+    label: "Discount %",
+    icon: <Percent className="h-4 w-4" />,
+    placeholder: "discount percentage",
+    unit: "%",
+  },
+  {
+    value: "free_shipping",
+    label: "Free Shipping",
+    icon: <Truck className="h-4 w-4" />,
+    placeholder: "free",
+    unit: "",
+  },
+  {
+    value: "product",
+    label: "Product",
+    icon: <Package className="h-4 w-4" />,
+    placeholder: "select product",
+    unit: "",
+  },
+  {
+    value: "bundle",
+    label: "Bundle",
+    icon: <Gift className="h-4 w-4" />,
+    placeholder: "select bundle",
+    unit: "",
+  },
+];
+
+export default function SpinningWheelAdmin() {
+  const { supabase } = useAuth();
   const [games, setGames] = useState<SpinGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingGame, setEditingGame] = useState<Partial<SpinGame>>({});
+  const [selectedGame, setSelectedGame] = useState<SpinGame | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<"games" | "results">("games");
-  const [spinResults, setSpinResults] = useState<any[]>([]);
-  const [resultsLoading, setResultsLoading] = useState(false);
-  const [dateFilter, setDateFilter] = useState<{ from: string; to: string }>({
-    from: "",
-    to: "",
-  });
-  const [searchTerm, setSearchTerm] = useState("");
-  // Get create param from URL to open dialog in create mode
+
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("create") === "true") {
-      setDialogOpen(true);
-    }
+    fetchGames();
   }, []);
 
-  useEffect(() => {
-    if (profile?.role !== "admin") return;
-    fetchGames();
-  }, [profile]);
-
   const fetchGames = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("spin_games")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setGames(data || []);
-    } catch (error: any) {
-      console.error("Error fetching spin games:", error);
-      toast.error("Could not load spin games");
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true);
+    const { data } = await supabase
+      .from("spin_games")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setGames(data || []);
+    setLoading(false);
   };
 
-  const handleSaveGame = async () => {
+  const saveGame = async (game: Partial<SpinGame>) => {
     try {
-      setSaving(true);
-
-      if (!editingGame.name || !editingGame.wheel_config?.length) {
-        toast.error("Please fill in all required fields");
-        return;
-      }
-
-      // Ensure probabilities sum to 1
-      const totalProb = editingGame.wheel_config.reduce(
-        (sum, seg) => sum + seg.probability,
-        0,
-      );
-      if (Math.abs(totalProb - 1) > 0.01) {
-        toast.error("Segment probabilities must sum to 1 (100%)");
-        return;
-      }
-
-      const gameData = {
-        ...editingGame,
-        updated_at: new Date().toISOString(),
-      };
-
-      let error;
-      if (editingGame.id) {
-        ({ error } = await supabase
+      if (selectedGame?.id) {
+        const { error } = await supabase
           .from("spin_games")
-          .update(gameData)
-          .eq("id", editingGame.id));
+          .update(game)
+          .eq("id", selectedGame.id);
+        if (error) throw error;
+        toast.success("Game updated successfully");
       } else {
-        gameData.created_by = profile?.id;
-        ({ error } = await supabase.from("spin_games").insert([gameData]));
+        const { error } = await supabase.from("spin_games").insert(game);
+        if (error) throw error;
+        toast.success("Game created successfully");
       }
-
-      if (error) throw error;
-
-      toast.success(
-        `Spin game ${editingGame.id ? "updated" : "created"} successfully`,
-      );
+      await fetchGames();
       setDialogOpen(false);
-      setEditingGame({});
-      fetchGames();
+      setSelectedGame(null);
     } catch (error: any) {
-      console.error("Error saving spin game:", error);
-      toast.error("Could not save spin game");
-    } finally {
-      setSaving(false);
+      toast.error(error.message || "Failed to save game");
     }
   };
 
-  const handleDeleteGame = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this spin game?")) return;
-
-    try {
+  const deleteGame = async (id: string) => {
+    if (
+      confirm(
+        "Are you sure you want to delete this game? This action cannot be undone.",
+      )
+    ) {
       const { error } = await supabase.from("spin_games").delete().eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("Spin game deleted successfully");
-      fetchGames();
-    } catch (error: any) {
-      console.error("Error deleting spin game:", error);
-      toast.error("Could not delete spin game");
+      if (error) {
+        toast.error("Failed to delete game");
+      } else {
+        toast.success("Game deleted");
+        await fetchGames();
+      }
     }
   };
 
-  const addSegment = () => {
-    const segments = editingGame.wheel_config || [];
-    const colors = editingGame.segment_colors || [
-      "#FF6B6B",
-      "#4ECDC4",
-      "#45B7D1",
-      "#96CEB4",
-      "#FFEAA7",
-      "#DDA0DD",
-      "#98D8C8",
-      "#F7DC6F",
-    ];
+  const toggleGameStatus = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from("spin_games")
+      .update({ is_active: !currentStatus })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to update game status");
+    } else {
+      toast.success(`Game ${!currentStatus ? "activated" : "deactivated"}`);
+      await fetchGames();
+    }
+  };
 
-    setEditingGame({
-      ...editingGame,
-      wheel_config: [
-        ...segments,
+  const getGameTypeIcon = (type: string) => {
+    return (
+      GAME_TYPES.find((t) => t.value === type)?.icon || (
+        <RotateCcw className="h-4 w-4" />
+      )
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto py-8 flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-yellow-500 bg-clip-text text-transparent">
+            Spinning Wheel Games
+          </h1>
+          <p className="text-muted-foreground">
+            Create and manage interactive spin-to-win experiences
+          </p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setSelectedGame(null)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Game
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedGame ? "Edit Spin Game" : "Create New Spin Game"}
+              </DialogTitle>
+              <DialogDescription>
+                Configure your spin wheel game with custom prizes and rules
+              </DialogDescription>
+            </DialogHeader>
+            <GameForm
+              initialGame={selectedGame}
+              onSave={saveGame}
+              onCancel={() => setDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Games Grid - Active Games Section */}
+      {games.filter((g) => g.is_active).length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <h2 className="text-lg font-semibold">Active Games</h2>
+            <Badge variant="secondary">
+              {games.filter((g) => g.is_active).length}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {games
+              .filter((g) => g.is_active)
+              .map((game) => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  onEdit={() => {
+                    setSelectedGame(game);
+                    setDialogOpen(true);
+                  }}
+                  onDelete={() => deleteGame(game.id)}
+                  onToggleStatus={() =>
+                    toggleGameStatus(game.id, game.is_active)
+                  }
+                  onLiveView={() =>
+                    window.open(`/spin/live/${game.id}`, "_blank")
+                  }
+                  getGameTypeIcon={getGameTypeIcon}
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Inactive Games Section */}
+      {games.filter((g) => !g.is_active).length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4 mt-8">
+            <div className="h-2 w-2 rounded-full bg-gray-400" />
+            <h2 className="text-lg font-semibold">Inactive Games</h2>
+            <Badge variant="secondary">
+              {games.filter((g) => !g.is_active).length}
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {games
+              .filter((g) => !g.is_active)
+              .map((game) => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  onEdit={() => {
+                    setSelectedGame(game);
+                    setDialogOpen(true);
+                  }}
+                  onDelete={() => deleteGame(game.id)}
+                  onToggleStatus={() =>
+                    toggleGameStatus(game.id, game.is_active)
+                  }
+                  onLiveView={() =>
+                    window.open(`/spin/live/${game.id}`, "_blank")
+                  }
+                  getGameTypeIcon={getGameTypeIcon}
+                />
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {games.length === 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <RotateCcw className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No spin games yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first spin wheel game to engage customers
+            </p>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Game
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// Game Card Component
+function GameCard({
+  game,
+  onEdit,
+  onDelete,
+  onToggleStatus,
+  onLiveView,
+  getGameTypeIcon,
+}: {
+  game: SpinGame;
+  onEdit: () => void;
+  onDelete: () => void;
+  onToggleStatus: () => void;
+  onLiveView: () => void;
+  getGameTypeIcon: (type: string) => JSX.Element;
+}) {
+  const totalProbability = game.prize_config.reduce(
+    (sum, p) => sum + (p.probability || 0),
+    0,
+  );
+  const isValidProbability = Math.abs(totalProbability - 100) <= 1;
+
+  return (
+    <Card className="relative overflow-hidden hover:shadow-lg transition-all group">
+      {/* Status Badge */}
+      <div className="absolute top-3 right-3 z-10">
+        <Badge variant={game.is_active ? "default" : "secondary"}>
+          {game.is_active ? (
+            <span className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              Active
+            </span>
+          ) : (
+            "Inactive"
+          )}
+        </Badge>
+      </div>
+
+      {/* Probability Warning */}
+      {!isValidProbability && (
+        <div className="absolute top-3 left-3 z-10">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Probabilities sum to {totalProbability}% (should be 100%)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
+
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <div
+            className={`p-2 rounded-lg ${GAME_TYPES.find((t) => t.value === game.game_type)?.color || "bg-blue-500"} bg-opacity-10`}
+          >
+            {getGameTypeIcon(game.game_type)}
+          </div>
+          <div className="flex-1">
+            <CardTitle className="text-lg">{game.name}</CardTitle>
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+              {game.description || "No description"}
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Prize Preview */}
+        <div className="flex flex-wrap gap-1">
+          {game.prize_config.slice(0, 6).map((prize, idx) => (
+            <TooltipProvider key={idx}>
+              <Tooltip>
+                <TooltipTrigger>
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm transition-transform hover:scale-110"
+                    style={{ backgroundColor: prize.color }}
+                  >
+                    {prize.type === "points" && <Coins className="h-3 w-3" />}
+                    {prize.type === "discount" && (
+                      <Percent className="h-3 w-3" />
+                    )}
+                    {prize.type === "product" && (
+                      <Package className="h-3 w-3" />
+                    )}
+                    {prize.type === "free_shipping" && (
+                      <Truck className="h-3 w-3" />
+                    )}
+                    {prize.type === "bundle" && <Gift className="h-3 w-3" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-medium">{prize.label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {prize.probability}% chance
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ))}
+          {game.prize_config.length > 6 && (
+            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-bold">
+              +{game.prize_config.length - 6}
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Free spins:</span>
+            <span className="font-medium">{game.free_spins_per_day}/day</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Paid spin:</span>
+            <span className="font-medium">{game.points_per_paid_spin} pts</span>
+          </div>
+          {game.game_type === "vip" && (
+            <div className="flex justify-between col-span-2">
+              <span className="text-muted-foreground">Access:</span>
+              <Badge variant="outline" className="text-xs">
+                VIP Only (Gold+)
+              </Badge>
+            </div>
+          )}
+          {game.is_single_prize && (
+            <div className="flex justify-between col-span-2">
+              <span className="text-muted-foreground">Grand prize:</span>
+              <Badge
+                variant={game.single_prize_claimed ? "secondary" : "default"}
+                className="text-xs"
+              >
+                {game.single_prize_claimed ? "Claimed" : "Available"}
+              </Badge>
+            </div>
+          )}
+          {game.ends_at &&
+            new Date(game.ends_at) < new Date() &&
+            game.is_active && (
+              <div className="flex justify-between col-span-2">
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant="destructive" className="text-xs">
+                  Expired
+                </Badge>
+              </div>
+            )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1"
+            onClick={onLiveView}
+          >
+            <Eye className="h-3 w-3" />
+            Live View
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={onEdit}
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1"
+            onClick={onDelete}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+        <Button
+          variant={game.is_active ? "destructive" : "default"}
+          size="sm"
+          className="w-full"
+          onClick={onToggleStatus}
+        >
+          {game.is_active ? "Deactivate" : "Activate"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Game Form Component
+function GameForm({
+  initialGame,
+  onSave,
+  onCancel,
+}: {
+  initialGame: SpinGame | null;
+  onSave: (game: any) => void;
+  onCancel: () => void;
+}) {
+  const { supabase } = useAuth();
+  const [activeTab, setActiveTab] = useState("basic");
+  const [saving, setSaving] = useState(false);
+
+  const [formData, setFormData] = useState<any>(
+    initialGame || {
+      name: "",
+      slug: "",
+      description: "",
+      game_type: "standard",
+      eligible_tiers: [],
+      min_points_required: 0,
+      requires_purchase_count: 0,
+      new_customer_only: false,
+      free_spins_per_day: 1,
+      free_spins_per_week: 5,
+      free_spins_total: 3,
+      points_per_paid_spin: 50,
+      prize_config: [
         {
-          label: `Prize ${segments.length + 1}`,
-          value: "10",
+          id: "1",
+          label: "50 Points",
           type: "points",
-          quantity: 1,
-          probability: 0.1,
-          color: colors[segments.length % colors.length],
-          product_name: "",
+          value: "50",
+          color: "#FF6B6B",
+          probability: 30,
+          product_id: null,
+          bundle_id: null,
+        },
+        {
+          id: "2",
+          label: "100 Points",
+          type: "points",
+          value: "100",
+          color: "#4ECDC4",
+          probability: 20,
+          product_id: null,
+          bundle_id: null,
+        },
+        {
+          id: "3",
+          label: "10% Off",
+          type: "discount",
+          value: "10",
+          color: "#45B7D1",
+          probability: 15,
+          product_id: null,
+          bundle_id: null,
+        },
+        {
+          id: "4",
+          label: "Free Shipping",
+          type: "free_shipping",
+          value: "free",
+          color: "#96CEB4",
+          probability: 10,
+          product_id: null,
+          bundle_id: null,
+        },
+        {
+          id: "5",
+          label: "Try Again",
+          type: "points",
+          value: "0",
+          color: "#DDA0DD",
+          probability: 25,
+          product_id: null,
+          bundle_id: null,
+        },
+      ],
+      is_single_prize: false,
+      starts_at: null,
+      ends_at: null,
+      is_active: true,
+      live_theme: "default",
+      show_confetti: true,
+      play_sounds: true,
+    },
+  );
+
+  const addPrize = () => {
+    setFormData({
+      ...formData,
+      prize_config: [
+        ...formData.prize_config,
+        {
+          id: Date.now().toString(),
+          label: "New Prize",
+          type: "points",
+          value: 0,
+          color:
+            PRIZE_COLORS[formData.prize_config.length % PRIZE_COLORS.length],
+          probability: 0,
+          product_id: null,
+          bundle_id: null,
         },
       ],
     });
   };
 
-  const updateSegment = (index: number, field: string, value: any) => {
-    const segments = [...(editingGame.wheel_config || [])];
-    segments[index] = { ...segments[index], [field]: value };
+  const updatePrize = (index: number, field: string, value: any) => {
+    const newPrizes = [...formData.prize_config];
+    newPrizes[index][field] = value;
 
-    // If changing type to 'product', set default product_name
-    if (field === "type" && value === "product") {
-      segments[index] = {
-        ...segments[index],
-        [field]: value,
-        product_name: segments[index].label || "Product Prize",
-      };
-    } else {
-      segments[index] = { ...segments[index], [field]: value };
-    }
-
-    // Rebalance probabilities if needed
-    if (field === "probability") {
-      const otherSegments = segments.filter((_, i) => i !== index);
-      const otherTotal = otherSegments.reduce(
-        (sum, seg) => sum + seg.probability,
-        0,
-      );
-      if (otherTotal + value > 1) {
-        // Scale down others
-        const scale = (1 - value) / otherTotal;
-        otherSegments.forEach((seg, i) => {
-          const originalIndex = segments.findIndex(
-            (s) => s.label === seg.label,
-          );
-          if (originalIndex !== -1) {
-            segments[originalIndex].probability *= scale;
-          }
-        });
+    // Auto-generate label based on prize type and value (without fetching)
+    if (
+      field === "type" ||
+      field === "value" ||
+      field === "product_id" ||
+      field === "bundle_id"
+    ) {
+      const prize = newPrizes[index];
+      if (prize.type === "points") {
+        prize.label = `${prize.value} Points`;
+      } else if (prize.type === "discount") {
+        prize.label = `${prize.value}% Off`;
+      } else if (prize.type === "free_shipping") {
+        prize.label = "Free Shipping";
+      } else if (prize.type === "product" && prize.product_id) {
+        prize.label = `Product (${prize.product_id.slice(0, 8)}...)`;
+        prize.value = prize.product_id;
+      } else if (prize.type === "bundle" && prize.bundle_id) {
+        prize.label = `Bundle (${prize.bundle_id.slice(0, 8)}...)`;
+        prize.value = prize.bundle_id;
       }
     }
 
-    setEditingGame({ ...editingGame, wheel_config: segments });
+    setFormData({ ...formData, prize_config: newPrizes });
   };
 
-  const removeSegment = (index: number) => {
-    const segments =
-      editingGame.wheel_config?.filter((_, i) => i !== index) || [];
-    setEditingGame({ ...editingGame, wheel_config: segments });
+  const removePrize = (index: number) => {
+    const newPrizes = formData.prize_config.filter(
+      (_: any, i: number) => i !== index,
+    );
+    setFormData({ ...formData, prize_config: newPrizes });
   };
 
-  const fetchSpinResults = async () => {
+  const validateProbabilities = () => {
+    const total = formData.prize_config.reduce(
+      (sum: number, p: any) => sum + (p.probability || 0),
+      0,
+    );
+    if (Math.abs(total - 100) > 1) {
+      toast.error(`Probabilities sum to ${total}%, must be 100%`);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validateProbabilities()) return;
+
+    setSaving(true);
     try {
-      setResultsLoading(true);
-
-      let query = supabase
-        .from("spin_results")
-        .select(
-          `
-        *,
-        spin_games (name),
-        coupons (code, discount_type, discount_value, valid_until, is_used),
-        users (email, full_name)
-      `,
-        )
-        .order("created_at", { ascending: false });
-
-      // Apply date filters
-      if (dateFilter.from) {
-        query = query.gte("created_at", dateFilter.from);
-      }
-      if (dateFilter.to) {
-        query = query.lte("created_at", dateFilter.to);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setSpinResults(data || []);
-    } catch (error: any) {
-      console.error("Error fetching spin results:", error);
-      toast.error("Could not load spin results");
+      // Clean up data before saving
+      const saveData = {
+        name: formData.name,
+        slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, "-"),
+        description: formData.description,
+        game_type: formData.game_type,
+        eligible_tiers: formData.eligible_tiers,
+        min_points_required: formData.min_points_required,
+        requires_purchase_count: formData.requires_purchase_count,
+        new_customer_only: formData.new_customer_only,
+        free_spins_per_day: formData.free_spins_per_day,
+        free_spins_per_week: formData.free_spins_per_week,
+        free_spins_total: formData.free_spins_total,
+        points_per_paid_spin: formData.points_per_paid_spin,
+        prize_config: formData.prize_config.map((p: any) => ({
+          label: p.label,
+          type: p.type,
+          value: p.value,
+          color: p.color,
+          probability: p.probability,
+        })),
+        is_single_prize: formData.is_single_prize,
+        starts_at: formData.starts_at,
+        ends_at: formData.ends_at,
+        is_active: formData.is_active,
+        live_theme: formData.live_theme,
+        show_confetti: formData.show_confetti,
+        play_sounds: formData.play_sounds,
+      };
+      await onSave(saveData);
     } finally {
-      setResultsLoading(false);
+      setSaving(false);
     }
   };
 
-  // Add this function to export results to CSV
-  const exportToCSV = () => {
-    const headers = [
-      "Date",
-      "User",
-      "Email",
-      "Game",
-      "Prize Type",
-      "Prize Label",
-      "Prize Value",
-      "Coupon Code",
-      "Coupon Status",
-      "Claimed",
-    ];
-
-    const rows = filteredResults.map((result) => [
-      format(new Date(result.created_at), "yyyy-MM-dd HH:mm"),
-      result.users?.full_name || "N/A",
-      result.users?.email || "N/A",
-      result.spin_games?.name || "N/A",
-      result.prize_type,
-      result.prize_value,
-      result.loyalty_points_awarded || result.prize_value,
-      result.coupons?.code || "N/A",
-      result.coupons?.is_used ? "Used" : "Available",
-      result.is_claimed ? "Yes" : "No",
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `spin-results-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-  };
-
-  // Filter results based on search
-  const filteredResults = spinResults.filter(
-    (result) =>
-      result.users?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      result.users?.full_name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      result.coupons?.code?.toLowerCase().includes(searchTerm.toLowerCase()),
+  const totalProbability = formData.prize_config.reduce(
+    (s: number, p: any) => s + (p.probability || 0),
+    0,
   );
+  const isProbabilityValid = Math.abs(totalProbability - 100) <= 1;
 
   return (
-    <div className="container mx-auto px-2 py-8">
-      <div className="flex justify-between items-center mb-8">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="basic">Basic Info</TabsTrigger>
+        <TabsTrigger value="prizes">
+          Prizes
+          {!isProbabilityValid && (
+            <AlertCircle className="h-3 w-3 ml-1 text-yellow-500" />
+          )}
+        </TabsTrigger>
+        <TabsTrigger value="advanced">Advanced</TabsTrigger>
+      </TabsList>
+
+      {/* Basic Info Tab */}
+      <TabsContent value="basic" className="space-y-6 pt-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Game Name *</Label>
+            <Input
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              placeholder="e.g., Weekend Wonder Wheel"
+            />
+          </div>
+          <div>
+            <Label>Slug</Label>
+            <Input
+              value={formData.slug}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                })
+              }
+              placeholder="weekend-wonder-wheel"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              URL-friendly identifier
+            </p>
+          </div>
+        </div>
+
         <div>
-          <h1 className="text-3xl font-bold">Spin Games</h1>
-          <p className="text-muted-foreground my-2">
-            Configure spin wheels and view customer wins
-          </p>
-          {/* Back to Marketing */}
-          <Button variant="link" className="px-0" asChild>
-            <Link href={"/admin/marketing"}>Back to Marketing</Link>
+          <Label>Description</Label>
+          <Input
+            value={formData.description}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
+            placeholder="Describe your spin game..."
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Game Type</Label>
+            <Select
+              value={formData.game_type}
+              onValueChange={(value) =>
+                setFormData({ ...formData, game_type: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GAME_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    <div className="flex items-center gap-2">
+                      {type.icon}
+                      {type.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Eligible Tiers</Label>
+            <Select
+              value={formData.eligible_tiers.join(",")}
+              onValueChange={(value) =>
+                setFormData({
+                  ...formData,
+                  eligible_tiers: value ? value.split(",") : [],
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="All tiers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all tiers">All tiers</SelectItem>
+                <SelectItem value="bronze,silver,gold,platinum">
+                  All (Bronze+)
+                </SelectItem>
+                <SelectItem value="silver,gold,platinum">Silver+</SelectItem>
+                <SelectItem value="gold,platinum">Gold+</SelectItem>
+                <SelectItem value="platinum">Platinum only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <Label>Free Spins / Day</Label>
+            <Input
+              type="number"
+              value={formData.free_spins_per_day}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  free_spins_per_day: parseInt(e.target.value) || 0,
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Free Spins / Week</Label>
+            <Input
+              type="number"
+              value={formData.free_spins_per_week}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  free_spins_per_week: parseInt(e.target.value) || 0,
+                })
+              }
+            />
+          </div>
+          <div>
+            <Label>Free Spins (Lifetime)</Label>
+            <Input
+              type="number"
+              value={formData.free_spins_total}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  free_spins_total: parseInt(e.target.value) || 0,
+                })
+              }
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label>Points Per Paid Spin</Label>
+          <Input
+            type="number"
+            value={formData.points_per_paid_spin}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                points_per_paid_spin: parseInt(e.target.value) || 0,
+              })
+            }
+          />
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={formData.new_customer_only}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, new_customer_only: checked })
+              }
+            />
+            <Label>New Customers Only</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={formData.is_single_prize}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, is_single_prize: checked })
+              }
+            />
+            <Label>Single Prize Mode</Label>
+          </div>
+        </div>
+      </TabsContent>
+
+      {/* Prizes Tab - Same as before */}
+      <TabsContent value="prizes" className="space-y-4 pt-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <Label>Prize Configuration</Label>
+            <p
+              className={`text-xs ${isProbabilityValid ? "text-muted-foreground" : "text-yellow-500"}`}
+            >
+              Probabilities sum to {totalProbability}%{" "}
+              {!isProbabilityValid && "(must be 100%)"}
+            </p>
+          </div>
+          <Button type="button" size="sm" onClick={addPrize}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Prize
           </Button>
         </div>
 
-        <Tabs
-          defaultValue="games"
-          value={activeTab}
-          onValueChange={(v) => {
-            setActiveTab(v as "games" | "results");
-            if (v === "results") fetchSpinResults();
-          }}
-          className="space-y-6"
-        >
-          <TabsList className="grid w-[400px] grid-cols-2">
-            <TabsTrigger value="games">Game Management</TabsTrigger>
-            <TabsTrigger value="results">Spin Results</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="games">
-            <div className="flex justify-end mb-4">
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    onClick={() =>
-                      setEditingGame({
-                        type: "daily",
-                        free_spins_per_day: 1,
-                        points_per_spin: 100,
-                        max_spins_per_day: 3,
-                        wheel_config: [],
-                        segment_colors: [
-                          "#FF6B6B",
-                          "#4ECDC4",
-                          "#45B7D1",
-                          "#96CEB4",
-                          "#FFEAA7",
-                          "#DDA0DD",
-                          "#98D8C8",
-                          "#F7DC6F",
-                        ],
-                        is_active: true,
-                      })
-                    }
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Spin Game
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingGame.id
-                        ? "Edit Spin Game"
-                        : "Create New Spin Game"}
-                    </DialogTitle>
-                    <DialogDescription>
-                      {editingGame.id
-                        ? "Modify the settings of your spin game and save to update."
-                        : "Configure the details of your new spin game and save to create."}
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  {editingGame && (
-                    <div className="space-y-6 py-4">
-                      {/* Basic Info */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">
-                          Basic Information
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="name">Game Name *</Label>
-                            <Input
-                              id="name"
-                              value={editingGame.name || ""}
-                              onChange={(e) =>
-                                setEditingGame({
-                                  ...editingGame,
-                                  name: e.target.value,
-                                })
-                              }
-                              placeholder="e.g., Daily Lucky Spin"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Game Type</Label>
-                            <Select
-                              value={editingGame.type}
-                              onValueChange={(value: any) =>
-                                setEditingGame({ ...editingGame, type: value })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="daily">Daily</SelectItem>
-                                <SelectItem value="weekly">Weekly</SelectItem>
-                                <SelectItem value="special">Special</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="description">Description</Label>
-                          <Textarea
-                            id="description"
-                            value={editingGame.description || ""}
-                            onChange={(e) =>
-                              setEditingGame({
-                                ...editingGame,
-                                description: e.target.value,
-                              })
-                            }
-                            placeholder="Describe the spin game rules and prizes"
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Spin Settings */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Spin Settings</h3>
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label>Free Spins Per Day</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={editingGame.free_spins_per_day || 1}
-                              onChange={(e) =>
-                                setEditingGame({
-                                  ...editingGame,
-                                  free_spins_per_day: parseInt(e.target.value),
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Points Per Spin</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={editingGame.points_per_spin || 100}
-                              onChange={(e) =>
-                                setEditingGame({
-                                  ...editingGame,
-                                  points_per_spin: parseInt(e.target.value),
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Max Spins Per Day</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={editingGame.max_spins_per_day || 3}
-                              onChange={(e) =>
-                                setEditingGame({
-                                  ...editingGame,
-                                  max_spins_per_day: parseInt(e.target.value),
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Wheel Segments */}
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <h3 className="text-lg font-semibold">
-                            Wheel Segments *
-                          </h3>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={addSegment}
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Segment
-                          </Button>
-                        </div>
-
-                        {editingGame.wheel_config?.map((segment, index) => (
-                          <div
-                            key={index}
-                            className="p-4 border rounded-lg space-y-3"
-                          >
-                            <div className="flex justify-between items-center">
-                              <h4 className="font-medium">
-                                Segment {index + 1}
-                              </h4>
+        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+          {formData.prize_config.map((prize: any, idx: number) => (
+            <Card key={prize.id || idx} className="p-4">
+              <div className="space-y-3">
+                <div className="flex gap-3 flex-wrap">
+                  <input
+                    type="color"
+                    value={prize.color}
+                    onChange={(e) => updatePrize(idx, "color", e.target.value)}
+                    className="w-10 h-10 rounded-lg cursor-pointer border"
+                  />
+                  <div className="flex-1 min-w-[120px]">
+                    <Select
+                      value={prize.type}
+                      onValueChange={(value) => updatePrize(idx, "type", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRIZE_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            <div className="flex items-center gap-2">
+                              {type.icon}
+                              {type.label}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {/* Prize Value / Selection */}
+                  <div className="flex-1 min-w-[150px]">
+                    {prize.type === "product" ? (
+                      <div className="flex gap-2">
+                        <Input
+                          value={prize.product_id || ""}
+                          onChange={(e) =>
+                            updatePrize(idx, "product_id", e.target.value)
+                          }
+                          placeholder="Product UUID"
+                          className="flex-1 font-mono text-xs"
+                        />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => removeSegment(index)}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                              <div className="space-y-2">
-                                <Label>Label</Label>
-                                <Input
-                                  value={segment.label}
-                                  onChange={(e) =>
-                                    updateSegment(
-                                      index,
-                                      "label",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="e.g., 100 Points"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Prize Type</Label>
-                                <Select
-                                  value={segment.type}
-                                  onValueChange={(value) =>
-                                    updateSegment(index, "type", value)
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="points">
-                                      Points
-                                    </SelectItem>
-                                    <SelectItem value="discount">
-                                      Discount %
-                                    </SelectItem>
-                                    <SelectItem value="product">
-                                      Product
-                                    </SelectItem>
-                                    <SelectItem value="free_shipping">
-                                      Free Shipping
-                                    </SelectItem>
-                                    <SelectItem value="nothing">
-                                      Try Again
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              {segment.type === "product" && (
-                                <>
-                                  <div className="space-y-2">
-                                    <Label>Product Name</Label>
-                                    <Input
-                                      value={
-                                        segment.product_name || segment.label
-                                      }
-                                      onChange={(e) =>
-                                        updateSegment(
-                                          index,
-                                          "product_name",
-                                          e.target.value,
-                                        )
-                                      }
-                                      placeholder="e.g., Smart LED Bulb - WiFi Enabled"
-                                    />
-                                    <p className="text-xs text-muted-foreground">
-                                      This is what the customer will see when
-                                      they win
-                                    </p>
-                                  </div>
-
-                                  {/* Optional: Add a note about quantity available */}
-                                  <div className="space-y-2">
-                                    <Label>Quantity Available</Label>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      value={segment.quantity || 1}
-                                      onChange={(e) =>
-                                        updateSegment(
-                                          index,
-                                          "quantity",
-                                          parseInt(e.target.value),
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                </>
-                              )}
-                              <div className="space-y-2">
-                                <Label>Value</Label>
-                                <Input
-                                  value={segment.value}
-                                  onChange={(e) =>
-                                    updateSegment(
-                                      index,
-                                      "value",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder={
-                                    segment.type === "points" ? "100" : "10"
-                                  }
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Probability (%)</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  step="1"
-                                  value={segment.probability * 100}
-                                  onChange={(e) =>
-                                    updateSegment(
-                                      index,
-                                      "probability",
-                                      parseFloat(e.target.value) / 100,
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Color</Label>
-                                <Input
-                                  type="color"
-                                  value={segment.color || "#000000"}
-                                  onChange={(e) =>
-                                    updateSegment(
-                                      index,
-                                      "color",
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="h-10"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-
-                        {(!editingGame.wheel_config ||
-                          editingGame.wheel_config.length === 0) && (
-                          <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                            <RefreshCw className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                            <p className="text-muted-foreground">
-                              No segments added yet
-                            </p>
-                            <Button
-                              type="button"
-                              variant="link"
-                              onClick={addSegment}
-                            >
-                              Add your first segment
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Rules */}
-                      <div className="space-y-2">
-                        <Label htmlFor="rules">Rules & Instructions</Label>
-                        <Textarea
-                          id="rules"
-                          value={editingGame.rules || ""}
-                          onChange={(e) =>
-                            setEditingGame({
-                              ...editingGame,
-                              rules: e.target.value,
-                            })
-                          }
-                          placeholder="Explain how the spin game works..."
-                          rows={3}
-                        />
-                      </div>
-
-                      {/* Schedule */}
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Schedule</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Start Date</Label>
-                            <Input
-                              type="datetime-local"
-                              value={editingGame.start_date?.slice(0, 16) || ""}
-                              onChange={(e) =>
-                                setEditingGame({
-                                  ...editingGame,
-                                  start_date: e.target.value || null,
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>End Date</Label>
-                            <Input
-                              type="datetime-local"
-                              value={editingGame.end_date?.slice(0, 16) || ""}
-                              onChange={(e) =>
-                                setEditingGame({
-                                  ...editingGame,
-                                  end_date: e.target.value || null,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Status */}
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="is_active"
-                          checked={editingGame.is_active || false}
-                          onCheckedChange={(checked) =>
-                            setEditingGame({
-                              ...editingGame,
-                              is_active: checked,
-                            })
-                          }
-                        />
-                        <Label htmlFor="is_active">Game Active</Label>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex justify-end gap-2 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => setDialogOpen(false)}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSaveGame} disabled={saving}>
-                          {saving ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-4 w-4 mr-2" />
-                              {editingGame.id ? "Update" : "Create"} Game
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Free Spins</TableHead>
-                      <TableHead>Points/Spin</TableHead>
-                      <TableHead>Segments</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Schedule</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8">
-                          <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-                        </TableCell>
-                      </TableRow>
-                    ) : games.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={8}
-                          className="text-center py-8 text-muted-foreground"
-                        >
-                          No spin games found. Create your first spin game!
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      games.map((game) => (
-                        <TableRow key={game.id}>
-                          <TableCell className="font-medium">
-                            {game.name}
-                          </TableCell>
-                          <TableCell className="capitalize">
-                            {game.type}
-                          </TableCell>
-                          <TableCell>{game.free_spins_per_day}</TableCell>
-                          <TableCell>{game.points_per_spin}</TableCell>
-                          <TableCell>
-                            {game.wheel_config?.length || 0}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={game.is_active ? "default" : "secondary"}
-                            >
-                              {game.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {game.start_date ? (
-                              <div className="text-sm">
-                                {format(new Date(game.start_date), "MMM d")}
-                                {game.end_date &&
-                                  ` → ${format(new Date(game.end_date), "MMM d")}`}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                Always
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingGame(game);
-                                setDialogOpen(true);
-                              }}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteGame(game.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="results">
-            <Card>
-              <CardHeader>
-                <CardTitle>Customer Spin Results</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  View all customer spins, wins, and coupon usage
-                </p>
-              </CardHeader>
-              <CardContent>
-                {/* Filters */}
-                <div className="flex flex-wrap gap-4 mb-6">
-                  <div className="flex-1 min-w-[200px]">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by user or coupon..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      placeholder="From"
-                      value={dateFilter.from}
-                      onChange={(e) =>
-                        setDateFilter({ ...dateFilter, from: e.target.value })
-                      }
-                      className="w-[150px]"
-                    />
-                    <Input
-                      type="date"
-                      placeholder="To"
-                      value={dateFilter.to}
-                      onChange={(e) =>
-                        setDateFilter({ ...dateFilter, to: e.target.value })
-                      }
-                      className="w-[150px]"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={fetchSpinResults}
-                    className="gap-2"
-                  >
-                    <Filter className="h-4 w-4" />
-                    Apply Filters
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={exportToCSV}
-                    className="gap-2"
-                    disabled={spinResults.length === 0}
-                  >
-                    <Download className="h-4 w-4" />
-                    Export CSV
-                  </Button>
-                </div>
-
-                {/* Results Table */}
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Game</TableHead>
-                        <TableHead>Prize</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead>Coupon</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {resultsLoading ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-                          </TableCell>
-                        </TableRow>
-                      ) : filteredResults.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={8}
-                            className="text-center py-8 text-muted-foreground"
-                          >
-                            No spin results found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        filteredResults.map((result) => (
-                          <TableRow key={result.id}>
-                            <TableCell>
-                              {format(
-                                new Date(result.created_at),
-                                "MMM d, h:mm a",
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium">
-                                  {result.users?.full_name || "N/A"}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {result.users?.email}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{result.spin_games?.name}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                {result.prize_type === "points" && (
-                                  <Coins className="h-4 w-4 text-yellow-500" />
-                                )}
-                                {result.prize_type === "discount" && (
-                                  <Ticket className="h-4 w-4 text-green-500" />
-                                )}
-                                {result.prize_type === "product" && (
-                                  <Gift className="h-4 w-4 text-purple-500" />
-                                )}
-                                <span className="capitalize">
-                                  {result.prize_type}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {result.prize_type === "points" ? (
-                                <Badge variant="secondary">
-                                  {result.loyalty_points_awarded} pts
-                                </Badge>
-                              ) : result.prize_type === "discount" ? (
-                                <Badge variant="secondary">
-                                  {result.coupons?.discount_type ===
-                                  "percentage"
-                                    ? `${result.coupons?.discount_value}%`
-                                    : `KES ${result.coupons?.discount_value}`}
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">
-                                  {result.prize_value}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {result.coupons ? (
-                                <div className="flex items-center gap-2">
-                                  <code className="px-2 py-1 bg-muted rounded text-xs">
-                                    {result.coupons.code}
-                                  </code>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(
-                                        result.coupons.code,
-                                      );
-                                      toast.success("Copied!");
-                                    }}
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">
-                                  —
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <Badge
-                                  variant={
-                                    result.is_claimed ? "default" : "outline"
-                                  }
-                                  className={
-                                    result.is_claimed ? "bg-green-500" : ""
-                                  }
-                                >
-                                  {result.is_claimed ? "Claimed" : "Available"}
-                                </Badge>
-                                {result.coupons?.is_used && (
-                                  <Badge variant="destructive" className="ml-1">
-                                    Used
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
+                                className="h-9 px-2"
                                 onClick={() => {
-                                  // View full details
-                                  toast.info(
-                                    `Prize: ${result.prize_label || result.prize_value}`,
+                                  navigator.clipboard.writeText(
+                                    prize.product_id || "",
                                   );
+                                  toast.success("Product ID copied");
                                 }}
                               >
-                                <Eye className="h-4 w-4" />
+                                <Copy className="h-3 w-3" />
                               </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Summary Stats */}
-                <div className="grid grid-cols-4 gap-4 mt-6">
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Total Spins
-                      </p>
-                      <p className="text-2xl font-bold">{spinResults.length}</p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Wins</p>
-                      <p className="text-2xl font-bold">
-                        {
-                          spinResults.filter((r) => r.prize_type !== "nothing")
-                            .length
+                            </TooltipTrigger>
+                            <TooltipContent>Copy ID</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    ) : prize.type === "bundle" ? (
+                      <div className="flex gap-2">
+                        <Input
+                          value={prize.bundle_id || ""}
+                          onChange={(e) =>
+                            updatePrize(idx, "bundle_id", e.target.value)
+                          }
+                          placeholder="Bundle UUID"
+                          className="flex-1 font-mono text-xs"
+                        />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 px-2"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(
+                                    prize.bundle_id || "",
+                                  );
+                                  toast.success("Bundle ID copied");
+                                }}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy ID</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    ) : (
+                      <Input
+                        type={prize.type === "points" ? "number" : "text"}
+                        value={prize.value}
+                        onChange={(e) =>
+                          updatePrize(idx, "value", e.target.value)
                         }
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Coupons Generated
-                      </p>
-                      <p className="text-2xl font-bold">
-                        {spinResults.filter((r) => r.coupon_id).length}
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Points Awarded
-                      </p>
-                      <p className="text-2xl font-bold">
-                        {spinResults.reduce(
-                          (sum, r) => sum + (r.loyalty_points_awarded || 0),
-                          0,
-                        )}
-                      </p>
-                    </CardContent>
-                  </Card>
+                        placeholder={
+                          PRIZE_TYPES.find((t) => t.value === prize.type)
+                            ?.placeholder
+                        }
+                      />
+                    )}
+                  </div>
+                  <div className="w-24">
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={prize.probability}
+                        onChange={(e) =>
+                          updatePrize(
+                            idx,
+                            "probability",
+                            parseInt(e.target.value) || 0,
+                          )
+                        }
+                        placeholder="%"
+                        className="text-center"
+                      />
+                      <span className="text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removePrize(idx)}
+                    className="flex-shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </Button>
                 </div>
-              </CardContent>
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <div
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: prize.color }}
+                  />
+                  <span className="text-sm font-medium">{prize.label}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {prize.probability}% chance
+                  </Badge>
+                </div>
+              </div>
             </Card>
-          </TabsContent>
-        </Tabs>
+          ))}
+        </div>
+      </TabsContent>
+
+      {/* Advanced Tab */}
+      <TabsContent value="advanced" className="space-y-6 pt-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Start Date (Optional)</Label>
+            <Input
+              type="datetime-local"
+              value={formData.starts_at || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, starts_at: e.target.value || null })
+              }
+            />
+          </div>
+          <div>
+            <Label>End Date (Optional)</Label>
+            <Input
+              type="datetime-local"
+              value={formData.ends_at || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, ends_at: e.target.value || null })
+              }
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label>Min Points Required</Label>
+            <Input
+              type="number"
+              value={formData.min_points_required}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  min_points_required: parseInt(e.target.value) || 0,
+                })
+              }
+              placeholder="0 = no requirement"
+            />
+          </div>
+          <div>
+            <Label>Min Purchases Required</Label>
+            <Input
+              type="number"
+              value={formData.requires_purchase_count}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  requires_purchase_count: parseInt(e.target.value) || 0,
+                })
+              }
+              placeholder="0 = no requirement"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <Label>Display Settings</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                <Label>Show Confetti on Win</Label>
+              </div>
+              <Switch
+                checked={formData.show_confetti}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, show_confetti: checked })
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {formData.play_sounds ? (
+                  <Volume2 className="h-4 w-4" />
+                ) : (
+                  <VolumeX className="h-4 w-4" />
+                )}
+                <Label>Sound Effects</Label>
+              </div>
+              <Switch
+                checked={formData.play_sounds}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, play_sounds: checked })
+                }
+              />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <Label>Theme Color</Label>
+          <div className="flex items-center gap-2 mt-1">
+            <Palette className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={formData.live_theme}
+              onChange={(e) =>
+                setFormData({ ...formData, live_theme: e.target.value })
+              }
+              placeholder="default, dark, colorful"
+            />
+          </div>
+        </div>
+
+        <div className="pt-4 border-t">
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={formData.is_active}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, is_active: checked })
+              }
+            />
+            <Label>Active (visible to customers)</Label>
+          </div>
+        </div>
+      </TabsContent>
+
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-3 pt-6 border-t">
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? "Saving..." : initialGame ? "Update Game" : "Create Game"}
+        </Button>
       </div>
-    </div>
+    </Tabs>
   );
 }

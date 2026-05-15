@@ -1,7 +1,9 @@
 -- db/spinning_wheel_advanced.sql
 
+drop table if exists spin_games;
+
 -- Multi-game configuration table
-CREATE TABLE IF NOT EXISTS spin_games (
+CREATE TABLE spin_games (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     slug text UNIQUE NOT NULL,
@@ -87,6 +89,20 @@ CREATE INDEX idx_spin_attempts_game_user ON spin_attempts(game_id, user_id);
 CREATE INDEX idx_spin_attempts_created ON spin_attempts(created_at DESC);
 CREATE INDEX idx_spin_games_active ON spin_games(is_active, starts_at, ends_at);
 CREATE INDEX idx_spin_live_ticker_game_created ON spin_live_ticker(game_id, created_at DESC);
+
+-- RLS policies
+-- spin_games: Admins can manage all, users can view active games
+CREATE POLICY "Allow admin access" ON spin_games FOR ALL 
+USING (public.is_admin());
+CREATE POLICY "Allow users to view active games" ON spin_games FOR SELECT
+USING (is_active AND starts_at <= now() AND ends_at >= now());
+
+-- spin_attempts: Users can see their own attempts, admins can see all
+CREATE POLICY "Allow admin access" ON spin_attempts FOR ALL
+USING (public.is_admin());
+CREATE POLICY "Allow users to see their own attempts" ON spin_attempts FOR SELECT
+USING (user_id = auth.uid());
+
 
 CREATE OR REPLACE FUNCTION increment_spin_usage(
   p_user_id uuid,

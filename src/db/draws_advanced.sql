@@ -1,7 +1,7 @@
 -- db/draws_advanced.sql
 
 -- Draws table
-CREATE TABLE IF NOT EXISTS draws (
+CREATE TABLE draws (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text NOT NULL,
     slug text UNIQUE NOT NULL,

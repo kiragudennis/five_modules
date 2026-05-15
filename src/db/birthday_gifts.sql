@@ -114,3 +114,6 @@ EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success', false, 'error', SQLERRM);
 END;
 $$;
+
+CREATE POLICY "Allow admin access" ON birthday_gifts FOR ALL 
+USING (public.is_admin());

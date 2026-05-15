@@ -104,43 +104,58 @@ BEGIN
     'pending', COUNT(*) FILTER (WHERE status = 'pending'),
     'completed', COUNT(*) FILTER (WHERE status = 'completed'),
     'points_awarded', COALESCE(SUM(reward_points) FILTER (WHERE status = 'completed'), 0),
-    'top_referrers', (
-      SELECT jsonb_agg(
-        jsonb_build_object(
-          'user_id', referrer_id,
-          'referrals_count', COUNT(*),
-          'points_earned', SUM(reward_points)
-        )
-        ORDER BY COUNT(*) DESC
-        LIMIT 5
-      )
-      FROM referrals
-      WHERE status = 'completed'
-      AND completed_at BETWEEN p_time_range_start AND p_time_range_end
-      GROUP BY referrer_id
+   'top_referrers', (
+  SELECT jsonb_agg(
+    jsonb_build_object(
+      'user_id', t.referrer_id,
+      'referrals_count', t.referrals_count,
+      'points_earned', t.points_earned
     )
+  )
+  FROM (
+    SELECT
+      referrer_id,
+      COUNT(*) AS referrals_count,
+      SUM(reward_points) AS points_earned
+    FROM referrals
+    WHERE status = 'completed'
+      AND completed_at BETWEEN p_time_range_start AND p_time_range_end
+    GROUP BY referrer_id
+    ORDER BY referrals_count DESC
+    LIMIT 5
+  ) t
+)
   ) INTO v_user_referrals
   FROM referrals
   WHERE created_at BETWEEN p_time_range_start AND p_time_range_end;
 
   -- TRAFFIC SOURCES (from new referrer_stats table)
-  SELECT jsonb_agg(
-    jsonb_build_object(
-      'source', source,
-      'type', source_type,
-      'clicks', total_clicks,
-      'conversions', total_conversions,
-      'revenue', total_revenue,
-      'conversion_rate', CASE WHEN total_clicks > 0 
-        THEN ROUND((total_conversions::numeric / total_clicks) * 100, 2)
+SELECT jsonb_agg(
+  jsonb_build_object(
+    'source', t.source,
+    'type', t.source_type,
+    'clicks', t.total_clicks,
+    'conversions', t.total_conversions,
+    'revenue', t.total_revenue,
+    'conversion_rate',
+      CASE WHEN t.total_clicks > 0
+        THEN ROUND((t.total_conversions::numeric / t.total_clicks) * 100, 2)
         ELSE 0
       END
-    )
-    ORDER BY total_clicks DESC
-    LIMIT 10
-  ) INTO v_traffic_sources
+  )
+) INTO v_traffic_sources
+FROM (
+  SELECT
+    source,
+    source_type,
+    total_clicks,
+    total_conversions,
+    total_revenue
   FROM referrer_stats
-  WHERE last_click_at BETWEEN p_time_range_start AND p_time_range_end;
+  WHERE last_click_at BETWEEN p_time_range_start AND p_time_range_end
+  ORDER BY total_clicks DESC
+  LIMIT 10
+) t;
 
   -- Build final result
   result := jsonb_build_object(

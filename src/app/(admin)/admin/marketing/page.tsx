@@ -57,7 +57,7 @@ import {
   Send,
   History,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import {
   AreaChart,
@@ -163,9 +163,184 @@ export default function AdminMarketingPage() {
   const [timeRange, setTimeRange] = useState<"hour" | "day" | "week" | "month">(
     "day",
   );
-  const [stats, setStats] = useState<MarketingStats | null>(null);
-  const [engagementHistory, setEngagementHistory] = useState<any[]>([]);
-  const [liveEngagement, setLiveEngagement] = useState<any[]>([]);
+  const [stats, setStats] = useState<MarketingStats | null>({
+    bundles: {
+      total: 0,
+      active: 0,
+      purchases: 0,
+      revenue: 0,
+      topBundles: [
+        { name: "Bundle A", purchases: 0, revenue: 0 },
+        { name: "Bundle B", purchases: 0, revenue: 0 },
+        { name: "Bundle C", purchases: 0, revenue: 0 },
+      ],
+    },
+    spins: {
+      total_games: 0,
+      active_games: 0,
+      total_spins: 0,
+      today_spins: 0,
+      prizes_awarded: { points: 0, discounts: 0, products: 0 },
+      top_winners: [
+        { user: "user_1", prize: "10% off", date: new Date().toISOString() },
+        {
+          user: "user_2",
+          prize: "Free Shipping",
+          date: new Date().toISOString(),
+        },
+        { user: "user_3", prize: "50 points", date: new Date().toISOString() },
+        {
+          user: "user_4",
+          prize: "Free Product",
+          date: new Date().toISOString(),
+        },
+      ],
+    },
+    challenges: {
+      total: 0,
+      active: 0,
+      completed: 0,
+      referrals: { total: 0, completed: 0, pending: 0 },
+      points_awarded: 0,
+    },
+    draws: {
+      total: 0,
+      active: 0,
+      entries: 0,
+      winners: 0,
+      pending_draws: 0,
+    },
+    deals: {
+      total: 0,
+      active: 0,
+      units_sold: 0,
+      revenue: 0,
+      expiring_soon: 0,
+    },
+    loyalty: {
+      total_points: 0,
+      points_earned: 0,
+      points_redeemed: 0,
+      tier_distribution: [
+        { tier: "Bronze", count: 0, color: "#cd7f32" },
+        { tier: "Silver", count: 0, color: "#c0c0c0" },
+        { tier: "Gold", count: 0, color: "#ffd700" },
+        { tier: "Platinum", count: 0, color: "#e5e4e2" },
+      ],
+    },
+    referrals: {
+      user_referrals: {
+        total: 0,
+        pending: 0,
+        completed: 0,
+        points_awarded: 0,
+        top_referrers: [
+          { user_id: "user_1", referrals_count: 0, points_earned: 0 },
+          { user_id: "user_2", referrals_count: 0, points_earned: 0 },
+          { user_id: "user_3", referrals_count: 0, points_earned: 0 },
+        ],
+      },
+      traffic_sources: [
+        {
+          source: "Twitter",
+          type: "social",
+          clicks: 0,
+          conversions: 0,
+          revenue: 0,
+          conversion_rate: 0,
+        },
+        {
+          source: "Facebook",
+          type: "social",
+          clicks: 0,
+          conversions: 0,
+          revenue: 0,
+          conversion_rate: 0,
+        },
+        {
+          source: "Instagram",
+          type: "social",
+          clicks: 0,
+          conversions: 0,
+          revenue: 0,
+          conversion_rate: 0,
+        },
+        {
+          source: "Email",
+          type: "email",
+          clicks: 0,
+          conversions: 0,
+          revenue: 0,
+          conversion_rate: 0,
+        },
+        {
+          source: "Direct",
+          type: "direct",
+          clicks: 0,
+          conversions: 0,
+          revenue: 0,
+          conversion_rate: 0,
+        },
+      ],
+    },
+  });
+  const [engagementHistory, setEngagementHistory] = useState<any[]>(() => {
+    // Generate engagement history (last 24 hours)
+    const history = [];
+    for (let i = 23; i >= 0; i--) {
+      const hour = new Date();
+      hour.setHours(hour.getHours() - i);
+      history.push({
+        time: format(hour, "HH:00"),
+        spins: Math.floor(Math.random() * 50) + 10,
+        purchases: Math.floor(Math.random() * 20) + 5,
+        shares: Math.floor(Math.random() * 30) + 2,
+      });
+    }
+    return history;
+  });
+  const [liveEngagement, setLiveEngagement] = useState<any[]>([
+    {
+      module: "Spin Wheel",
+      activeUsers: Math.floor(Math.random() * 50) + 20,
+      interactionsPerMinute: Math.floor(Math.random() * 30) + 5,
+      socialShares: Math.floor(Math.random() * 10),
+      liveViewers: Math.floor(Math.random() * 100) + 50,
+      lastEvent: new Date().toISOString(),
+    },
+    {
+      module: "Challenges",
+      activeUsers: Math.floor(Math.random() * 30) + 10,
+      interactionsPerMinute: Math.floor(Math.random() * 20) + 3,
+      socialShares: Math.floor(Math.random() * 8),
+      liveViewers: Math.floor(Math.random() * 60) + 20,
+      lastEvent: new Date().toISOString(),
+    },
+    {
+      module: "Lucky Draws",
+      activeUsers: Math.floor(Math.random() * 100) + 50,
+      interactionsPerMinute: Math.floor(Math.random() * 50) + 10,
+      socialShares: Math.floor(Math.random() * 20),
+      liveViewers: Math.floor(Math.random() * 200) + 100,
+      lastEvent: new Date().toISOString(),
+    },
+    {
+      module: "Bundles",
+      activeUsers: Math.floor(Math.random() * 40) + 15,
+      interactionsPerMinute: Math.floor(Math.random() * 15) + 2,
+      socialShares: Math.floor(Math.random() * 5),
+      liveViewers: Math.floor(Math.random() * 80) + 30,
+      lastEvent: new Date().toISOString(),
+    },
+    {
+      module: "Flash Deals",
+      activeUsers: Math.floor(Math.random() * 80) + 30,
+      interactionsPerMinute: Math.floor(Math.random() * 40) + 8,
+      socialShares: Math.floor(Math.random() * 15),
+      liveViewers: Math.floor(Math.random() * 150) + 80,
+      lastEvent: new Date().toISOString(),
+    },
+  ]);
   const [socialMentions, setSocialMentions] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [isMentionDialogOpen, setIsMentionDialogOpen] = useState(false);
@@ -669,7 +844,8 @@ export default function AdminMarketingPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={engagementHistory}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hour" />
+                    <XAxis dataKey="time" />
+
                     <YAxis />
                     <Tooltip />
                     <Legend />

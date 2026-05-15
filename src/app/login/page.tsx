@@ -53,7 +53,7 @@ export default function LoginPage({
           ? `/admin`
           : orderData
             ? "/checkout/payment"
-            : "/products";
+            : "/";
       router.push(redirectPath);
     }
   }, [profile, router, orderData, redirect]);
