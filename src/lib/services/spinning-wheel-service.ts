@@ -1,5 +1,6 @@
 // src/lib/services/spinning-wheel-service.ts
-
+// This service handles all interactions with the spinning wheel game, including fetching available games, checking user eligibility, performing spins, and managing the live ticker.
+// It abstracts away the database interactions and business logic related to the spin game.
 import { createClient } from "@/lib/supabase/server";
 import {
   SpinGame,
@@ -11,7 +12,12 @@ import { PointsService } from "./points-service";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export class SpinningWheelService {
-  private supabase = createClient();
+  private supabase: SupabaseClient | null = null;
+
+  // Explicitly define constructor with no parameters
+  constructor() {
+    // No context needed for App Router
+  }
 
   /**
    * Get or create Supabase client (async for server components)
@@ -20,9 +26,7 @@ export class SpinningWheelService {
     if (!this.supabase) {
       this.supabase = await createClient();
     }
-    return this.supabase instanceof SupabaseClient
-      ? this.supabase
-      : createClient();
+    return this.supabase as SupabaseClient;
   }
   /**
    * Get all active games available to a user
@@ -76,72 +80,32 @@ export class SpinningWheelService {
   /**
    * Get user's spin allocation for a specific game
    */
-  async getUserAllocation(
-    userId: string,
-    gameId: string,
-  ): Promise<UserSpinAllocation> {
-    const today = new Date().toISOString().split("T")[0];
-    const weekStart = this.getWeekStart();
+  // src/lib/services/spining-wheel-service.client.ts
+
+  async getUserAllocation(userId: string, gameId: string) {
     const supabase = await this.getSupabase();
+    const { data, error } = await supabase.rpc("get_user_allocation", {
+      p_user_id: userId,
+      p_game_id: gameId,
+    });
 
-    // Get or create allocation record
-    let { data: allocation } = await supabase
-      .from("user_spin_allocations")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("game_id", gameId)
-      .eq("date", today)
-      .single();
-
-    if (!allocation) {
-      allocation = {
-        user_id: userId,
-        game_id: gameId,
-        date: today,
+    // Handle null/undefined response
+    if (error || !data) {
+      // Return default allocation
+      return {
         spins_used_today: 0,
         spins_used_this_week: 0,
         spins_used_total: 0,
-        last_spin_at: null,
+        free_spins_remaining_today: 0,
+        free_spins_remaining_week: 0,
+        free_spins_remaining_total: 0,
+        can_spin_free: true,
+        can_spin_paid: false,
+        points_required_for_paid: 0,
       };
     }
 
-    const { data: game } = await supabase
-      .from("spin_games")
-      .select(
-        "free_spins_per_day, free_spins_per_week, free_spins_total, points_per_paid_spin",
-      )
-      .eq("id", gameId)
-      .single();
-
-    const freeRemainingTotal = Math.max(
-      0,
-      game?.free_spins_total - allocation.spins_used_total,
-    );
-    const freeRemainingToday = Math.max(
-      0,
-      game?.free_spins_per_day - allocation.spins_used_today,
-    );
-    const freeRemainingWeek = Math.max(
-      0,
-      game?.free_spins_per_week - allocation.spins_used_this_week,
-    );
-    const canSpinFree =
-      freeRemainingTotal > 0 && freeRemainingToday > 0 && freeRemainingWeek > 0;
-
-    const userPoints = await PointsService.getBalance(supabase, userId);
-    const canSpinPaid = userPoints >= game?.points_per_paid_spin;
-
-    return {
-      spins_used_today: allocation.spins_used_today,
-      spins_used_this_week: allocation.spins_used_this_week,
-      spins_used_total: allocation.spins_used_total,
-      free_spins_remaining_today: freeRemainingToday,
-      free_spins_remaining_week: freeRemainingWeek,
-      free_spins_remaining_total: freeRemainingTotal,
-      can_spin_free: canSpinFree,
-      can_spin_paid: canSpinPaid,
-      points_required_for_paid: game?.points_per_paid_spin,
-    };
+    return data;
   }
 
   /**

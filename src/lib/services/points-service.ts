@@ -1,4 +1,7 @@
 // src/lib/services/points-service.ts
+// This service manages the loyalty points system, including fetching user balances, transaction history, awarding points, and redeeming points.
+// It provides a clean API for other parts of the application to interact with the points system without needing to know the underlying database structure or business logic.
+// It is shared by all five modules that interact with points: Bundles, Deals, Spin Game, Flash Sales and Draws.
 "use client";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -59,8 +62,16 @@ export class PointsService {
       .from("loyalty_points")
       .select("points,points_earned,points_redeemed,tier")
       .eq("user_id", userId)
-      .single();
-    if (error) throw error;
+      .maybeSingle();
+    // If no record exists, return default balance
+    if (error || !data) {
+      return {
+        points: 0,
+        points_earned: 0,
+        points_redeemed: 0,
+        tier: "bronze",
+      };
+    }
     return data;
   }
 
