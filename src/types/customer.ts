@@ -114,6 +114,14 @@ export interface ProfileData {
   created_at: string;
   updated_at?: string;
   referred_by?: string;
+  loyalty?: {
+    points: number;
+    points_earned: number;
+    points_redeemed: number;
+    tier: string;
+    tier_details: any[];
+    last_updated: string;
+  } | null;
 }
 
 export interface Order {

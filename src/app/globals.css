@@ -197,3 +197,24 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Add to globals.css */
+@keyframes fadeInSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-in {
+  animation-duration: 0.3s;
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeInSlideRight;
+}

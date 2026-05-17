@@ -67,6 +67,10 @@ CREATE TABLE products (
 -- Add has_varieties boolean column to products table
 ALTER TABLE products ADD COLUMN has_varieties boolean DEFAULT false;
 ALTER TABLE products ADD COLUMN status text DEFAULT 'active' NOT NULL;
+-- First, create the enum type
+CREATE TYPE product_status AS ENUM ('active', 'inactive', 'draft', 'archived');
+
+ALTER TABLE products ADD COLUMN status product_status DEFAULT 'active' NOT NULL;
 
 -- Product varieties table for products with multiple options
 CREATE TABLE product_varieties (

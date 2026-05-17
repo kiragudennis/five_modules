@@ -23,6 +23,26 @@ CREATE TABLE IF NOT EXISTS loyalty_points (
     updated_at timestamptz DEFAULT now()
 );
 
+-- Get current loyalty profile for all users (for AuthContext)
+-- Create a view that joins everything
+CREATE OR REPLACE VIEW user_loyalty_profile AS
+SELECT 
+  u.*,
+  lp.points,
+  lp.points_earned,
+  lp.points_redeemed,
+  lp.tier as current_tier,
+  lt.min_points,
+  lt.points_per_shilling,
+  lt.discount_percentage,
+  lt.free_shipping_threshold,
+  lt.priority_support,
+  lt.birthday_bonus_points,
+  lp.last_updated as loyalty_last_updated
+FROM users u
+LEFT JOIN loyalty_points lp ON u.id = lp.user_id
+LEFT JOIN loyalty_tiers lt ON lp.tier = lt.tier;
+
 -- 3. Create loyalty_transactions table (if not exists) - THIS IS THE MISSING TABLE
 CREATE TABLE IF NOT EXISTS loyalty_transactions (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

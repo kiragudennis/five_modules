@@ -43,13 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [supabase] = useState(() => getSupabaseClient());
 
-  const fetchUserRole = useCallback(
+  const fetchUser = useCallback(
     async (supabaseUser: SupabaseUser) => {
       setLoading(true);
 
       try {
+        // We need to fetch users loyalty tier and points
         const { data, error } = await supabase
-          .from("users")
+          .from("user_loyalty_profile")
           .select("*")
           .eq("id", supabaseUser.id)
           .maybeSingle();
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (
             error.code?.includes("AUTH") ||
             error.message?.includes("Invalid") ||
-            error.status === 400
+            error.code === "400"
           ) {
             await supabase.auth.signOut();
           }
@@ -97,6 +98,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           created_at: data.created_at,
           updated_at: data.updated_at,
+
+          // loyalty data
+          loyalty: data.loyalty_points
+            ? {
+                points: data.loyalty_points.points,
+                points_earned: data.loyalty_points.points_earned,
+                points_redeemed: data.loyalty_points.points_redeemed,
+                tier: data.loyalty_points.tier,
+                tier_details: data.loyalty_points.loyalty_tiers,
+                last_updated: data.loyalty_points.last_updated,
+              }
+            : null,
         };
 
         setProfile(profileData);
@@ -126,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (mounted) {
         if (session?.user) {
-          await fetchUserRole(session.user);
+          await fetchUser(session.user);
         } else {
           setLoading(false);
         }
@@ -145,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       (async () => {
         if (session?.user) {
-          await fetchUserRole(session.user);
+          await fetchUser(session.user);
         } else {
           setLoading(false);
         }
@@ -156,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchUserRole, supabase]);
+  }, [fetchUser, supabase]);
 
   const signIn = async (
     email: string,

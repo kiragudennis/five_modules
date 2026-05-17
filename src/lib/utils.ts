@@ -15,7 +15,7 @@ export function cn(...inputs: ClassValue[]) {
 // utils/format.ts (shared safe zone)
 export function formatCurrency(
   amount: number,
-  currency: string = "USD"
+  currency: string = "USD",
 ): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -54,18 +54,18 @@ export function calculateShipping({
 export function calculateOrderTotals(
   cartItems: CartItem[],
   country: string,
-  city: string
+  city: string,
 ): ShippingCalculationResult {
   // Calculate total weight
   const totalWeight = cartItems.reduce(
     (acc, item) => acc + item.product.weight * item.quantity,
-    0
+    0,
   );
 
   // Calculate subtotal
   const subtotal = cartItems.reduce(
     (acc, item) => acc + (item.product.price ?? 0) * item.quantity,
-    0
+    0,
   );
 
   // Determine shipping zone based on location
@@ -87,9 +87,17 @@ export function calculateOrderTotals(
   };
 }
 
+export const formatPrice = (price: number) => {
+  return new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    minimumFractionDigits: 0,
+  }).format(price);
+};
+
 export function determineShippingZone(
   country: string,
-  city: string
+  city: string,
 ): ShippingZone {
   // Normalize inputs
   const normalizedCountry = country.trim().toUpperCase();
@@ -143,7 +151,7 @@ export const generateToken = async () => {
         headers: {
           Authorization: `Basic ${auth}`,
         },
-      }
+      },
     );
     const token = response.data.access_token; // No need for await here
 

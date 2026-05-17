@@ -1,12 +1,17 @@
-// app/admin/marketing/bundles/page.tsx
+// app/admin/bundles/page.tsx
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
+import { BundleService } from "@/lib/services/bundle-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -30,9 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
 import {
   Gift,
   Plus,
@@ -44,51 +46,79 @@ import {
   Crown,
   Coins,
   ExternalLink,
+  TrendingUp,
+  RefreshCw,
+  Star,
+  Eye,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { MistryBundle } from "@/types/store";
 import Link from "next/link";
+import { Bundle, BundleFormData } from "@/types/bundles";
+import { ProductSearch } from "@/components/admin/product-search";
+import { formatPrice } from "@/lib/utils";
+
+const BUNDLE_TYPES = [
+  {
+    value: "curated",
+    label: "Curated Bundle",
+    icon: Crown,
+    color: "from-amber-500 to-yellow-500",
+  },
+  {
+    value: "build_own",
+    label: "Build Your Own",
+    icon: Package,
+    color: "from-blue-500 to-cyan-500",
+  },
+  {
+    value: "tiered",
+    label: "Tiered Bundle",
+    icon: TrendingUp,
+    color: "from-green-500 to-emerald-500",
+  },
+  {
+    value: "subscription",
+    label: "Subscription",
+    icon: RefreshCw,
+    color: "from-indigo-500 to-purple-500",
+  },
+  {
+    value: "bonus_points",
+    label: "Bonus Points",
+    icon: Star,
+    color: "from-yellow-500 to-orange-500",
+  },
+  {
+    value: "mystery",
+    label: "Mystery Bundle",
+    icon: Gift,
+    color: "from-purple-500 to-pink-500",
+  },
+];
 
 export default function AdminBundlesPage() {
   const { supabase, profile } = useAuth();
-  const [bundles, setBundles] = useState<MistryBundle[]>([]);
+  const [bundles, setBundles] = useState<Bundle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingBundle, setEditingBundle] = useState<Partial<MistryBundle>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
-  const [tiers, setTiers] = useState<any[]>([]);
+  const [editingBundle, setEditingBundle] = useState<Partial<BundleFormData>>(
+    {},
+  );
   const [saving, setSaving] = useState(false);
-  const [liveConfig, setLiveConfig] = useState({
-    bundle_type: "mystery" as "mystery" | "tiered" | "build_your_own",
-    mystery_reveal_mode: "manual" as "manual" | "after_purchase",
-    total_value_ksh: null as number | null,
-    is_live_stream_only: false,
-    is_stream_active: false,
-    is_mystery_revealed: false,
-    live_stock_total: 0,
-  });
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+  const [livePreview, setLivePreview] = useState<string | null>(null);
 
-  // Get create param from URL to open dialog in create mode
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("create") === "true") {
-      setDialogOpen(true);
-    }
-  }, []);
+  const bundleService = new BundleService(supabase);
 
-  useEffect(() => {
-    if (profile?.role !== "admin") return;
-    fetchBundles();
-    fetchProducts();
-    fetchTiers();
-  }, [profile]);
-
-  const fetchBundles = async () => {
+  // Fetch bundles
+  const fetchBundles = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from("mistry_bundles")
+        .from("bundles")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -100,33 +130,34 @@ export default function AdminBundlesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, price, images, category");
+  // Fetch products for selection
+  const fetchProducts = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, name, price, images, category, stock")
+      .eq("status", "active")
+      .limit(100);
 
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error: any) {
+    if (error) {
       console.error("Error fetching products:", error);
+      return;
     }
-  };
+    setProducts(data || []);
+  }, [supabase]);
 
-  const fetchTiers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("loyalty_tiers")
-        .select("tier, min_points, discount_percentage")
-        .order("min_points");
+  useEffect(() => {
+    if (profile?.role !== "admin") return;
+    fetchBundles();
+    fetchProducts();
+  }, [profile, fetchBundles, fetchProducts]);
 
-      if (error) throw error;
-      setTiers(data || []);
-    } catch (error: any) {
-      console.error("Error fetching tiers:", error);
-    }
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
   };
 
   const handleSaveBundle = async () => {
@@ -134,68 +165,103 @@ export default function AdminBundlesPage() {
       setSaving(true);
 
       // Validate required fields
-      if (
-        !editingBundle.name ||
-        !editingBundle.slug ||
-        !editingBundle.discount_type ||
-        !editingBundle.discount_value
-      ) {
+      if (!editingBundle.name || !editingBundle.bundle_type) {
         toast.error("Please fill in all required fields");
         return;
       }
 
-      if (!editingBundle.products || editingBundle.products.length === 0) {
-        toast.error("Please select at least one product");
-        return;
+      // Build products JSON based on bundle type
+      let productsJson = {};
+
+      if (editingBundle.bundle_type === "curated") {
+        productsJson = {
+          type: "curated",
+          items: selectedProducts.map((p, idx) => ({
+            product_id: p.id,
+            quantity: p.quantity || 1,
+            display_order: idx,
+            required: true,
+          })),
+        };
+      } else if (editingBundle.bundle_type === "build_own") {
+        productsJson = {
+          type: "build_own",
+          categories: editingBundle.eligible_categories,
+          product_pool: editingBundle.eligible_product_ids,
+          min_items: editingBundle.min_items_to_select || 1,
+          max_items: editingBundle.max_items_to_select || 5,
+        };
+      } else if (editingBundle.bundle_type === "tiered") {
+        productsJson = {
+          type: "tiered",
+          items: selectedProducts.map((p) => ({
+            product_id: p.id,
+            quantity: p.quantity || 1,
+          })),
+          tiers: editingBundle.tier_config || [],
+        };
+      } else if (editingBundle.bundle_type === "subscription") {
+        productsJson = {
+          type: "subscription",
+          items: selectedProducts.map((p) => ({
+            product_id: p.id,
+            quantity: p.quantity || 1,
+          })),
+          interval: editingBundle.subscription_interval,
+          commitment_months: editingBundle.subscription_duration_months,
+        };
+      } else if (editingBundle.bundle_type === "bonus_points") {
+        productsJson = {
+          type: "bonus_points",
+          items: selectedProducts.map((p) => ({
+            product_id: p.id,
+            quantity: p.quantity || 1,
+          })),
+          points_per_bundle: editingBundle.bonus_points,
+        };
+      } else if (editingBundle.bundle_type === "mystery") {
+        productsJson = {
+          type: "mystery",
+          min_value: editingBundle.mystery_products?.min_value || 0,
+          max_value: editingBundle.mystery_products?.max_value || 0,
+          product_pool: editingBundle.eligible_product_ids || [],
+          quantity: editingBundle.mystery_products?.quantity || 3,
+        };
       }
 
       const bundleData = {
         ...editingBundle,
+        slug: editingBundle.slug || generateSlug(editingBundle.name),
+        products: productsJson,
         updated_at: new Date().toISOString(),
       };
 
       let error;
-      let savedBundleId = editingBundle.id;
       if (editingBundle.id) {
         // Update existing bundle
-        ({ error } = await supabase
-          .from("mistry_bundles")
+        const { error: updateError } = await supabase
+          .from("bundles")
           .update(bundleData)
-          .eq("id", editingBundle.id));
+          .eq("id", editingBundle.id);
+        error = updateError;
       } else {
         // Create new bundle
         bundleData.created_by = profile?.id;
         bundleData.current_purchases = 0;
-        const insertResult = await supabase
-          .from("mistry_bundles")
-          .insert([bundleData])
-          .select("id")
-          .single();
-        error = insertResult.error;
-        savedBundleId = insertResult.data?.id;
+        const { error: insertError } = await supabase
+          .from("bundles")
+          .insert([bundleData]);
+        error = insertError;
       }
 
       if (error) throw error;
-
-      if (savedBundleId) {
-        const { error: liveError } = await supabase.from("bundle_live_config").upsert(
-          {
-            bundle_id: savedBundleId,
-            ...liveConfig,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "bundle_id" },
-        );
-        if (liveError) {
-          toast.warning("Bundle saved but live config was not updated.");
-        }
-      }
 
       toast.success(
         `Bundle ${editingBundle.id ? "updated" : "created"} successfully`,
       );
       setDialogOpen(false);
       setEditingBundle({});
+      setSelectedProducts([]);
       fetchBundles();
     } catch (error: any) {
       console.error("Error saving bundle:", error);
@@ -205,45 +271,11 @@ export default function AdminBundlesPage() {
     }
   };
 
-  const loadLiveConfig = async (bundleId: string) => {
-    const { data } = await supabase
-      .from("bundle_live_config")
-      .select("*")
-      .eq("bundle_id", bundleId)
-      .maybeSingle();
-
-    if (!data) {
-      setLiveConfig({
-        bundle_type: "mystery",
-        mystery_reveal_mode: "manual",
-        total_value_ksh: null,
-        is_live_stream_only: false,
-        is_stream_active: false,
-        is_mystery_revealed: false,
-        live_stock_total: 0,
-      });
-      return;
-    }
-
-    setLiveConfig({
-      bundle_type: data.bundle_type || "mystery",
-      mystery_reveal_mode: data.mystery_reveal_mode || "manual",
-      total_value_ksh: data.total_value_ksh || null,
-      is_live_stream_only: data.is_live_stream_only || false,
-      is_stream_active: data.is_stream_active || false,
-      is_mystery_revealed: data.is_mystery_revealed || false,
-      live_stock_total: data.live_stock_total || 0,
-    });
-  };
-
   const handleDeleteBundle = async (id: string) => {
     if (!confirm("Are you sure you want to delete this bundle?")) return;
 
     try {
-      const { error } = await supabase
-        .from("mistry_bundles")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("bundles").delete().eq("id", id);
 
       if (error) throw error;
 
@@ -255,294 +287,341 @@ export default function AdminBundlesPage() {
     }
   };
 
-  const toggleProductInBundle = (productId: string, checked: boolean) => {
-    const currentProducts = editingBundle.products || [];
-
-    if (checked) {
-      // Add product
-      setEditingBundle({
-        ...editingBundle,
-        products: [
-          ...currentProducts,
-          { product_id: productId, quantity: 1, required: true },
-        ],
-      });
+  const toggleProductSelection = (product: any) => {
+    const exists = selectedProducts.find((p) => p.id === product.id);
+    if (exists) {
+      setSelectedProducts(selectedProducts.filter((p) => p.id !== product.id));
     } else {
-      // Remove product
-      setEditingBundle({
-        ...editingBundle,
-        products: currentProducts.filter((p) => p.product_id !== productId),
-      });
+      setSelectedProducts([...selectedProducts, { ...product, quantity: 1 }]);
     }
   };
 
   const updateProductQuantity = (productId: string, quantity: number) => {
-    const currentProducts = editingBundle.products || [];
+    setSelectedProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, quantity } : p)),
+    );
+  };
+
+  const addTier = () => {
+    const tiers = editingBundle.tier_config || [];
     setEditingBundle({
       ...editingBundle,
-      products: currentProducts.map((p) =>
-        p.product_id === productId ? { ...p, quantity } : p,
-      ),
+      tier_config: [...tiers, { min_items: tiers.length + 2, discount: 5 }],
     });
   };
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "");
+  const removeTier = (index: number) => {
+    const tiers = [...(editingBundle.tier_config || [])];
+    tiers.splice(index, 1);
+    setEditingBundle({ ...editingBundle, tier_config: tiers });
+  };
+
+  const openLivePreview = (bundleId: string) => {
+    setLivePreview(bundleId);
+    window.open(`/bundles/live/${bundleId}`, "_blank");
+  };
+
+  const getBundleTypeIcon = (type: string) => {
+    const found = BUNDLE_TYPES.find((t) => t.value === type);
+    if (found) {
+      const Icon = found.icon;
+      return <Icon className="h-4 w-4" />;
+    }
+    return <Package className="h-4 w-4" />;
   };
 
   return (
-    <div className="container mx-auto px-2 py-8">
-      <div className="flex sm:flex-row flex-col justify-between items-center mb-8">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Mystery Bundles</h1>
-          <p className="text-muted-foreground my-2">
-            Create and manage product bundles with special discounts
+          <h1 className="text-3xl font-bold">Bundles Management</h1>
+          <p className="text-muted-foreground mt-1">
+            Create and manage product bundles, mystery boxes, and subscription
+            deals
           </p>
-          {/* Back to Marketing */}
-          <Button variant="link" className="px-0" asChild>
-            <Link href={"/admin/marketing"}>Back to Marketing</Link>
-          </Button>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button
               onClick={() => {
-                setEditingBundle({ products: [] });
-                setLiveConfig({
-                  bundle_type: "mystery",
+                setEditingBundle({
+                  bundle_type: "curated",
+                  status: "draft",
+                  max_per_customer: 1,
+                  bonus_points: 0,
+                  points_required: 0,
+                  eligible_tiers: [],
+                  min_items_to_select: 1,
+                  max_items_to_select: 5,
                   mystery_reveal_mode: "manual",
-                  total_value_ksh: null,
-                  is_live_stream_only: false,
-                  is_stream_active: false,
-                  is_mystery_revealed: false,
-                  live_stock_total: 0,
                 });
+                setSelectedProducts([]);
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Bundle
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingBundle.id ? "Edit Bundle" : "Create New Bundle"}
               </DialogTitle>
               <DialogDescription>
-                {editingBundle.id
-                  ? "Modify the settings of your bundle and save to update."
-                  : "Configure the details of your new bundle and save to create."}
+                Configure your bundle details, pricing, and availability
               </DialogDescription>
             </DialogHeader>
 
-            {editingBundle && (
-              <div className="space-y-6 py-4">
-                {/* Basic Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Basic Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Bundle Name *</Label>
-                      <Input
-                        id="name"
-                        value={editingBundle.name || ""}
-                        onChange={(e) => {
-                          const name = e.target.value;
-                          setEditingBundle({
-                            ...editingBundle,
-                            name,
-                            slug: generateSlug(name),
-                          });
-                        }}
-                        placeholder="e.g., Solar Starter Kit"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="slug">Slug *</Label>
-                      <Input
-                        id="slug"
-                        value={editingBundle.slug || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            slug: e.target.value,
-                          })
-                        }
-                        placeholder="solar-starter-kit"
-                      />
-                    </div>
-                  </div>
-
+            <div className="space-y-6 py-4">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={editingBundle.description || ""}
-                      onChange={(e) =>
+                    <Label>Bundle Type *</Label>
+                    <Select
+                      value={editingBundle.bundle_type}
+                      onValueChange={(value) =>
                         setEditingBundle({
                           ...editingBundle,
-                          description: e.target.value,
+                          bundle_type: value,
                         })
                       }
-                      placeholder="Describe what's included in this bundle"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="badge_text">Badge Text</Label>
-                      <Input
-                        id="badge_text"
-                        value={editingBundle.badge_text || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            badge_text: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., Best Seller, Limited"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="badge_color">Badge Color</Label>
-                      <Input
-                        id="badge_color"
-                        value={editingBundle.badge_color || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            badge_color: e.target.value,
-                          })
-                        }
-                        placeholder="bg-green-500, text-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Discount Settings */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Discount Settings</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Discount Type *</Label>
-                      <Select
-                        value={editingBundle.discount_type || "percentage"}
-                        onValueChange={(value: "percentage" | "fixed") =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            discount_type: value,
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="percentage">
-                            Percentage (%)
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select bundle type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BUNDLE_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            <div className="flex items-center gap-2">
+                              <type.icon className="h-4 w-4" />
+                              {type.label}
+                            </div>
                           </SelectItem>
-                          <SelectItem value="fixed">
-                            Fixed Amount (KES)
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Discount Value *</Label>
-                      <Input
-                        type="number"
-                        value={editingBundle.discount_value || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            discount_value: parseFloat(e.target.value),
-                          })
-                        }
-                        placeholder={
-                          editingBundle.discount_type === "percentage"
-                            ? "20"
-                            : "5000"
-                        }
-                      />
-                    </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="bundle_price">
-                      Custom Bundle Price (Optional)
-                    </Label>
+                    <Label>Bundle Name *</Label>
                     <Input
-                      id="bundle_price"
-                      type="number"
-                      value={editingBundle.bundle_price || ""}
-                      onChange={(e) =>
+                      value={editingBundle.name || ""}
+                      onChange={(e) => {
+                        const name = e.target.value;
                         setEditingBundle({
                           ...editingBundle,
-                          bundle_price: parseFloat(e.target.value) || null,
-                        })
-                      }
-                      placeholder="Leave empty to auto-calculate"
+                          name,
+                          slug: generateSlug(name),
+                        });
+                      }}
+                      placeholder="e.g., Solar Starter Kit"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      If set, this price overrides the calculated price from
-                      products
-                    </p>
                   </div>
                 </div>
 
-                {/* Products Selection */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">
-                    Products in Bundle *
-                  </h3>
-                  <div className="border rounded-lg max-h-96 overflow-y-auto">
-                    {products.map((product) => {
-                      const bundleProduct = editingBundle.products?.find(
-                        (p) => p.product_id === product.id,
-                      );
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Slug</Label>
+                    <Input
+                      value={editingBundle.slug || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          slug: e.target.value,
+                        })
+                      }
+                      placeholder="auto-generated"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={editingBundle.status || "draft"}
+                      onValueChange={(value) =>
+                        setEditingBundle({ ...editingBundle, status: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-                      return (
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    value={editingBundle.description || ""}
+                    onChange={(e) =>
+                      setEditingBundle({
+                        ...editingBundle,
+                        description: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    placeholder="Describe the bundle and its benefits..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Badge Text</Label>
+                    <Input
+                      value={editingBundle.badge_text || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          badge_text: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., Best Seller, Limited"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Badge Color</Label>
+                    <Input
+                      value={editingBundle.badge_color || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          badge_color: e.target.value,
+                        })
+                      }
+                      placeholder="bg-green-500 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">Pricing</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Base Price (KSH) *</Label>
+                    <Input
+                      type="number"
+                      value={editingBundle.base_price || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          base_price: parseFloat(e.target.value),
+                        })
+                      }
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Discounted Price</Label>
+                    <Input
+                      type="number"
+                      value={editingBundle.discounted_price || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          discounted_price: parseFloat(e.target.value) || null,
+                        })
+                      }
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Bonus Points</Label>
+                    <Input
+                      type="number"
+                      value={editingBundle.bonus_points || 0}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          bonus_points: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Points Required</Label>
+                    <Input
+                      type="number"
+                      value={editingBundle.points_required || 0}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          points_required: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Products Selection - Enhanced with Search */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  Products
+                </h3>
+
+                {/* Product Search Component */}
+                {editingBundle.bundle_type !== "mystery" && (
+                  <ProductSearch
+                    onProductSelect={(product) => {
+                      setSelectedProducts((prev) => [...prev, product]);
+                    }}
+                    selectedProductIds={selectedProducts.map((p) => p.id)}
+                    bundleType={editingBundle.bundle_type}
+                  />
+                )}
+
+                {/* Selected Products List */}
+                {selectedProducts.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-muted px-4 py-2 text-sm font-medium">
+                      Selected Products ({selectedProducts.length})
+                    </div>
+                    <div className="divide-y max-h-60 overflow-y-auto">
+                      {selectedProducts.map((product, idx) => (
                         <div
                           key={product.id}
-                          className="flex items-center gap-4 p-4 border-b last:border-0 hover:bg-muted/50"
+                          className="flex items-center gap-4 p-3"
                         >
-                          <Switch
-                            checked={!!bundleProduct}
-                            onCheckedChange={(checked) =>
-                              toggleProductInBundle(product.id, checked)
-                            }
-                          />
-                          {product.images.length > 0 && (
+                          {product.images?.[0] ? (
                             <img
                               src={product.images[0]}
                               alt={product.name}
-                              className="h-12 w-12 object-cover rounded"
+                              className="h-10 w-10 object-cover rounded"
                             />
+                          ) : (
+                            <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                              <Package className="h-5 w-5 text-muted-foreground" />
+                            </div>
                           )}
-                          <div className="flex-1">
-                            <p className="font-medium">{product.name}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {product.name}
+                            </p>
                             <p className="text-sm text-muted-foreground">
-                              KES {product.price.toLocaleString()}
+                              {formatPrice(product.price)} • Stock:{" "}
+                              {product.stock}
                             </p>
                           </div>
-                          {bundleProduct && (
+                          {editingBundle.bundle_type !== "tiered" && (
                             <div className="flex items-center gap-2">
-                              <Label
-                                htmlFor={`qty-${product.id}`}
-                                className="text-sm"
-                              >
-                                Qty:
-                              </Label>
+                              <Label className="text-sm">Qty:</Label>
                               <Input
-                                id={`qty-${product.id}`}
                                 type="number"
                                 min="1"
-                                value={bundleProduct.quantity}
+                                value={product.quantity}
                                 onChange={(e) =>
                                   updateProductQuantity(
                                     product.id,
@@ -553,350 +632,517 @@ export default function AdminBundlesPage() {
                               />
                             </div>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setSelectedProducts((prev) =>
+                                prev.filter((p) => p.id !== product.id),
+                              )
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedProducts.length === 0 &&
+                  editingBundle.bundle_type !== "mystery" && (
+                    <div className="text-center p-8 border rounded-lg bg-muted/20">
+                      <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Search and select products to add to this bundle
+                      </p>
+                    </div>
+                  )}
+
+                {/* Mystery bundle product pool selection */}
+                {editingBundle.bundle_type === "mystery" && (
+                  <div className="space-y-4">
+                    <ProductSearch
+                      onProductSelect={(product) => {
+                        const currentPool =
+                          editingBundle.eligible_product_ids || [];
+                        setEditingBundle({
+                          ...editingBundle,
+                          eligible_product_ids: [...currentPool, product.id],
+                        });
+                      }}
+                      selectedProductIds={
+                        editingBundle.eligible_product_ids || []
+                      }
+                      bundleType="mystery"
+                    />
+
+                    {(editingBundle.eligible_product_ids || []).length > 0 && (
+                      <div className="border rounded-lg p-3">
+                        <p className="text-sm font-medium mb-2">
+                          Product Pool (
+                          {editingBundle.eligible_product_ids?.length} products)
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {editingBundle.eligible_product_ids?.map(
+                            (productId) => {
+                              const product = products.find(
+                                (p) => p.id === productId,
+                              );
+                              return product ? (
+                                <Badge
+                                  key={productId}
+                                  variant="secondary"
+                                  className="gap-1"
+                                >
+                                  {product.name}
+                                  <X
+                                    className="h-3 w-3 cursor-pointer hover:text-destructive"
+                                    onClick={() =>
+                                      setEditingBundle({
+                                        ...editingBundle,
+                                        eligible_product_ids:
+                                          editingBundle.eligible_product_ids?.filter(
+                                            (id) => id !== productId,
+                                          ),
+                                      })
+                                    }
+                                  />
+                                </Badge>
+                              ) : null;
+                            },
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Type-Specific Configurations */}
+              {editingBundle.bundle_type === "tiered" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">
+                    Tiered Discounts
+                  </h3>
+                  <div className="space-y-3">
+                    {(editingBundle.tier_config || []).map((tier, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-4 p-3 border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <Label className="text-xs">Min Items</Label>
+                          <Input
+                            type="number"
+                            value={tier.min_items}
+                            onChange={(e) => {
+                              const newTiers = [
+                                ...(editingBundle.tier_config || []),
+                              ];
+                              newTiers[idx].min_items = parseInt(
+                                e.target.value,
+                              );
+                              setEditingBundle({
+                                ...editingBundle,
+                                tier_config: newTiers,
+                              });
+                            }}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-xs">Discount (%)</Label>
+                          <Input
+                            type="number"
+                            value={tier.discount}
+                            onChange={(e) => {
+                              const newTiers = [
+                                ...(editingBundle.tier_config || []),
+                              ];
+                              newTiers[idx].discount = parseInt(e.target.value);
+                              setEditingBundle({
+                                ...editingBundle,
+                                tier_config: newTiers,
+                              });
+                            }}
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeTier(idx)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addTier}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Tier
+                    </Button>
                   </div>
                 </div>
+              )}
 
-                {/* Access Restrictions */}
+              {editingBundle.bundle_type === "build_own" && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Access Restrictions</h3>
+                  <h3 className="text-lg font-semibold border-b pb-2">
+                    Build Your Own Settings
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Minimum Tier Required</Label>
-                      <Select
-                        value={
-                          editingBundle.min_tier_required || "no-restriction"
+                      <Label>Min Items to Select</Label>
+                      <Input
+                        type="number"
+                        value={editingBundle.min_items_to_select || 1}
+                        onChange={(e) =>
+                          setEditingBundle({
+                            ...editingBundle,
+                            min_items_to_select: parseInt(e.target.value),
+                          })
                         }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Max Items to Select</Label>
+                      <Input
+                        type="number"
+                        value={editingBundle.max_items_to_select || 5}
+                        onChange={(e) =>
+                          setEditingBundle({
+                            ...editingBundle,
+                            max_items_to_select: parseInt(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {editingBundle.bundle_type === "subscription" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">
+                    Subscription Settings
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Interval</Label>
+                      <Select
+                        value={editingBundle.subscription_interval || "monthly"}
                         onValueChange={(value) =>
                           setEditingBundle({
                             ...editingBundle,
-                            min_tier_required: value || null,
+                            subscription_interval: value,
                           })
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="No tier restriction" />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="no-restriction">
-                            No restriction
-                          </SelectItem>
-                          {tiers.map((tier) => (
-                            <SelectItem key={tier.tier} value={tier.tier}>
-                              <div className="flex items-center gap-2">
-                                <Crown className="h-4 w-4" />
-                                {tier.tier.charAt(0).toUpperCase() +
-                                  tier.tier.slice(1)}
-                              </div>
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Points Required</Label>
-                      <div className="relative">
-                        <Coins className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          type="number"
-                          value={editingBundle.points_required || 0}
-                          onChange={(e) =>
-                            setEditingBundle({
-                              ...editingBundle,
-                              points_required: parseInt(e.target.value),
-                            })
-                          }
-                          className="pl-9"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Purchase Limits */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Purchase Limits</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Max Purchases Per User</Label>
+                      <Label>Commitment (months)</Label>
                       <Input
                         type="number"
-                        value={editingBundle.max_purchases_per_user || ""}
+                        value={editingBundle.subscription_duration_months || ""}
                         onChange={(e) =>
                           setEditingBundle({
                             ...editingBundle,
-                            max_purchases_per_user:
+                            subscription_duration_months:
                               parseInt(e.target.value) || null,
                           })
                         }
                         placeholder="Unlimited"
-                        min="1"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Total Purchases Allowed</Label>
-                      <Input
-                        type="number"
-                        value={editingBundle.total_purchases_allowed || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            total_purchases_allowed:
-                              parseInt(e.target.value) || null,
-                          })
-                        }
-                        placeholder="Unlimited"
-                        min="1"
                       />
                     </div>
                   </div>
                 </div>
+              )}
 
-                {/* Schedule */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Schedule</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Start Date</Label>
-                      <Input
-                        type="datetime-local"
-                        value={editingBundle.start_date?.slice(0, 16) || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            start_date: e.target.value || null,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>End Date</Label>
-                      <Input
-                        type="datetime-local"
-                        value={editingBundle.end_date?.slice(0, 16) || ""}
-                        onChange={(e) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            end_date: e.target.value || null,
-                          })
-                        }
-                      />
-                    </div>
+              {/* Inventory & Schedule */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  Inventory & Schedule
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Total Available</Label>
+                    <Input
+                      type="number"
+                      value={editingBundle.total_available || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          total_available: parseInt(e.target.value) || null,
+                        })
+                      }
+                      placeholder="Unlimited"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Max Per Customer</Label>
+                    <Input
+                      type="number"
+                      value={editingBundle.max_per_customer || 1}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          max_per_customer: parseInt(e.target.value),
+                        })
+                      }
+                    />
                   </div>
                 </div>
 
-                {/* Status and Featured */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Status</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={editingBundle.status || "draft"}
-                        onValueChange={(
-                          value: "draft" | "active" | "inactive" | "expired",
-                        ) =>
-                          setEditingBundle({ ...editingBundle, status: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="inactive">Inactive</SelectItem>
-                          <SelectItem value="expired">Expired</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center space-x-2 pt-8">
-                      <Switch
-                        id="featured"
-                        checked={editingBundle.featured || false}
-                        onCheckedChange={(checked) =>
-                          setEditingBundle({
-                            ...editingBundle,
-                            featured: checked,
-                          })
-                        }
-                      />
-                      <Label htmlFor="featured">Featured Bundle</Label>
-                    </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="datetime-local"
+                      value={editingBundle.starts_at?.slice(0, 16) || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          starts_at: e.target.value || null,
+                        })
+                      }
+                    />
                   </div>
-                </div>
-
-                {/* Advanced Bundle Mode */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Advanced Live Settings</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Bundle Type</Label>
-                      <Select
-                        value={liveConfig.bundle_type}
-                        onValueChange={(
-                          value: "mystery" | "tiered" | "build_your_own",
-                        ) => setLiveConfig((prev) => ({ ...prev, bundle_type: value }))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="mystery">Mystery Bundle</SelectItem>
-                          <SelectItem value="tiered">Tiered Bundle</SelectItem>
-                          <SelectItem value="build_your_own">Build Your Own</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Mystery Reveal Mode</Label>
-                      <Select
-                        value={liveConfig.mystery_reveal_mode}
-                        onValueChange={(value: "manual" | "after_purchase") =>
-                          setLiveConfig((prev) => ({
-                            ...prev,
-                            mystery_reveal_mode: value,
-                          }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="manual">Manual Reveal (Live)</SelectItem>
-                          <SelectItem value="after_purchase">After Purchase</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input
+                      type="datetime-local"
+                      value={editingBundle.ends_at?.slice(0, 16) || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          ends_at: e.target.value || null,
+                        })
+                      }
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Total Value (KSH)</Label>
-                      <Input
-                        type="number"
-                        value={liveConfig.total_value_ksh || ""}
-                        onChange={(e) =>
-                          setLiveConfig((prev) => ({
-                            ...prev,
-                            total_value_ksh: Number(e.target.value) || null,
-                          }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Live Stock Total</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={liveConfig.live_stock_total}
-                        onChange={(e) =>
-                          setLiveConfig((prev) => ({
-                            ...prev,
-                            live_stock_total: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={liveConfig.is_live_stream_only}
-                        onCheckedChange={(checked) =>
-                          setLiveConfig((prev) => ({
-                            ...prev,
-                            is_live_stream_only: checked,
-                          }))
-                        }
-                      />
-                      <Label>Live Stream Only</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={liveConfig.is_stream_active}
-                        onCheckedChange={(checked) =>
-                          setLiveConfig((prev) => ({
-                            ...prev,
-                            is_stream_active: checked,
-                          }))
-                        }
-                      />
-                      <Label>Stream Active</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={liveConfig.is_mystery_revealed}
-                        onCheckedChange={(checked) =>
-                          setLiveConfig((prev) => ({
-                            ...prev,
-                            is_mystery_revealed: checked,
-                          }))
-                        }
-                      />
-                      <Label>Mystery Revealed</Label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Terms and Conditions */}
-                <div className="space-y-2">
-                  <Label htmlFor="terms">Terms & Conditions</Label>
-                  <Textarea
-                    id="terms"
-                    value={editingBundle.terms_conditions || ""}
-                    onChange={(e) =>
-                      setEditingBundle({
-                        ...editingBundle,
-                        terms_conditions: e.target.value,
-                      })
-                    }
-                    rows={3}
-                  />
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={() => setDialogOpen(false)}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSaveBundle} disabled={saving}>
-                    {saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        {editingBundle.id ? "Update" : "Create"} Bundle
-                      </>
-                    )}
-                  </Button>
                 </div>
               </div>
-            )}
+
+              {/* Live Stream Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  Live Stream Settings
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0">
+                    <Label>Live Stream Exclusive</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Only available during live streams
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingBundle.is_live_exclusive || false}
+                    onCheckedChange={(checked) =>
+                      setEditingBundle({
+                        ...editingBundle,
+                        is_live_exclusive: checked,
+                      })
+                    }
+                  />
+                </div>
+                {editingBundle.is_live_exclusive && (
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0">
+                      <Label>Stream Active</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Currently live on stream
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editingBundle.is_stream_active || false}
+                      onCheckedChange={(checked) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          is_stream_active: checked,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Mystery Bundle Settings */}
+              {editingBundle.bundle_type === "mystery" && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">
+                    Mystery Bundle Settings
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Min Value (KSH)</Label>
+                      <Input
+                        type="number"
+                        value={editingBundle.mystery_products?.min_value || ""}
+                        onChange={(e) =>
+                          setEditingBundle({
+                            ...editingBundle,
+                            mystery_products: {
+                              ...editingBundle.mystery_products,
+                              min_value: parseInt(e.target.value),
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Max Value (KSH)</Label>
+                      <Input
+                        type="number"
+                        value={editingBundle.mystery_products?.max_value || ""}
+                        onChange={(e) =>
+                          setEditingBundle({
+                            ...editingBundle,
+                            mystery_products: {
+                              ...editingBundle.mystery_products,
+                              max_value: parseInt(e.target.value),
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reveal Mode</Label>
+                    <Select
+                      value={editingBundle.mystery_reveal_mode || "manual"}
+                      onValueChange={(value) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          mystery_reveal_mode: value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">
+                          Manual (Live Stream)
+                        </SelectItem>
+                        <SelectItem value="after_purchase">
+                          After Purchase
+                        </SelectItem>
+                        <SelectItem value="immediate">Immediate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {/* Display Settings */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold border-b pb-2">
+                  Display Settings
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Image URL</Label>
+                    <Input
+                      value={editingBundle.image_url || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          image_url: e.target.value,
+                        })
+                      }
+                      placeholder="https://..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cover Image URL</Label>
+                    <Input
+                      value={editingBundle.cover_image_url || ""}
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          cover_image_url: e.target.value,
+                        })
+                      }
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0">
+                    <Label>Featured Bundle</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Show on homepage
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editingBundle.featured || false}
+                    onCheckedChange={(checked) =>
+                      setEditingBundle({ ...editingBundle, featured: checked })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Terms */}
+              <div className="space-y-2">
+                <Label>Terms & Conditions</Label>
+                <Textarea
+                  value={editingBundle.terms_conditions || ""}
+                  onChange={(e) =>
+                    setEditingBundle({
+                      ...editingBundle,
+                      terms_conditions: e.target.value,
+                    })
+                  }
+                  rows={3}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveBundle} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {editingBundle.id ? "Update" : "Create"} Bundle
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
+      {/* Bundles Table */}
       <Card>
-        <CardContent className="p-2">
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Discount</TableHead>
-                <TableHead>Access</TableHead>
+                <TableHead>Bundle</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Stock</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Purchases</TableHead>
+                <TableHead>Sales</TableHead>
                 <TableHead>Schedule</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -905,9 +1151,7 @@ export default function AdminBundlesPage() {
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8">
-                    <div className="flex justify-center items-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : bundles.length === 0 ? (
@@ -916,14 +1160,15 @@ export default function AdminBundlesPage() {
                     colSpan={8}
                     className="text-center py-8 text-muted-foreground"
                   >
-                    No bundles found. Create your first bundle to get started.
+                    No bundles created yet. Click "Create Bundle" to get
+                    started.
                   </TableCell>
                 </TableRow>
               ) : (
                 bundles.map((bundle) => (
                   <TableRow key={bundle.id}>
                     <TableCell className="font-medium">
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-2">
                         {bundle.name}
                         {bundle.featured && (
                           <Badge variant="default" className="bg-yellow-500">
@@ -934,7 +1179,7 @@ export default function AdminBundlesPage() {
                           <Badge
                             style={{
                               backgroundColor:
-                                bundle.badge_color?.split(" ")[0] || "#000",
+                                bundle.badge_color?.split(" ")[0],
                             }}
                           >
                             {bundle.badge_text}
@@ -942,27 +1187,36 @@ export default function AdminBundlesPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{bundle.products?.length || 0} items</TableCell>
                     <TableCell>
-                      {bundle.discount_type === "percentage"
-                        ? `${bundle.discount_value}%`
-                        : `KES ${bundle.discount_value?.toLocaleString()}`}
+                      <div className="flex items-center gap-1">
+                        {getBundleTypeIcon(bundle.bundle_type)}
+                        <span className="capitalize">
+                          {bundle.bundle_type.replace("_", " ")}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        {bundle.min_tier_required && (
-                          <Badge variant="outline" className="block w-fit">
-                            <Crown className="h-3 w-3 inline mr-1" />
-                            {bundle.min_tier_required}
-                          </Badge>
-                        )}
-                        {bundle.points_required > 0 && (
-                          <Badge variant="outline" className="block w-fit">
-                            <Coins className="h-3 w-3 inline mr-1" />
-                            {bundle.points_required} pts
-                          </Badge>
-                        )}
-                      </div>
+                      KSH {bundle.base_price.toLocaleString()}
+                      {bundle.discounted_price && (
+                        <span className="text-xs text-muted-foreground line-through ml-1">
+                          {bundle.discounted_price.toLocaleString()}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {bundle.remaining_count !== null ? (
+                        <span
+                          className={
+                            bundle.remaining_count <= 10
+                              ? "text-orange-500"
+                              : ""
+                          }
+                        >
+                          {bundle.remaining_count} / {bundle.total_available}
+                        </span>
+                      ) : (
+                        "Unlimited"
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -977,57 +1231,72 @@ export default function AdminBundlesPage() {
                         {bundle.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {bundle.current_purchases || 0}
-                      {bundle.total_purchases_allowed && (
-                        <span className="text-muted-foreground text-sm">
-                          {" "}
-                          / {bundle.total_purchases_allowed}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {bundle.start_date ? (
-                        <div className="text-sm">
-                          {format(new Date(bundle.start_date), "MMM d, yyyy")}
-                          {bundle.end_date && (
-                            <div className="flex flex-wrap items-center gap-2">
-                              {" "}
-                              →{" "}
-                              {format(new Date(bundle.end_date), "MMM d, yyyy")}
-                            </div>
-                          )}
+                    <TableCell>{bundle.current_purchases || 0}</TableCell>
+                    <TableCell className="text-sm">
+                      {bundle.starts_at ? (
+                        <div>
+                          {format(new Date(bundle.starts_at), "MMM d")}
+                          {bundle.ends_at &&
+                            ` → ${format(new Date(bundle.ends_at), "MMM d")}`}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-sm">
-                          Always
-                        </span>
+                        "Always"
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link href={`/bundles/live/${bundle.id}`} target="_blank">
-                          <ExternalLink className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={async () => {
-                          setEditingBundle(bundle);
-                          await loadLiveConfig(bundle.id);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteBundle(bundle.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openLivePreview(bundle.id)}
+                          title="Live Preview"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            const { data } = await supabase
+                              .from("bundles")
+                              .select("*")
+                              .eq("id", bundle.id)
+                              .single();
+                            setEditingBundle(data);
+                            if (data.products?.items) {
+                              // Load selected products
+                              const productIds = data.products.items.map(
+                                (i: any) => i.product_id,
+                              );
+                              const { data: productsData } = await supabase
+                                .from("products")
+                                .select("*")
+                                .in("id", productIds);
+                              if (productsData) {
+                                setSelectedProducts(
+                                  productsData.map((p) => ({
+                                    ...p,
+                                    quantity:
+                                      data.products.items.find(
+                                        (i: any) => i.product_id === p.id,
+                                      )?.quantity || 1,
+                                  })),
+                                );
+                              }
+                            }
+                            setDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteBundle(bundle.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1036,6 +1305,24 @@ export default function AdminBundlesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Live Preview Modal */}
+      {livePreview && (
+        <Dialog open={!!livePreview} onOpenChange={() => setLivePreview(null)}>
+          <DialogContent className="max-w-6xl h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>Live Bundle Preview</DialogTitle>
+              <DialogDescription>
+                This is how the bundle appears on the live stream display
+              </DialogDescription>
+            </DialogHeader>
+            <iframe
+              src={`/bundles/live/${livePreview}`}
+              className="w-full h-full rounded-lg"
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
