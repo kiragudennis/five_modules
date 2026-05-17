@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { usePolling } from "@/hooks/usePolling";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
-import { LiveDisplayShell } from "@/components/live/live-display-shell";
+import LiveDisplayShell from "@/components/live/live-display-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,7 +23,10 @@ export default function DrawLivePage() {
   const [draw, setDraw] = useState<DrawLiveData | null>(null);
   const [totalEntries, setTotalEntries] = useState(0);
   const [recentEntries, setRecentEntries] = useState<
-    { entries_count: number; users?: { full_name?: string | null; email?: string | null } | null }[]
+    {
+      entries_count: number;
+      users?: { full_name?: string | null; email?: string | null } | null;
+    }[]
   >([]);
 
   const load = async () => {
