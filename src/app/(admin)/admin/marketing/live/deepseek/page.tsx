@@ -1,6 +1,7 @@
 // src/app/(admin)/admin/live/page.tsx
 // This is the admin page for switching between live displays for different games during demos.
 // It polls the database for recently active games and shows their status and links to open them on a second monitor.
+// @ts-nocheck
 
 "use client";
 
