@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Gift,
   Star,
@@ -18,10 +17,8 @@ import {
   RefreshCw,
   TrendingUp,
   Sparkles,
-  Clock,
-  Users,
-  Coins,
   Zap,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Bundle } from "@/types/bundles";

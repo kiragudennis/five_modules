@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { usePolling } from "@/hooks/usePolling";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
-import { LiveDisplayShell } from "@/components/live/live-display-shell";
+import LiveDisplayShell from "@/components/live/live-display-shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,7 +30,11 @@ export default function ChallengeLivePage() {
 
   const load = async () => {
     const [{ data: c }, { data: scores }] = await Promise.all([
-      supabase.from("challenges").select("id,name,end_date").eq("id", id).single(),
+      supabase
+        .from("challenges")
+        .select("id,name,end_date")
+        .eq("id", id)
+        .single(),
       supabase
         .from("challenge_scores")
         .select("user_id,score,users:user_id(full_name,email)")
@@ -42,7 +46,10 @@ export default function ChallengeLivePage() {
     setRows((scores || []) as ScoreRow[]);
     if (c?.end_date) {
       setSecondsLeft(
-        Math.max(0, Math.floor((new Date(c.end_date).getTime() - Date.now()) / 1000)),
+        Math.max(
+          0,
+          Math.floor((new Date(c.end_date).getTime() - Date.now()) / 1000),
+        ),
       );
     }
   };
@@ -95,7 +102,9 @@ export default function ChallengeLivePage() {
         <Card className="border-slate-800 bg-slate-900 md:col-span-2">
           <CardContent className="pt-6">
             <p className="text-sm text-slate-400">Time remaining</p>
-            <p className={`text-6xl font-black ${finalHour ? "text-red-400" : "text-green-400"}`}>
+            <p
+              className={`text-6xl font-black ${finalHour ? "text-red-400" : "text-green-400"}`}
+            >
               {Math.floor(secondsLeft / 3600)
                 .toString()
                 .padStart(2, "0")}
@@ -103,8 +112,7 @@ export default function ChallengeLivePage() {
               {Math.floor((secondsLeft % 3600) / 60)
                 .toString()
                 .padStart(2, "0")}
-              :
-              {(secondsLeft % 60).toString().padStart(2, "0")}
+              :{(secondsLeft % 60).toString().padStart(2, "0")}
             </p>
           </CardContent>
         </Card>
@@ -118,7 +126,8 @@ export default function ChallengeLivePage() {
                   className="flex items-center justify-between rounded border border-slate-800 p-2"
                 >
                   <span className="text-sm">
-                    #{idx + 1} {r.users?.full_name || r.users?.email || "Customer"}
+                    #{idx + 1}{" "}
+                    {r.users?.full_name || r.users?.email || "Customer"}
                   </span>
                   <Badge>{r.score}</Badge>
                 </div>

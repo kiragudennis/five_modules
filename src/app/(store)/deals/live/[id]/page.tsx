@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { usePolling } from "@/hooks/usePolling";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
-import { LiveDisplayShell } from "@/components/live/live-display-shell";
+import LiveDisplayShell from "@/components/live/live-display-shell";
 import { Card, CardContent } from "@/components/ui/card";
 
 type DealLive = {
@@ -41,12 +41,17 @@ export default function DealLivePage() {
     const row = (dealData || null) as DealLive | null;
     setDeal(row);
     setClaimNames(
-      (claims || []).map((c: any) => c.users?.full_name || c.users?.email || "Customer"),
+      (claims || []).map(
+        (c: any) => c.users?.full_name || c.users?.email || "Customer",
+      ),
     );
 
     if (row?.ends_at) {
       setSecondsLeft(
-        Math.max(0, Math.floor((new Date(row.ends_at).getTime() - Date.now()) / 1000)),
+        Math.max(
+          0,
+          Math.floor((new Date(row.ends_at).getTime() - Date.now()) / 1000),
+        ),
       );
     }
   };
@@ -79,7 +84,11 @@ export default function DealLivePage() {
   }, [deal]);
 
   const timerColor =
-    secondsLeft > 1800 ? "text-green-400" : secondsLeft > 600 ? "text-yellow-400" : "text-red-400";
+    secondsLeft > 1800
+      ? "text-green-400"
+      : secondsLeft > 600
+        ? "text-yellow-400"
+        : "text-red-400";
 
   return (
     <LiveDisplayShell
@@ -96,12 +105,13 @@ export default function DealLivePage() {
               {Math.floor(secondsLeft / 60)
                 .toString()
                 .padStart(2, "0")}
-              :
-              {(secondsLeft % 60).toString().padStart(2, "0")}
+              :{(secondsLeft % 60).toString().padStart(2, "0")}
             </p>
             <p className="mt-3 text-sm text-slate-300">
               KES {deal?.deal_price}{" "}
-              <span className="text-slate-500 line-through">KES {deal?.original_price}</span>
+              <span className="text-slate-500 line-through">
+                KES {deal?.original_price}
+              </span>
             </p>
           </CardContent>
         </Card>
@@ -109,7 +119,10 @@ export default function DealLivePage() {
           <CardContent className="pt-6">
             <p className="mb-1 text-sm text-slate-400">Stock depletion</p>
             <div className="h-3 rounded bg-slate-700">
-              <div className="h-3 rounded bg-red-500" style={{ width: `${stockPct}%` }} />
+              <div
+                className="h-3 rounded bg-red-500"
+                style={{ width: `${stockPct}%` }}
+              />
             </div>
             <p className="mt-1 text-xs text-slate-400">{stockPct}% claimed</p>
           </CardContent>
