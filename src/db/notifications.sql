@@ -29,26 +29,33 @@ CREATE TABLE IF NOT EXISTS notifications (
     ))
 );
 
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
-CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
-CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at) WHERE read = true;
+-- Add draw-related notification types
+ALTER TABLE notifications DROP CONSTRAINT IF EXISTS valid_notification_type;
 
--- Add comments for documentation
-COMMENT ON TABLE notifications IS 'User notifications for loyalty, orders, and system events';
-COMMENT ON COLUMN notifications.id IS 'Unique identifier for the notification';
-COMMENT ON COLUMN notifications.user_id IS 'User who receives the notification';
-COMMENT ON COLUMN notifications.type IS 'Type of notification: loyalty_partial_redeem, loyalty_points_earned, loyalty_points_expiring, loyalty_tier_upgrade, order_confirmation, order_shipped, order_delivered, payment_received, payment_failed, coupon_issued, system_alert';
-COMMENT ON COLUMN notifications.title IS 'Short title of the notification';
-COMMENT ON COLUMN notifications.message IS 'Detailed message content';
-COMMENT ON COLUMN notifications.read IS 'Whether user has read the notification';
-COMMENT ON COLUMN notifications.metadata IS 'Additional data like points amount, order_id, discount amount, etc.';
-COMMENT ON COLUMN notifications.created_at IS 'When the notification was created';
-COMMENT ON COLUMN notifications.read_at IS 'When the user read the notification';
+ALTER TABLE notifications ADD CONSTRAINT valid_notification_type CHECK (type IN (
+    -- Existing loyalty types
+    'loyalty_partial_redeem',
+    'loyalty_points_earned',
+    'loyalty_points_expiring',
+    'loyalty_tier_upgrade',
+    -- Existing order types
+    'order_confirmation',
+    'order_shipped',
+    'order_delivered',
+    'payment_received',
+    'payment_failed',
+    'coupon_issued',
+    'system_alert',
+    -- New draw-related types
+    'draw_win',              -- User won a draw
+    'draw_runner_up',        -- User was a runner-up
+    'draw_reminder',         -- Reminder about upcoming draw
+    'draw_entry_confirmed',  -- Entry confirmation
+    'draw_consolation',      -- Consolation points awarded
+    'draw_redraw'           -- Draw was redrawn due to unclaimed prize
+));
 
--- Function to create a notification
+-- Update the create_notification function to include new types
 CREATE OR REPLACE FUNCTION create_notification(
     p_user_id uuid,
     p_type text,
@@ -76,7 +83,13 @@ BEGIN
         'payment_received',
         'payment_failed',
         'coupon_issued',
-        'system_alert'
+        'system_alert',
+        'draw_win',
+        'draw_runner_up',
+        'draw_reminder',
+        'draw_entry_confirmed',
+        'draw_consolation',
+        'draw_redraw'
     ) THEN
         RAISE EXCEPTION 'Invalid notification type: %', p_type;
     END IF;
@@ -88,6 +101,76 @@ BEGIN
     RETURN v_notification_id;
 END;
 $$;
+
+-- Update batch_create_notifications function
+CREATE OR REPLACE FUNCTION batch_create_notifications(
+    p_user_ids uuid[],
+    p_type text,
+    p_title text,
+    p_message text,
+    p_metadata jsonb DEFAULT '{}'::jsonb
+)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_count integer;
+    v_user_id uuid;
+BEGIN
+    -- Validate notification type
+    IF p_type NOT IN (
+        'loyalty_partial_redeem',
+        'loyalty_points_earned',
+        'loyalty_points_expiring',
+        'loyalty_tier_upgrade',
+        'order_confirmation',
+        'order_shipped',
+        'order_delivered',
+        'payment_received',
+        'payment_failed',
+        'coupon_issued',
+        'system_alert',
+        'draw_win',
+        'draw_runner_up',
+        'draw_reminder',
+        'draw_entry_confirmed',
+        'draw_consolation',
+        'draw_redraw'
+    ) THEN
+        RAISE EXCEPTION 'Invalid notification type: %', p_type;
+    END IF;
+    
+    v_count := 0;
+    FOREACH v_user_id IN ARRAY p_user_ids
+    LOOP
+        PERFORM create_notification(v_user_id, p_type, p_title, p_message, p_metadata);
+        v_count := v_count + 1;
+    END LOOP;
+    
+    RETURN v_count;
+END;
+$$;
+
+-- Create indexes for performance
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at) WHERE read = true;
+
+-- Add comments for documentation
+COMMENT ON TABLE notifications IS 'User notifications for loyalty, orders, and system events';
+COMMENT ON COLUMN notifications.id IS 'Unique identifier for the notification';
+COMMENT ON COLUMN notifications.user_id IS 'User who receives the notification';
+COMMENT ON COLUMN notifications.type IS 'Type of notification: loyalty_partial_redeem, loyalty_points_earned, loyalty_points_expiring, loyalty_tier_upgrade, order_confirmation, order_shipped, order_delivered, payment_received, payment_failed, coupon_issued, system_alert';
+COMMENT ON COLUMN notifications.title IS 'Short title of the notification';
+COMMENT ON COLUMN notifications.message IS 'Detailed message content';
+COMMENT ON COLUMN notifications.read IS 'Whether user has read the notification';
+COMMENT ON COLUMN notifications.metadata IS 'Additional data like points amount, order_id, discount amount, etc.';
+COMMENT ON COLUMN notifications.created_at IS 'When the notification was created';
+COMMENT ON COLUMN notifications.read_at IS 'When the user read the notification';
 
 -- Function to mark notification as read
 CREATE OR REPLACE FUNCTION mark_notification_read(
@@ -278,51 +361,6 @@ BEGIN
     ORDER BY n.created_at DESC
     LIMIT p_limit
     OFFSET p_offset;
-END;
-$$;
-
--- Function to batch create notifications (useful for system-wide announcements)
-CREATE OR REPLACE FUNCTION batch_create_notifications(
-    p_user_ids uuid[],
-    p_type text,
-    p_title text,
-    p_message text,
-    p_metadata jsonb DEFAULT '{}'::jsonb
-)
-RETURNS integer
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-    v_count integer;
-    v_user_id uuid;
-BEGIN
-    -- Validate notification type
-    IF p_type NOT IN (
-        'loyalty_partial_redeem',
-        'loyalty_points_earned',
-        'loyalty_points_expiring',
-        'loyalty_tier_upgrade',
-        'order_confirmation',
-        'order_shipped',
-        'order_delivered',
-        'payment_received',
-        'payment_failed',
-        'coupon_issued',
-        'system_alert'
-    ) THEN
-        RAISE EXCEPTION 'Invalid notification type: %', p_type;
-    END IF;
-    
-    v_count := 0;
-    FOREACH v_user_id IN ARRAY p_user_ids
-    LOOP
-        PERFORM create_notification(v_user_id, p_type, p_title, p_message, p_metadata);
-        v_count := v_count + 1;
-    END LOOP;
-    
-    RETURN v_count;
 END;
 $$;
 

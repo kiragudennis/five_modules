@@ -197,6 +197,42 @@ CREATE INDEX IF NOT EXISTS idx_referrals_referred_user_id ON referrals(referred_
 CREATE INDEX IF NOT EXISTS idx_referrals_referral_code ON referrals(referral_code);
 CREATE INDEX IF NOT EXISTS idx_referrals_status ON referrals(status);
 
+-- Add new columns to existing referrals table
+ALTER TABLE referrals 
+ADD COLUMN IF NOT EXISTS draw_entries_awarded BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS draw_entries_count INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS draw_id UUID REFERENCES draws(id) ON DELETE SET NULL,
+ADD COLUMN IF NOT EXISTS conversion_type TEXT CHECK (conversion_type IN ('signup', 'first_purchase', 'qualifying_purchase')),
+ADD COLUMN IF NOT EXISTS conversion_value NUMERIC(10,2),
+ADD COLUMN IF NOT EXISTS referrer_notified BOOLEAN DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS referred_notified BOOLEAN DEFAULT FALSE;
+ALTER TABLE referrals ADD CONSTRAINT unique_referral_code UNIQUE (referral_code);
+
+-- Create referral code index if not exists
+CREATE INDEX IF NOT EXISTS idx_referrals_code ON referrals(referral_code);
+CREATE INDEX IF NOT EXISTS idx_referrals_status_converted ON referrals(status, completed_at);
+CREATE INDEX IF NOT EXISTS idx_referrals_draw ON referrals(draw_id);
+
+-- Update the check constraint
+ALTER TABLE referrals DROP CONSTRAINT IF EXISTS referrals_status_check;
+ALTER TABLE referrals ADD CONSTRAINT referrals_status_check 
+  CHECK (status IN ('pending', 'joined', 'completed', 'expired', 'converted'));
+
+-- Add referral_click tracking table
+CREATE TABLE IF NOT EXISTS referral_clicks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    referral_code VARCHAR(50) NOT NULL REFERENCES referrals(referral_code) ON DELETE CASCADE,
+    referrer_id UUID REFERENCES users(id),
+    ip_address TEXT,
+    user_agent TEXT,
+    clicked_at TIMESTAMPTZ DEFAULT NOW(),
+    converted BOOLEAN DEFAULT FALSE,
+    converted_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_clicks_code ON referral_clicks(referral_code);
+CREATE INDEX IF NOT EXISTS idx_referral_clicks_clicked_at ON referral_clicks(clicked_at);
+
 -- REWARDS (Anniversary, Milestone)
 CREATE TABLE IF NOT EXISTS rewards (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -251,6 +287,7 @@ ALTER TABLE user_challenges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rewards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_rewards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE referral_clicks ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS Policies
 CREATE POLICY "Users can view active bundles" ON mistry_bundles
@@ -293,6 +330,12 @@ CREATE POLICY "Users can view their referrals" ON referrals
     FOR SELECT USING (auth.uid() = referrer_id OR auth.uid() = referred_user_id);
 
 CREATE POLICY "Admins can manage referrals" ON referrals
+    FOR ALL USING (auth.uid() IN (SELECT id FROM users WHERE role = 'admin'));
+
+CREATE POLICY "Users can view their referral clicks" ON referral_clicks
+    FOR SELECT USING (auth.uid() IN (SELECT referrer_id FROM referrals WHERE referral_code = referral_clicks.referral_code));
+
+CREATE POLICY "Admins can manage referral clicks" ON referral_clicks
     FOR ALL USING (auth.uid() IN (SELECT id FROM users WHERE role = 'admin'));
 
 CREATE POLICY "Users can view active rewards" ON rewards

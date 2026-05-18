@@ -1,68 +1,137 @@
+// app/(admin)/admin/marketing/draws/[drawId]/control/page.tsx - Enhanced version
+
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { usePolling } from "@/hooks/usePolling";
+import {
+  Loader2,
+  Trophy,
+  Users,
+  Ticket,
+  RefreshCw,
+  Play,
+  Lock,
+  Eye,
+  Crown,
+} from "lucide-react";
 
 type DrawControl = {
   id: string;
   name: string;
-  status: "entry_collection" | "entries_locked" | "winner_reveal" | "completed";
+  status: "draft" | "open" | "closed" | "drawing" | "completed" | "cancelled";
   winner_name?: string | null;
+  winner_user_id?: string | null;
+  total_entries?: number;
+  total_participants?: number;
 };
 
 export default function DrawControlPage() {
   const { drawId } = useParams<{ drawId: string }>();
   const { supabase } = useAuth();
   const [draw, setDraw] = useState<DrawControl | null>(null);
-  const [participants, setParticipants] = useState<
-    { user_id: string; entries_count: number; users?: { full_name?: string | null; email?: string | null } | null }[]
-  >([]);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectingWinner, setSelectingWinner] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  const load = async () => {
-    const [{ data: drawData }, { data: entries }] = await Promise.all([
-      supabase
-        .from("draws")
-        .select("id,name,status,winner_name")
-        .eq("id", drawId)
-        .single(),
-      supabase
-        .from("draw_entries")
-        .select("user_id,entries_count,users:user_id(full_name,email)")
-        .eq("draw_id", drawId),
-    ]);
+  const loadData = useCallback(async () => {
+    if (!drawId) return;
 
-    setDraw((drawData || null) as DrawControl | null);
-    setParticipants(
-      (entries || []) as {
-        user_id: string;
-        entries_count: number;
-        users?: { full_name?: string | null; email?: string | null } | null;
-      }[],
-    );
-  };
+    try {
+      const [
+        { data: drawData, error: drawError },
+        { data: entries, error: entriesError },
+      ] = await Promise.all([
+        supabase
+          .from("draws")
+          .select("id, name, status, winner_id, winner_name")
+          .eq("id", drawId)
+          .single(),
+        supabase
+          .from("draw_entries")
+          .select(
+            `user_id, entry_count, users!draw_entries_user_id_fkey (
+      full_name,
+      email
+    )`,
+          )
+          .eq("draw_id", drawId)
+          .order("entry_count", { ascending: false }),
+      ]);
 
+      if (drawError) {
+        toast.error("Could not load draw data.");
+        console.error(drawError);
+        return;
+      }
+
+      if (entriesError) {
+        toast.error("Could not load participant data.");
+        console.error(entriesError);
+        return;
+      }
+
+      // Calculate totals
+      const totalEntries =
+        entries?.reduce((sum, e) => sum + (e.entry_count || 0), 0) || 0;
+      const uniqueParticipants = entries
+        ? new Set(entries.map((e) => e.user_id)).size
+        : 0;
+
+      setDraw({
+        ...(drawData || {}),
+        total_entries: totalEntries,
+        total_participants: uniqueParticipants,
+      } as DrawControl);
+      setParticipants(entries || []);
+    } catch (error) {
+      console.error("Error loading draw control data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [drawId, supabase]);
+
+  // Use polling instead of real-time to avoid resource issues
   useEffect(() => {
-    void load();
-  }, [drawId]);
+    loadData();
 
-  usePolling(load, { intervalMs: 2500 });
+    // Poll every 5 seconds
+    pollingRef.current = setInterval(() => {
+      loadData();
+    }, 5000);
 
-  const setStatus = async (status: DrawControl["status"]) => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [loadData]);
+
+  const updateStatus = async (newStatus: string) => {
     if (!draw) return;
-    const { error } = await supabase.from("draws").update({ status }).eq("id", draw.id);
+    setUpdatingStatus(true);
+
+    const { error } = await supabase
+      .from("draws")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("id", draw.id);
+
     if (error) {
       toast.error("Could not update phase.");
-      return;
+      console.error(error);
+    } else {
+      toast.success(`Phase switched to ${newStatus}`);
+      await loadData();
     }
-    toast.success(`Phase switched to ${status}`);
-    await load();
+    setUpdatingStatus(false);
   };
 
   const selectWinner = async () => {
@@ -70,97 +139,216 @@ export default function DrawControlPage() {
       toast.error("No participants available.");
       return;
     }
+
+    setSelectingWinner(true);
+
+    // Build weighted pool based on entry counts
     const weightedPool: typeof participants = [];
     participants.forEach((p) => {
-      for (let i = 0; i < Math.max(1, p.entries_count); i += 1) {
+      const weight = Math.min(p.entry_count, 100); // Cap at 100 to prevent huge arrays
+      for (let i = 0; i < weight; i++) {
         weightedPool.push(p);
       }
     });
-    const winner = weightedPool[Math.floor(Math.random() * weightedPool.length)];
-    const winnerName = winner.users?.full_name || winner.users?.email || "Customer";
+
+    // Simulate "shuffling" for drama (brief delay)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const winner =
+      weightedPool[Math.floor(Math.random() * weightedPool.length)];
+    const winnerName =
+      winner.users?.full_name || winner.users?.email || "Customer";
 
     const { error } = await supabase
       .from("draws")
       .update({
         status: "completed",
         winner_name: winnerName,
-        winner_user_id: winner.user_id,
-        winner_claim_status: "pending",
+        winner_id: winner.user_id,
       })
       .eq("id", draw.id);
 
     if (error) {
       toast.error("Could not store winner.");
-      return;
+      console.error(error);
+    } else {
+      toast.success(`Winner selected: ${winnerName}`);
+      await loadData();
     }
-    toast.success(`Winner selected: ${winnerName}`);
-    await load();
+    setSelectingWinner(false);
   };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "open":
+        return <Play className="h-4 w-4 text-green-500" />;
+      case "closed":
+        return <Lock className="h-4 w-4 text-orange-500" />;
+      case "drawing":
+        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+      case "completed":
+        return <Trophy className="h-4 w-4 text-yellow-500" />;
+      default:
+        return <Eye className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-12 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      </div>
+    );
+  }
+
+  if (!draw) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+        <p className="text-muted-foreground">Draw not found</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {!draw ? (
-        <p className="text-sm text-muted-foreground">Loading control panel...</p>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-2">
-              <span>{draw.name} control panel</span>
-              <Badge>{draw.status}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={() => void setStatus("entry_collection")}
-              >
-                Phase 1: Entry collection
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => void setStatus("entries_locked")}
-              >
-                Phase 2: Entries locked
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => void setStatus("winner_reveal")}
-              >
-                Phase 3: Winner reveal
-              </Button>
-              <Button onClick={() => void selectWinner()}>Select winner</Button>
-              <Button asChild variant="secondary">
-                <Link href={`/draws/live/${draw.id}`} target="_blank">
-                  Open live screen
-                </Link>
-              </Button>
-            </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">{draw.name}</h1>
+        <p className="text-muted-foreground">Draw Control Panel</p>
+      </div>
 
-            {draw.winner_name ? (
-              <div className="rounded border p-3">
-                <p className="text-sm text-muted-foreground">Winner</p>
-                <p className="text-xl font-bold">{draw.winner_name}</p>
-              </div>
-            ) : null}
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">
-                Participants ({participants.length})
-              </p>
-              {participants.slice(0, 20).map((p) => (
-                <div
-                  key={p.user_id}
-                  className="flex items-center justify-between rounded border p-2 text-sm"
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Main Control Panel */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>Draw Phases</span>
+                <Badge variant="outline" className="gap-1">
+                  {getStatusIcon(draw.status)}
+                  Current: {draw.status}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant={draw.status === "open" ? "default" : "outline"}
+                  onClick={() => updateStatus("open")}
+                  disabled={updatingStatus || draw.status === "completed"}
+                  className="gap-2"
                 >
-                  <span>{p.users?.full_name || p.users?.email || p.user_id}</span>
-                  <Badge variant="outline">{p.entries_count} entries</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  <Play className="h-4 w-4" />
+                  Phase 1: Entry Collection
+                </Button>
+                <Button
+                  variant={draw.status === "closed" ? "default" : "outline"}
+                  onClick={() => updateStatus("closed")}
+                  disabled={updatingStatus || draw.status === "completed"}
+                  className="gap-2"
+                >
+                  <Lock className="h-4 w-4" />
+                  Phase 2: Entries Locked
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={selectWinner}
+                  disabled={
+                    selectingWinner ||
+                    draw.status === "completed" ||
+                    participants.length === 0
+                  }
+                  className="gap-2"
+                >
+                  {selectingWinner ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trophy className="h-4 w-4" />
+                  )}
+                  Select Winner
+                </Button>
+              </div>
+
+              <div className="pt-4 border-t">
+                <Button asChild variant="secondary" className="w-full gap-2">
+                  <Link href={`/draws/${draw.id}`} target="_blank">
+                    <Eye className="h-4 w-4" />
+                    Open Live Display
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Winner Display */}
+          {draw.winner_name && (
+            <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+              <CardContent className="py-6 text-center">
+                <Trophy className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Current Winner</p>
+                <p className="text-2xl font-bold">{draw.winner_name}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Stats Sidebar */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Statistics</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <Ticket className="h-5 w-5 text-purple-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold">
+                  {draw.total_entries?.toLocaleString() || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Entries</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <Users className="h-5 w-5 text-blue-500 mx-auto mb-1" />
+                <p className="text-2xl font-bold">
+                  {draw.total_participants?.toLocaleString() || 0}
+                </p>
+                <p className="text-xs text-muted-foreground">Participants</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Participants ({participants.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="max-h-96 overflow-y-auto">
+              <div className="space-y-2">
+                {participants.slice(0, 50).map((p, idx) => (
+                  <div
+                    key={p.user_id}
+                    className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-sm"
+                  >
+                    <span className="truncate flex-1">
+                      {p.users?.full_name ||
+                        p.users?.email ||
+                        p.user_id.slice(0, 8)}
+                    </span>
+                    <Badge variant="outline" className="ml-2">
+                      {p.entry_count} entry{p.entry_count !== 1 ? "s" : ""}
+                    </Badge>
+                  </div>
+                ))}
+                {participants.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">
+                    No participants yet
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

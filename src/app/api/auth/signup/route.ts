@@ -124,6 +124,8 @@ export async function POST(req: Request) {
           referral_code: referralCode.toUpperCase(),
           status: "joined", // They've joined, waiting for first purchase
           reward_points: 100, // Default points
+          converted_at: new Date().toISOString(),
+          conversion_type: "account_creation",
           metadata: {
             joined_at: new Date().toISOString(),
             signup_data: {
