@@ -1,218 +1,177 @@
-// app/accounts/[accountId]/challenges/page.tsx
+// app/(store)/accounts/[accountId]/challenges/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChallengesService } from "@/lib/services/challenges-service";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Target,
-  ChevronLeft,
-  Crown,
-  Coins,
-  Gift,
-  Users,
-  ShoppingBag,
-  Star,
-  MessageCircle,
-  Twitter,
-  Facebook,
-  Link2,
-  CheckCircle,
-  Loader2,
-  Clock,
   Trophy,
+  Target,
+  Users,
+  Flame,
+  TrendingUp,
+  Share2,
+  Gift,
+  Coins,
+  Eye,
+  Crown,
+  Medal,
+  Zap,
+  Clock,
+  Loader2,
+  Calendar,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { Challenge, UserChallenge } from "@/types/customer";
+import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Challenge, ChallengeParticipant } from "@/types/challenges";
 
-export default function ChallengesPage() {
+const CHALLENGE_ICONS: Record<
+  string,
+  { icon: any; color: string; label: string }
+> = {
+  referral: {
+    icon: Share2,
+    color: "from-blue-500 to-cyan-500",
+    label: "Referral",
+  },
+  purchase: {
+    icon: TrendingUp,
+    color: "from-green-500 to-emerald-500",
+    label: "Purchase",
+  },
+  share: {
+    icon: Share2,
+    color: "from-purple-500 to-pink-500",
+    label: "Social Share",
+  },
+  streak: {
+    icon: Flame,
+    color: "from-orange-500 to-red-500",
+    label: "Daily Streak",
+  },
+  team: { icon: Users, color: "from-indigo-500 to-purple-500", label: "Team" },
+  combo: { icon: Zap, color: "from-yellow-500 to-orange-500", label: "Combo" },
+  social: { icon: Share2, color: "from-pink-500 to-rose-500", label: "Social" },
+};
+
+export default function UserChallengesPage() {
   const { accountId } = useParams();
   const router = useRouter();
   const { supabase, profile } = useAuth();
+  const [activeChallenges, setActiveChallenges] = useState<Challenge[]>([]);
+  const [myChallenges, setMyChallenges] = useState<
+    { challenge: Challenge; participant: ChallengeParticipant }[]
+  >([]);
   const [loading, setLoading] = useState(true);
-  const [userChallenges, setUserChallenges] = useState<UserChallenge[]>([]);
-  const [availableChallenges, setAvailableChallenges] = useState<Challenge[]>(
-    [],
-  );
-  const [referrals, setReferrals] = useState<any[]>([]);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
 
+  const challengesService = new ChallengesService(supabase);
+
+  // Verify ownership
   useEffect(() => {
-    if (!profile || profile.id !== accountId) {
+    if (!profile) {
       router.push("/login");
       return;
     }
-    fetchChallenges();
-  }, [accountId, profile]);
+    if (profile.id !== accountId) {
+      router.push(`/accounts/${profile.id}/challenges`);
+    }
+  }, [profile, accountId, router]);
 
-  const fetchChallenges = async () => {
+  const fetchData = useCallback(async () => {
+    if (!profile?.id) return;
+
     try {
-      setLoading(true);
+      const [available, joined] = await Promise.all([
+        challengesService.getActiveChallenges(profile.id),
+        challengesService.getUserChallenges(profile.id),
+      ]);
 
-      // Get user's challenges
-      const { data: userChallengesData, error: userChallengesError } =
-        await supabase
-          .from("user_challenges")
-          .select(
-            `
-          *,
-          challenge:challenge_id (*)
-        `,
-          )
-          .eq("user_id", accountId)
-          .order("created_at", { ascending: false });
-
-      if (userChallengesError) throw userChallengesError;
-      setUserChallenges(userChallengesData || []);
-
-      // Get available challenges
-      const { data: challengesData, error: challengesError } = await supabase
-        .from("challenges")
-        .select("*")
-        .eq("is_active", true)
-        .order("created_at");
-
-      if (challengesError) throw challengesError;
-
-      // Filter challenges user hasn't started/completed
-      const startedChallengeIds = new Set(
-        userChallengesData?.map((uc: any) => uc.challenge_id) || [],
-      );
-      const available = challengesData.filter(
-        (c: any) => !startedChallengeIds.has(c.id),
-      );
-      setAvailableChallenges(available);
-
-      // Get user's referrals
-      const { data: referralsData, error: referralsError } = await supabase
-        .from("referrals")
-        .select(
-          `
-          *,
-          referred_user:referred_user_id (email, full_name, created_at)
-        `,
-        )
-        .eq("referrer_id", accountId)
-        .order("created_at", { ascending: false });
-
-      if (!referralsError && referralsData) {
-        setReferrals(referralsData);
-      }
-    } catch (error: any) {
+      setActiveChallenges(available);
+      setMyChallenges(joined as any);
+    } catch (error) {
       console.error("Error fetching challenges:", error);
-      toast.error("Could not load challenges");
+      toast.error("Failed to load challenges");
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile?.id, challengesService]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleJoinChallenge = async (challengeId: string) => {
+    if (!profile) return;
+
+    setJoiningId(challengeId);
     try {
-      const { data, error } = await supabase
-        .from("user_challenges")
-        .insert({
-          user_id: accountId,
-          challenge_id: challengeId,
-          status: "in_progress",
-          progress: 0,
-          target: 1, // This would be set based on challenge requirements
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast.success("Challenge joined!");
-      fetchChallenges(); // Refresh
+      await challengesService.joinChallenge(challengeId, profile.id);
+      toast.success("Successfully joined challenge!");
+      await fetchData();
     } catch (error: any) {
-      console.error("Error joining challenge:", error);
-      toast.error("Could not join challenge");
-    }
-  };
-
-  const handleShareReferral = async () => {
-    try {
-      // Generate referral code if user doesn't have one
-      let referralCode = profile?.referral_code;
-
-      if (!referralCode) {
-        const code =
-          "REF-" + Math.random().toString(36).substring(2, 10).toUpperCase();
-        const { error } = await supabase
-          .from("users")
-          .update({ referral_code: code })
-          .eq("id", accountId);
-
-        if (error) throw error;
-        referralCode = code;
-      }
-
-      // Create shareable link
-      const shareLink = `${window.location.origin}/login?ref=${referralCode}`;
-
-      // Copy to clipboard
-      await navigator.clipboard.writeText(shareLink);
-
-      toast.success("Referral link copied to clipboard!");
-    } catch (error: any) {
-      console.error("Error sharing referral:", error);
-      toast.error("Could not generate referral link");
+      toast.error(error.message);
+    } finally {
+      setJoiningId(null);
     }
   };
 
   const getChallengeIcon = (type: string) => {
-    switch (type) {
-      case "referral":
-        return <Users className="h-5 w-5" />;
-      case "purchase":
-        return <ShoppingBag className="h-5 w-5" />;
-      case "review":
-        return <Star className="h-5 w-5" />;
-      case "social":
-        return <MessageCircle className="h-5 w-5" />;
-      default:
-        return <Target className="h-5 w-5" />;
-    }
+    const config = CHALLENGE_ICONS[type] || CHALLENGE_ICONS.purchase;
+    const Icon = config.icon;
+    return <Icon className="h-5 w-5" />;
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "in_progress":
-        return (
-          <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900">
-            In Progress
+  const getTimeRemaining = (endsAt: string) => {
+    return formatDistanceToNow(new Date(endsAt), { addSuffix: true });
+  };
+
+  const getProgressPercentage = (
+    participant: ChallengeParticipant,
+    challenge: Challenge,
+  ) => {
+    // Get target from top prize tier or use default
+    const topPrize = challenge.prize_tiers?.find((t) => t.rank === 1);
+    const target =
+      typeof topPrize?.prize_value === "number" ? topPrize.prize_value : 5000;
+    return Math.min(100, (participant.current_score / target) * 100);
+  };
+
+  const formatPrizePreview = (prizeTiers: any[]) => {
+    if (!prizeTiers || prizeTiers.length === 0) return null;
+
+    const topThree = prizeTiers.slice(0, 3);
+    return (
+      <div className="flex gap-2">
+        {topThree.map((tier, idx) => (
+          <Badge key={idx} variant="outline" className="gap-1">
+            {tier.rank === 1 && <Crown className="h-3 w-3 text-yellow-500" />}
+            {tier.rank === 2 && <Medal className="h-3 w-3 text-gray-400" />}
+            {tier.rank === 3 && <Medal className="h-3 w-3 text-amber-600" />}
+            {tier.prize_type === "points" && `${tier.prize_value} pts`}
+            {tier.prize_type === "discount" && `${tier.prize_value}% off`}
+            {tier.prize_type === "badge" && tier.prize_value}
           </Badge>
-        );
-      case "completed":
-        return (
-          <Badge variant="outline" className="bg-green-50 dark:bg-green-900">
-            Completed
-          </Badge>
-        );
-      case "reward_claimed":
-        return (
-          <Badge variant="default" className="bg-green-600 dark:bg-green-700">
-            Reward Claimed
-          </Badge>
-        );
-      case "expired":
-        return <Badge variant="destructive">Expired</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
+        ))}
+        {prizeTiers.length > 3 && (
+          <Badge variant="outline">+{prizeTiers.length - 3} more</Badge>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
     return (
-      <div className="container mx-auto px-2 py-8">
-        <div className="flex flex-col justify-center items-center h-64 space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Challenges loading...</p>
-        </div>
+      <div className="container mx-auto px-4 py-16 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
       </div>
     );
   }
@@ -221,256 +180,259 @@ export default function ChallengesPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex flex-wrap items-center gap-4 mb-8">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push(`/accounts/${accountId}`)}
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back to Profile
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Challenges</h1>
-            <p className="text-muted-foreground mt-1">
-              Complete challenges and earn amazing rewards
-            </p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+            Challenges
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Compete, earn points, and win amazing prizes
+          </p>
         </div>
 
-        {/* Referral Section */}
-        <Card className="mb-8 bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-          <CardContent className=":sm:pt-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-purple-100 rounded-full">
-                  <Users className="h-8 w-8 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Refer a Friend</h3>
-                  <p className="text-muted-foreground">
-                    Share your referral link and earn points when they join
+        <Tabs defaultValue="my" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="my">My Challenges</TabsTrigger>
+            <TabsTrigger value="available">Available</TabsTrigger>
+          </TabsList>
+
+          {/* My Challenges Tab */}
+          <TabsContent value="my" className="space-y-4">
+            {myChallenges.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No Challenges Yet
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    You haven't joined any challenges. Check out available ones!
                   </p>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleShareReferral}
-                  className="whitespace-nowrap"
-                >
-                  <Link2 className="h-4 w-4 mr-2" />
-                  Share Link
-                </Button>
-              </div>
-            </div>
+                  <Button
+                    onClick={() =>
+                      document
+                        .querySelector('[value="available"]')
+                        ?.dispatchEvent(new Event("click"))
+                    }
+                  >
+                    Browse Challenges
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              myChallenges.map(({ challenge, participant }) => {
+                const config = CHALLENGE_ICONS[challenge.challenge_type];
+                const progress = getProgressPercentage(participant, challenge);
+                const timeRemaining = getTimeRemaining(challenge.ends_at);
+                const isUrgent =
+                  new Date(challenge.ends_at).getTime() - Date.now() <
+                  24 * 60 * 60 * 1000;
 
-            {/* Referral Stats */}
-            {referrals.length > 0 && (
-              <div className="mt-6 pt-6 border-t">
-                <h4 className="font-semibold mb-3">Your Referrals</h4>
-                <div className="space-y-3">
-                  {referrals.slice(0, 3).map((ref) => (
-                    <div
-                      key={ref.id}
-                      className="flex items-center justify-between p-3 bg-background rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium">{ref.referred_email}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Joined{" "}
-                          {ref.referred_user_id
-                            ? format(
-                                new Date(ref.referred_user?.created_at),
-                                "MMM d, yyyy",
-                              )
-                            : "Pending"}
-                        </p>
+                return (
+                  <Card
+                    key={challenge.id}
+                    className="group hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => router.push(`/challenges/${challenge.id}`)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex flex-wrap justify-between items-start gap-4">
+                        <div className="flex-1">
+                          {/* Header */}
+                          <div className="flex items-center gap-2 mb-2">
+                            <div
+                              className={cn(
+                                "p-1.5 rounded-lg bg-gradient-to-r",
+                                config?.color,
+                              )}
+                            >
+                              {getChallengeIcon(challenge.challenge_type)}
+                            </div>
+                            <h3 className="font-semibold text-lg">
+                              {challenge.name}
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className="capitalize text-xs"
+                            >
+                              {config?.label || challenge.challenge_type}
+                            </Badge>
+                          </div>
+
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                            {challenge.description}
+                          </p>
+
+                          {/* Stats */}
+                          <div className="flex flex-wrap gap-4 text-sm mb-3">
+                            <div className="flex items-center gap-1">
+                              <Trophy className="h-4 w-4 text-yellow-500" />
+                              <span className="font-semibold">
+                                #{participant.current_rank || "—"}
+                              </span>
+                              <span className="text-muted-foreground">
+                                rank
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Coins className="h-4 w-4 text-green-500" />
+                              <span className="font-semibold">
+                                {participant.current_score}
+                              </span>
+                              <span className="text-muted-foreground">
+                                points
+                              </span>
+                            </div>
+                            {challenge.challenge_type === "streak" &&
+                              participant.current_streak > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <Flame className="h-4 w-4 text-orange-500" />
+                                  <span className="font-semibold">
+                                    {participant.current_streak}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    day streak
+                                  </span>
+                                </div>
+                              )}
+                            <div
+                              className={cn(
+                                "flex items-center gap-1",
+                                isUrgent && "text-red-500",
+                              )}
+                            >
+                              <Clock className="h-4 w-4" />
+                              <span>{timeRemaining}</span>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">
+                                Progress to Top Prize
+                              </span>
+                              <span className="font-medium">
+                                {Math.round(progress)}%
+                              </span>
+                            </div>
+                            <Progress value={progress} className="h-2" />
+                          </div>
+                        </div>
+
+                        {/* Prize Preview */}
+                        <div className="text-right">
+                          {formatPrizePreview(challenge.prize_tiers)}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 group-hover:bg-transparent"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <Badge
-                        variant={
-                          ref.status === "completed" ? "default" : "outline"
-                        }
-                      >
-                        {ref.status}
-                      </Badge>
-                    </div>
-                  ))}
-                  {referrals.length > 3 && (
-                    <p className="text-sm text-muted-foreground text-center">
-                      +{referrals.length - 3} more referrals
-                    </p>
-                  )}
-                </div>
-              </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
-          </CardContent>
-        </Card>
+          </TabsContent>
 
-        {/* Available Challenges */}
-        {availableChallenges.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">Available Challenges</h2>
-            <div className="grid gap-4">
-              {availableChallenges.map((challenge) => (
-                <Card
-                  key={challenge.id}
-                  className="border-2 border-dashed border-primary/50"
-                >
-                  <CardContent className="sm:pt-6">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 bg-primary/10 rounded-full">
-                        {getChallengeIcon(challenge.type)}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">
-                          {challenge.name}
-                        </h3>
-                        <p className="text-muted-foreground">
-                          {challenge.description}
-                        </p>
+          {/* Available Challenges Tab */}
+          <TabsContent value="available" className="space-y-4">
+            {activeChallenges.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Trophy className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    No Active Challenges
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Check back soon for new challenges!
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              activeChallenges.map((challenge) => {
+                const config = CHALLENGE_ICONS[challenge.challenge_type];
+                const timeRemaining = getTimeRemaining(challenge.ends_at);
+                const isUrgent =
+                  new Date(challenge.ends_at).getTime() - Date.now() <
+                  24 * 60 * 60 * 1000;
 
-                        <div className="flex flex-wrap gap-4 mt-4">
-                          {challenge.reward_points > 0 && (
-                            <Badge
-                              variant="secondary"
-                              className="flex items-center gap-1"
+                return (
+                  <Card
+                    key={challenge.id}
+                    className="hover:shadow-lg transition-all border-2 border-dashed border-primary/30"
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex flex-wrap justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div
+                              className={cn(
+                                "p-1.5 rounded-lg bg-gradient-to-r",
+                                config?.color,
+                              )}
                             >
-                              <Coins className="h-3 w-3" />
-                              {challenge.reward_points} points
-                            </Badge>
-                          )}
-                          {challenge.reward_tier_upgrade && (
+                              {getChallengeIcon(challenge.challenge_type)}
+                            </div>
+                            <h3 className="font-semibold text-lg">
+                              {challenge.name}
+                            </h3>
                             <Badge
-                              variant="secondary"
-                              className="flex items-center gap-1"
+                              variant="outline"
+                              className="capitalize text-xs"
                             >
-                              <Crown className="h-3 w-3" />
-                              Upgrade to {challenge.reward_tier_upgrade}
+                              {config?.label || challenge.challenge_type}
                             </Badge>
-                          )}
+                          </div>
+
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                            {challenge.description}
+                          </p>
+
+                          <div className="flex flex-wrap gap-4 text-sm mb-3">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span>Ends {timeRemaining}</span>
+                            </div>
+                            {challenge.participation_points > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Gift className="h-4 w-4 text-purple-500" />
+                                <span>
+                                  {challenge.participation_points} participation
+                                  points
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {formatPrizePreview(challenge.prize_tiers)}
                         </div>
 
                         <Button
-                          className="mt-4"
-                          onClick={() => handleJoinChallenge(challenge.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJoinChallenge(challenge.id);
+                          }}
+                          disabled={joiningId === challenge.id}
                         >
+                          {joiningId === challenge.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Target className="h-4 w-4 mr-2" />
+                          )}
                           Join Challenge
                         </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Active & Completed Challenges */}
-        <h2 className="text-xl font-semibold mb-4">Your Challenges</h2>
-        {userChallenges.length === 0 ? (
-          <Card>
-            <CardContent className="py-12">
-              <div className="text-center">
-                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-bold mb-2">No Challenges Yet</h3>
-                <p className="text-muted-foreground">
-                  Join a challenge to start earning rewards!
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {userChallenges.map((userChallenge) => (
-              <Card key={userChallenge.id}>
-                <CardContent className="sm:pt-6">
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-muted rounded-full">
-                      {getChallengeIcon(userChallenge.challenge.type)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold">
-                          {userChallenge.challenge.name}
-                        </h3>
-                        {getStatusBadge(userChallenge.status)}
-                      </div>
-
-                      <p className="text-sm text-muted-foreground mb-4">
-                        {userChallenge.challenge.description}
-                      </p>
-
-                      {/* Progress Bar */}
-                      {userChallenge.status === "in_progress" && (
-                        <div className="mb-4">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span>Progress</span>
-                            <span>
-                              {userChallenge.progress} / {userChallenge.target}
-                            </span>
-                          </div>
-                          <Progress
-                            value={
-                              (userChallenge.progress / userChallenge.target) *
-                              100
-                            }
-                            className="h-2"
-                          />
-                        </div>
-                      )}
-
-                      {/* Reward Details */}
-                      {userChallenge.status === "completed" &&
-                        userChallenge.loyalty_points_awarded > 0 && (
-                          <div className="bg-green-50 p-3 rounded-lg mb-3">
-                            <div className="flex items-center gap-2">
-                              <Coins className="h-4 w-4 text-green-600" />
-                              <span className="text-green-600">
-                                +{userChallenge.loyalty_points_awarded} points
-                                earned
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Reward Claim Button */}
-                      {userChallenge.status === "completed" &&
-                        !userChallenge.reward_claimed_at && (
-                          <Button size="sm" className="mt-2">
-                            Claim Reward
-                          </Button>
-                        )}
-
-                      {/* Dates */}
-                      <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-                        {userChallenge.completed_at && (
-                          <span className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" />
-                            Completed{" "}
-                            {format(
-                              new Date(userChallenge.completed_at),
-                              "MMM d, yyyy",
-                            )}
-                          </span>
-                        )}
-                        {userChallenge.reward_claimed_at && (
-                          <span className="flex items-center gap-1">
-                            <Gift className="h-3 w-3" />
-                            Claimed{" "}
-                            {format(
-                              new Date(userChallenge.reward_claimed_at),
-                              "MMM d, yyyy",
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

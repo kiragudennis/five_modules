@@ -1,6 +1,6 @@
-// src/lib/services/challenges-service.ts
+// src/lib/services/challenges-service.ts (Enhanced Version)
 
-import { createClient } from "@/lib/supabase/server";
+import { SupabaseClient } from "@supabase/supabase-js";
 import {
   Challenge,
   ChallengeParticipant,
@@ -9,31 +9,20 @@ import {
   ScoringConfig,
 } from "@/types/challenges";
 import { PointsService } from "./points-service";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { NotificationService } from "./notification-service";
 
 export class ChallengesService {
-  private supabase = createClient();
-
-  /**
-   * Get or create Supabase client (async for server components)
-   */
-  private async getSupabase(): Promise<SupabaseClient> {
-    if (!this.supabase) {
-      this.supabase = await createClient();
-    }
-    return this.supabase instanceof SupabaseClient
-      ? this.supabase
-      : createClient();
-  }
+  private cache = new Map();
+  private cacheTimeout = 5000; // 5 seconds
+  constructor(private supabase: SupabaseClient) {}
 
   /**
    * Get all active challenges for a user
    */
   async getActiveChallenges(userId: string): Promise<Challenge[]> {
-    const supabase = await this.getSupabase();
     const now = new Date().toISOString();
 
-    const { data: challenges, error } = await supabase
+    const { data: challenges, error } = await this.supabase
       .from("challenges")
       .select("*")
       .eq("status", "active")
@@ -47,14 +36,13 @@ export class ChallengesService {
     const available: Challenge[] = [];
 
     for (const challenge of challenges || []) {
-      const { data: participant } = await supabase
+      const { data: participant } = await this.supabase
         .from("challenge_participants")
         .select("id")
         .eq("challenge_id", challenge.id)
         .eq("user_id", userId)
         .maybeSingle();
 
-      // If not joined, they can join
       if (!participant) {
         available.push(challenge);
       }
@@ -69,9 +57,7 @@ export class ChallengesService {
   async getUserChallenges(
     userId: string,
   ): Promise<(Challenge & { participant: ChallengeParticipant })[]> {
-    const supabase = await this.getSupabase();
-
-    const { data: participants, error } = await supabase
+    const { data: participants, error } = await this.supabase
       .from("challenge_participants")
       .select("*, challenges(*)")
       .eq("user_id", userId)
@@ -93,12 +79,10 @@ export class ChallengesService {
     userId: string,
     teamId?: string,
   ): Promise<void> {
-    const supabase = await this.getSupabase();
-
     // Check if challenge is active
-    const { data: challenge, error: challengeError } = await supabase
+    const { data: challenge, error: challengeError } = await this.supabase
       .from("challenges")
-      .select("status, starts_at, ends_at, allow_teams, max_team_size")
+      .select("status, starts_at, ends_at, allow_teams, max_team_size, name")
       .eq("id", challengeId)
       .single();
 
@@ -114,7 +98,7 @@ export class ChallengesService {
     }
 
     // Check if already joined
-    const { data: existing } = await supabase
+    const { data: existing } = await this.supabase
       .from("challenge_participants")
       .select("id")
       .eq("challenge_id", challengeId)
@@ -127,7 +111,7 @@ export class ChallengesService {
 
     // Handle team joining
     if (teamId && challenge.allow_teams) {
-      const { data: team, error: teamError } = await supabase
+      const { data: team, error: teamError } = await this.supabase
         .from("challenge_teams")
         .select("member_count, max_team_size")
         .eq("id", teamId)
@@ -141,14 +125,14 @@ export class ChallengesService {
         throw new Error("Team is full");
       }
 
-      await supabase
+      await this.supabase
         .from("challenge_teams")
         .update({ member_count: team.member_count + 1 })
         .eq("id", teamId);
     }
 
     // Join challenge
-    await supabase.from("challenge_participants").insert({
+    await this.supabase.from("challenge_participants").insert({
       challenge_id: challengeId,
       user_id: userId,
       team_id: teamId || null,
@@ -156,16 +140,26 @@ export class ChallengesService {
       joined_at: now.toISOString(),
     });
 
+    // Send notification
+    const notificationService = new NotificationService(this.supabase);
+    await notificationService.sendInAppNotification(
+      userId,
+      "challenge_joined",
+      `🎯 You've joined ${challenge.name}!`,
+      `Start earning points by completing actions. Good luck!`,
+      { challenge_id: challengeId, challenge_name: challenge.name },
+    );
+
     // Add to live ticker
-    const { data: profile } = await supabase
-      .from("profiles")
+    const { data: user } = await this.supabase
+      .from("users")
       .select("full_name")
       .eq("id", userId)
       .single();
 
-    await supabase.from("challenge_live_ticker").insert({
+    await this.supabase.from("challenge_live_ticker").insert({
       challenge_id: challengeId,
-      user_name: profile?.full_name || "Someone",
+      user_name: user?.full_name || "Someone",
       action_text: `joined the challenge`,
       points_awarded: 0,
     });
@@ -181,10 +175,8 @@ export class ChallengesService {
     actionValue?: number,
     metadata?: any,
   ): Promise<{ pointsAwarded: number; newScore: number }> {
-    const supabase = await this.getSupabase();
-
-    // Get challenge and participant using a different approach since nested select can be tricky
-    const { data: challenge, error: challengeError } = await supabase
+    // Get challenge and participant
+    const { data: challenge, error: challengeError } = await this.supabase
       .from("challenges")
       .select("*")
       .eq("id", challengeId)
@@ -192,8 +184,7 @@ export class ChallengesService {
 
     if (challengeError) throw challengeError;
 
-    // Get participant separately
-    const { data: participant, error: participantError } = await supabase
+    const { data: participant, error: participantError } = await this.supabase
       .from("challenge_participants")
       .select("*")
       .eq("challenge_id", challengeId)
@@ -215,6 +206,14 @@ export class ChallengesService {
 
     if (pointsAwarded === 0)
       return { pointsAwarded: 0, newScore: participant.current_score };
+
+    // Apply multiplier for final hour if applicable
+    const now = new Date();
+    const end = new Date(challenge.ends_at);
+    const hoursLeft = (end.getTime() - now.getTime()) / (1000 * 60 * 60);
+    if (hoursLeft <= 1 && hoursLeft > 0) {
+      pointsAwarded = pointsAwarded * 2;
+    }
 
     // Update streak if applicable
     let newStreak = participant.current_streak;
@@ -253,10 +252,10 @@ export class ChallengesService {
       }
     }
 
-    // Award points using static PointsService.award
+    // Award points
     if (pointsAwarded > 0) {
       await PointsService.award(
-        supabase,
+        this.supabase,
         userId,
         pointsAwarded,
         "challenge_action",
@@ -266,7 +265,7 @@ export class ChallengesService {
     }
 
     // Record action
-    await supabase.from("challenge_actions").insert({
+    await this.supabase.from("challenge_actions").insert({
       challenge_id: challengeId,
       user_id: userId,
       team_id: participant.team_id,
@@ -279,7 +278,7 @@ export class ChallengesService {
     // Update participant score
     const newScore = participant.current_score + pointsAwarded;
 
-    await supabase
+    await this.supabase
       .from("challenge_participants")
       .update({
         current_score: newScore,
@@ -292,30 +291,52 @@ export class ChallengesService {
 
     // Update team score if applicable
     if (participant.team_id) {
-      await supabase.rpc("increment_team_score", {
+      await this.supabase.rpc("increment_team_score", {
         p_team_id: participant.team_id,
         p_points: pointsAwarded,
       });
     }
 
+    // Check if user's rank changed and send notification
+    const oldRank = participant.current_rank;
+    const { rank: newRank } = await this.getUserRank(challengeId, userId);
+
+    if (oldRank !== newRank && newRank > 0) {
+      const notificationService = new NotificationService(this.supabase);
+      if (newRank < (oldRank || 999)) {
+        notificationService.sendInAppNotification(
+          userId,
+          "rank_improved",
+          `📈 You moved up to #${newRank}!`,
+          `You're now rank ${newRank} in ${challenge.name}. Keep going!`,
+          {
+            challenge_id: challengeId,
+            challenge_name: challenge.name,
+            old_rank: oldRank,
+            new_rank: newRank,
+          },
+        );
+      }
+    }
+
     // Add to live ticker
-    const { data: profile } = await supabase
-      .from("profiles")
+    const { data: user } = await this.supabase
+      .from("users")
       .select("full_name")
       .eq("id", userId)
       .single();
 
     const { data: team } = participant.team_id
-      ? await supabase
+      ? await this.supabase
           .from("challenge_teams")
           .select("team_name")
           .eq("id", participant.team_id)
           .single()
       : { data: null };
 
-    await supabase.from("challenge_live_ticker").insert({
+    await this.supabase.from("challenge_live_ticker").insert({
       challenge_id: challengeId,
-      user_name: profile?.full_name || "Someone",
+      user_name: user?.full_name || "Someone",
       team_name: team?.team_name,
       action_text: this.getActionText(actionType, actionValue),
       points_awarded: pointsAwarded,
@@ -342,19 +363,32 @@ export class ChallengesService {
     switch (challenge.challenge_type) {
       case "referral":
         if (actionType === "referral_completed") {
-          return config.points_per_referral || 100;
+          let points = config.points_per_referral || 100;
+          // Bonus for top referrer
+          if (config.bonus_for_top_referrer && metadata?.is_top_referrer) {
+            points += config.bonus_for_top_referrer;
+          }
+          return points;
         }
         break;
 
       case "purchase":
         if (actionType === "purchase_made" && actionValue) {
-          const points = Math.floor(actionValue * (config.points_per_ksh || 1));
+          let points = Math.floor(actionValue * (config.points_per_ksh || 1));
+
+          // Check if within double points window
+          if (config.double_points_hours) {
+            const hour = new Date().getHours();
+            if (config.double_points_hours.includes(hour)) {
+              points = points * 2;
+            }
+          }
 
           // Bonus at thresholds
           if (config.bonus_at_thresholds) {
             for (const threshold of config.bonus_at_thresholds) {
               if (actionValue >= threshold.threshold) {
-                return points + threshold.bonus_points;
+                points += threshold.bonus_points;
               }
             }
           }
@@ -364,7 +398,15 @@ export class ChallengesService {
 
       case "share":
         if (actionType === "share_posted") {
-          return config.points_per_share || 50;
+          let points = config.points_per_share || 50;
+          // Platform bonus
+          if (
+            metadata?.platform &&
+            config.platform_bonus?.[metadata.platform]
+          ) {
+            points += config.platform_bonus[metadata.platform];
+          }
+          return points;
         }
         break;
 
@@ -375,13 +417,50 @@ export class ChallengesService {
         break;
 
       case "combo":
-        const weight =
-          config.weights?.[actionType as keyof typeof config.weights] || 1;
-        return Math.floor((actionValue || 100) * weight);
+        if (actionType) {
+          // Type-safe weights access
+          const weights = config.weights;
+          let weight = 1;
+
+          if (weights) {
+            switch (actionType) {
+              case "referral":
+                weight = weights.referral || 1;
+                break;
+              case "purchase":
+                weight = weights.purchase || 1;
+                break;
+              case "share":
+                weight = weights.share || 1;
+                break;
+              case "streak":
+                weight = weights.streak || 1;
+                break;
+              default:
+                weight = 1;
+            }
+          }
+
+          const basePoints = (actionValue || 100) * weight;
+          // Apply combo multiplier based on consecutive actions
+          const comboMultiplier = Math.min(
+            2,
+            1 + (metadata?.combo_count || 0) * 0.1,
+          );
+          return Math.floor(
+            basePoints * (config.combo_multiplier || 1) * comboMultiplier,
+          );
+        }
+        break;
 
       case "social":
         if (actionType === "social_hashtag") {
-          return config.points_per_share || 75;
+          let points = config.points_per_hashtag || 75;
+          // Bonus for verified posts
+          if (metadata?.verified) {
+            points += config.bonus_for_verified || 25;
+          }
+          return points;
         }
         break;
     }
@@ -390,45 +469,68 @@ export class ChallengesService {
   }
 
   /**
-   * Get leaderboard for a challenge
+   * Get leaderboard for a challenge with real-time rank changes
    */
   async getLeaderboard(
     challengeId: string,
     limit: number = 50,
     teamMode: boolean = false,
   ): Promise<any[]> {
-    const supabase = await this.getSupabase();
+    const cacheKey = `leaderboard-${challengeId}`;
+    const cached = this.cache.get(cacheKey);
+
+    if (
+      teamMode &&
+      cached &&
+      Date.now() - cached.timestamp < this.cacheTimeout
+    ) {
+      return cached.teams_data;
+    } else if (
+      !teamMode &&
+      cached &&
+      Date.now() - cached.timestamp < this.cacheTimeout
+    ) {
+      return cached.participants_data;
+    }
 
     if (teamMode) {
-      const { data } = await supabase
+      const { data: teams } = await this.supabase
         .from("challenge_teams")
         .select("*")
         .eq("challenge_id", challengeId)
         .order("current_score", { ascending: false })
         .limit(limit);
-      return data || [];
+
+      this.cache.set(cacheKey, {
+        teams_data: teams,
+        timestamp: Date.now(),
+      });
+      return teams || [];
     }
 
-    const { data } = await supabase
+    const { data: participants } = await this.supabase
       .from("challenge_participants")
-      .select("*, profiles(full_name, avatar_url)")
+      .select("*, users!user_id(full_name, avatar_url)")
       .eq("challenge_id", challengeId)
       .order("current_score", { ascending: false })
       .limit(limit);
 
-    return data || [];
+    this.cache.set(cacheKey, {
+      participants_data: participants,
+      timestamp: Date.now(),
+    });
+
+    return participants || [];
   }
 
   /**
-   * Get user's position in leaderboard
+   * Get user's position in leaderboard with points needed to overtake next player
    */
   async getUserRank(
     challengeId: string,
     userId: string,
-  ): Promise<{ rank: number; score: number }> {
-    const supabase = await this.getSupabase();
-
-    const { data: participants } = await supabase
+  ): Promise<{ rank: number; score: number; pointsToNext: number }> {
+    const { data: participants } = await this.supabase
       .from("challenge_participants")
       .select("user_id, current_score")
       .eq("challenge_id", challengeId)
@@ -439,12 +541,23 @@ export class ChallengesService {
     );
 
     if (userIndex === -1) {
-      return { rank: 0, score: 0 };
+      return { rank: 0, score: 0, pointsToNext: 0 };
     }
+
+    const pointsToNext =
+      userIndex > 0
+        ? Math.max(
+            0,
+            (participants?.[userIndex - 1]?.current_score || 0) -
+              (participants?.[userIndex]?.current_score || 0) +
+              1,
+          )
+        : 0;
 
     return {
       rank: userIndex + 1,
       score: (participants && participants[userIndex].current_score) || 0,
+      pointsToNext,
     };
   }
 
@@ -456,10 +569,8 @@ export class ChallengesService {
     trackerUserId: string,
     trackedUserId: string,
   ): Promise<void> {
-    const supabase = await this.getSupabase();
-
     // Check if tracking already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await this.supabase
       .from("challenge_tracking")
       .select("id")
       .eq("challenge_id", challengeId)
@@ -468,7 +579,7 @@ export class ChallengesService {
       .maybeSingle();
 
     if (!existing) {
-      await supabase.from("challenge_tracking").insert({
+      await this.supabase.from("challenge_tracking").insert({
         challenge_id: challengeId,
         tracker_user_id: trackerUserId,
         tracked_user_id: trackedUserId,
@@ -477,15 +588,13 @@ export class ChallengesService {
   }
 
   /**
-   * Get tracked competitor status
+   * Get tracked competitor status with real-time updates
    */
   async getTrackedCompetitor(
     challengeId: string,
     trackerUserId: string,
   ): Promise<TrackedUser | null> {
-    const supabase = await this.getSupabase();
-
-    const { data: tracking } = await supabase
+    const { data: tracking } = await this.supabase
       .from("challenge_tracking")
       .select("tracked_user_id")
       .eq("challenge_id", challengeId)
@@ -495,9 +604,9 @@ export class ChallengesService {
     if (!tracking) return null;
 
     // Get competitor's current position and score
-    const { data: competitor } = await supabase
+    const { data: competitor } = await this.supabase
       .from("challenge_participants")
-      .select("current_score, profiles(full_name, avatar_url)")
+      .select("current_score, users!user_id(full_name, avatar_url)")
       .eq("challenge_id", challengeId)
       .eq("user_id", tracking.tracked_user_id)
       .single();
@@ -510,15 +619,41 @@ export class ChallengesService {
 
     return {
       user_id: tracking.tracked_user_id,
-      full_name: competitor?.profiles?.[0]?.full_name || "Competitor",
+      full_name: competitor?.users?.full_name || "Competitor",
       current_score: competitor?.current_score || 0,
       current_rank: competitorRank.rank,
       points_needed_to_overtake: Math.max(
         0,
         (competitor?.current_score || 0) - trackerRank.score + 1,
       ),
-      avatar_url: competitor?.profiles?.[0]?.avatar_url || null,
+      avatar_url: competitor?.users?.avatar_url || null,
     };
+  }
+
+  async getLiveTicker(challengeId: string, limit: number = 20): Promise<any> {
+    const cacheKey = `ticker-${challengeId}`;
+    const cached = this.cache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < 2000) {
+      // 2 second cache for ticker
+      return cached.data;
+    }
+
+    const { data, error } = await this.supabase
+      .from("challenge_live_ticker")
+      .select("*")
+      .eq("challenge_id", challengeId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    this.cache.set(cacheKey, {
+      data: data || [],
+      timestamp: Date.now(),
+    });
+
+    return data || [];
   }
 
   /**
@@ -529,12 +664,10 @@ export class ChallengesService {
     teamLeaderId: string,
     teamName: string,
   ): Promise<ChallengeTeam> {
-    const supabase = await this.getSupabase();
-
     // Generate unique team code
     const teamCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    const { data: team, error } = await supabase
+    const { data: team, error } = await this.supabase
       .from("challenge_teams")
       .insert({
         challenge_id: challengeId,
@@ -558,9 +691,7 @@ export class ChallengesService {
    * Join a team by code
    */
   async joinTeamByCode(teamCode: string, userId: string): Promise<void> {
-    const supabase = await this.getSupabase();
-
-    const { data: team, error } = await supabase
+    const { data: team, error } = await this.supabase
       .from("challenge_teams")
       .select("*")
       .eq("team_code", teamCode.toUpperCase())
@@ -572,30 +703,117 @@ export class ChallengesService {
   }
 
   /**
-   * Get live ticker items
+   * Subscribe to real-time challenge updates
    */
-  async getLiveTicker(challengeId: string, limit: number = 30) {
-    const supabase = await this.getSupabase();
+  subscribeToChallengeUpdates(
+    challengeId: string,
+    callbacks: {
+      onLeaderboardUpdate?: (leaderboard: any[]) => void;
+      onTickerUpdate?: (ticker: any) => void;
+      onRankChange?: (userId: string, oldRank: number, newRank: number) => void;
+    },
+  ) {
+    const channel = this.supabase.channel(`challenge-${challengeId}`);
 
-    const { data } = await supabase
-      .from("challenge_live_ticker")
-      .select("*")
-      .eq("challenge_id", challengeId)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    // Listen for participant score changes
+    channel.on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "challenge_participants",
+        filter: `challenge_id=eq.${challengeId}`,
+      },
+      async (payload) => {
+        if (callbacks.onLeaderboardUpdate) {
+          const leaderboard = await this.getLeaderboard(challengeId);
+          callbacks.onLeaderboardUpdate(leaderboard);
+        }
+      },
+    );
 
-    return data || [];
+    // Listen for new ticker items
+    channel.on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "challenge_live_ticker",
+        filter: `challenge_id=eq.${challengeId}`,
+      },
+      (payload) => {
+        if (callbacks.onTickerUpdate) {
+          callbacks.onTickerUpdate(payload.new);
+        }
+      },
+    );
+
+    channel.subscribe();
+    return () => channel.unsubscribe();
   }
 
   /**
    * Admin: Force recalculate all ranks
    */
-  private async recalculateRanks(challengeId: string): Promise<void> {
-    const supabase = await this.getSupabase();
-
-    await supabase.rpc("recalculate_challenge_ranks", {
+  async recalculateRanks(challengeId: string): Promise<void> {
+    await this.supabase.rpc("recalculate_challenge_ranks", {
       p_challenge_id: challengeId,
     });
+  }
+
+  /**
+   * Admin: Manually adjust a participant's score
+   */
+  async adminAdjustScore(
+    challengeId: string,
+    userId: string,
+    adjustment: number,
+    reason: string,
+  ): Promise<void> {
+    const { data: participant } = await this.supabase
+      .from("challenge_participants")
+      .select("current_score")
+      .eq("challenge_id", challengeId)
+      .eq("user_id", userId)
+      .single();
+
+    if (!participant) throw new Error("Participant not found");
+
+    const newScore = Math.max(0, participant.current_score + adjustment);
+
+    await this.supabase
+      .from("challenge_participants")
+      .update({ current_score: newScore })
+      .eq("challenge_id", challengeId)
+      .eq("user_id", userId);
+
+    // Log the adjustment
+    await this.supabase.from("challenge_actions").insert({
+      challenge_id: challengeId,
+      user_id: userId,
+      action_type: "admin_adjustment",
+      points_awarded: adjustment,
+      action_metadata: { reason, admin: true },
+    });
+
+    // Recalculate ranks
+    await this.recalculateRanks(challengeId);
+  }
+
+  /**
+   * Admin: Extend or end challenge
+   */
+  async adminUpdateChallengeEndTime(
+    challengeId: string,
+    newEndTime: Date,
+  ): Promise<void> {
+    await this.supabase
+      .from("challenges")
+      .update({
+        ends_at: newEndTime.toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", challengeId);
   }
 
   private getActionText(actionType: string, actionValue?: number): string {
