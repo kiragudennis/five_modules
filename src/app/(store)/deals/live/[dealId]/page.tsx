@@ -247,7 +247,7 @@ export default function DealLivePage() {
 
   const urgencyStyles = getUrgencyStyles();
   const isLowStock =
-    status?.stock_remaining !== null &&
+    status?.stock_remaining &&
     status.stock_remaining <= 10 &&
     status.stock_remaining > 0;
   const isSoldOut = status?.stock_remaining === 0;
@@ -489,37 +489,36 @@ export default function DealLivePage() {
                 )}
 
                 {/* Stock Meter */}
-                {deal.show_stock_counter &&
-                  status?.stock_remaining !== null && (
-                    <div className="mt-6">
-                      <div className="flex justify-between text-sm text-purple-300 mb-2">
-                        <span>Stock Remaining</span>
-                        <span
-                          className={isLowStock ? "text-red-400 font-bold" : ""}
-                        >
-                          {status.stock_remaining} / {deal.total_quantity}
+                {deal.show_stock_counter && status?.stock_remaining && (
+                  <div className="mt-6">
+                    <div className="flex justify-between text-sm text-purple-300 mb-2">
+                      <span>Stock Remaining</span>
+                      <span
+                        className={isLowStock ? "text-red-400 font-bold" : ""}
+                      >
+                        {status.stock_remaining} / {deal.total_quantity}
+                      </span>
+                    </div>
+                    <Progress
+                      value={status.stock_percentage}
+                      className={cn("h-3", urgencyStyles.timerBg)}
+                    />
+                    {isLowStock && (
+                      <div className="flex items-center justify-center gap-2 mt-3 text-red-400 animate-pulse">
+                        <Flame className="h-4 w-4" />
+                        <span className="text-sm font-bold">
+                          CRITICAL STOCK! ONLY {status.stock_remaining} LEFT!
                         </span>
                       </div>
-                      <Progress
-                        value={status.stock_percentage}
-                        className={cn("h-3", urgencyStyles.timerBg)}
-                      />
-                      {isLowStock && (
-                        <div className="flex items-center justify-center gap-2 mt-3 text-red-400 animate-pulse">
-                          <Flame className="h-4 w-4" />
-                          <span className="text-sm font-bold">
-                            CRITICAL STOCK! ONLY {status.stock_remaining} LEFT!
-                          </span>
-                        </div>
-                      )}
-                      {isSoldOut && (
-                        <div className="flex items-center justify-center gap-2 mt-3 text-red-400">
-                          <AlertTriangle className="h-4 w-4" />
-                          <span className="text-sm font-bold">SOLD OUT!</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                    {isSoldOut && (
+                      <div className="flex items-center justify-center gap-2 mt-3 text-red-400">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-sm font-bold">SOLD OUT!</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Bonus Points */}
                 {deal.bonus_points_per_purchase > 0 && (

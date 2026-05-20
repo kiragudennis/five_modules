@@ -33,42 +33,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-
-interface Deal {
-  id: string;
-  name: string;
-  description: string;
-  deal_type: string;
-  status: string;
-  starts_at: string;
-  ends_at: string;
-  total_quantity: number | null;
-  remaining_quantity: number | null;
-  per_user_limit: number;
-  bonus_points_per_purchase: number;
-  points_required_for_early_access: number | null;
-  points_to_revive: number | null;
-  revive_duration_minutes: number;
-  show_countdown: boolean;
-  show_stock_counter: boolean;
-  show_claim_ticker: boolean;
-  urgency_levels: any[];
-  mystery_config: any;
-}
-
-interface DealStatus {
-  is_active: boolean;
-  time_remaining_ms: number;
-  time_remaining_formatted: string;
-  urgency_level: any;
-  stock_remaining: number | null;
-  stock_percentage: number;
-  can_claim: boolean;
-  user_claims_count: number;
-  remaining_user_claims: number;
-  can_revive: boolean;
-  revive_cost_points: number | null;
-}
+import { Deal, DealStatus } from "@/types/deals";
 
 export default function DealLiveControlsPage() {
   const { dealId } = useParams<{ dealId: string }>();

@@ -69,8 +69,6 @@ export default function DealsPage() {
   const [loading, setLoading] = useState(true);
   const [userClaims, setUserClaims] = useState<Record<string, number>>({});
 
-  const dealsService = new DealsService(supabase);
-
   const fetchDeals = useCallback(async () => {
     const now = new Date().toISOString();
 

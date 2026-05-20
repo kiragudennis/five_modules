@@ -34,61 +34,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { format, formatDistanceToNow } from "date-fns";
-import Link from "next/link";
-
-interface Deal {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  deal_type: string;
-  product_id: string | null;
-  discount_type: string | null;
-  discount_value: number | null;
-  deal_price: number | null;
-  total_quantity: number | null;
-  remaining_quantity: number | null;
-  per_user_limit: number;
-  starts_at: string;
-  ends_at: string;
-  status: string;
-  featured_image_url: string | null;
-  banner_color: string;
-  bonus_points_per_purchase: number;
-  points_required_for_early_access: number | null;
-  points_to_revive: number | null;
-  revive_duration_minutes: number;
-  show_countdown: boolean;
-  show_stock_counter: boolean;
-  show_claim_ticker: boolean;
-  bogo_config: any;
-  free_gift_config: any;
-  mystery_config: any;
-}
-
-interface DealStatus {
-  is_active: boolean;
-  time_remaining_ms: number;
-  time_remaining_formatted: string;
-  urgency_level: { color: string; message: string };
-  stock_remaining: number | null;
-  stock_percentage: number;
-  can_claim: boolean;
-  user_claims_count: number;
-  remaining_user_claims: number;
-  can_revive: boolean;
-  revive_cost_points: number | null;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number;
-  images: string[];
-  description: string;
-}
+import { Deal, DealStatus } from "@/types/deals";
+import { Product } from "@/types/store";
 
 export default function DealPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -304,7 +251,7 @@ export default function DealPage() {
   const isActive = status?.is_active === true;
   const isSoldOut = status?.stock_remaining === 0;
   const isLowStock =
-    status?.stock_remaining !== null &&
+    status?.stock_remaining &&
     status.stock_remaining <= 10 &&
     status.stock_remaining > 0;
   const hasReachedLimit =
