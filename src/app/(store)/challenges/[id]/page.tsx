@@ -1,5 +1,5 @@
 // app/(store)/challenges/[challengeId]/page.tsx
-
+// Challenge Detail Page - View challenge details, join, track progress, and interact with the challenge.
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";

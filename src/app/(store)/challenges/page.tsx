@@ -1,5 +1,5 @@
 // app/(store)/challenges/page.tsx (Customer-facing)
-
+// Customer-facing Challenges Page - Browse active challenges, view details, and join competitions to earn rewards.
 "use client";
 
 import { useEffect, useState, useCallback } from "react";

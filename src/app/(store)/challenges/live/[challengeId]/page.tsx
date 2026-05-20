@@ -1,5 +1,5 @@
 // app/(store)/challenges/live/[challengeId]/page.tsx
-
+// Challenge Live Display - Real-time leaderboard, live ticker, and dynamic visuals for broadcasting the challenge in action.
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
