@@ -48,7 +48,7 @@ export interface Bundle {
   is_mystery_revealed: boolean;
   mystery_revealed_at: string | null;
   mystery_products: any;
-  mystrey_min_value: number | null;
+  mystery_min_value: number | null;
   bonus_points: number;
   eligible_tiers: string[];
   points_required: number;
@@ -72,6 +72,7 @@ export interface Bundle {
   starts_at: string | null;
   ends_at: string | null;
   terms_conditions: string | null;
+  review_count: number | null;
   created_at: string;
   updated_at: string;
 }

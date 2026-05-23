@@ -1,4 +1,5 @@
-// app/bundles/live/[bundleId]/page.tsx
+// app/bundles/live/[bundleId]/page.tsx - Fixed and Enhanced
+
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -9,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Gift,
   Star,
@@ -30,10 +32,16 @@ import {
   Radio,
   Trophy,
   AlertCircle,
+  Mic,
+  MicOff,
+  PartyPopper,
+  Target,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNowStrict } from "date-fns";
 import { Bundle, LivePurchase, LiveStats } from "@/types/bundles";
+import confetti from "canvas-confetti";
+import { toast } from "sonner";
 
 const BUNDLE_COLORS = {
   mystery: "from-purple-600 to-pink-600",
@@ -43,6 +51,57 @@ const BUNDLE_COLORS = {
   subscription: "from-indigo-500 to-purple-500",
   bonus_points: "from-yellow-500 to-orange-500",
 };
+
+// Announcement component for host to read out
+const AnnouncementBanner = ({
+  userName,
+  action,
+  prize,
+}: {
+  userName: string;
+  action: string;
+  prize?: string;
+}) => (
+  <motion.div
+    initial={{ scale: 0, opacity: 0 }}
+    animate={{ scale: 1, opacity: 1 }}
+    exit={{ scale: 0, opacity: 0 }}
+    className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md"
+  >
+    <Card className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 shadow-2xl">
+      <div className="text-center">
+        <PartyPopper className="h-8 w-8 mx-auto mb-2" />
+        <p className="text-lg font-bold">
+          🎉 {userName} {action}! 🎉
+        </p>
+        {prize && <p className="text-sm mt-1">Won: {prize}</p>}
+        <p className="text-xs mt-2 opacity-90">
+          Shout out to {userName.split(" ")[0]}!
+        </p>
+      </div>
+    </Card>
+  </motion.div>
+);
+
+// Hot streak notification
+const HotStreakNotification = ({ count }: { count: number }) => (
+  <motion.div
+    initial={{ x: 100, opacity: 0 }}
+    animate={{ x: 0, opacity: 1 }}
+    exit={{ x: 100, opacity: 0 }}
+    className="fixed bottom-24 right-4 z-50"
+  >
+    <Card className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-3 shadow-lg">
+      <div className="flex items-center gap-2">
+        <Zap className="h-5 w-5 animate-pulse" />
+        <div>
+          <p className="font-bold text-sm">HOT STREAK! 🔥</p>
+          <p className="text-xs">{count} claims in the last 10 minutes!</p>
+        </div>
+      </div>
+    </Card>
+  </motion.div>
+);
 
 export default function LiveBundlePage() {
   const { bundleId } = useParams<{ bundleId: string }>();
@@ -57,15 +116,115 @@ export default function LiveBundlePage() {
     remaining_stock: 0,
     stock_percentage: 100,
   });
-  const [isMysteryRevealed, setIsMysteryRevealed] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [lastPurchase, setLastPurchase] = useState<LivePurchase | null>(null);
+  const [showAnnouncement, setShowAnnouncement] = useState<any>(null);
+  const [showHotStreak, setShowHotStreak] = useState(false);
+  const [recentClaims, setRecentClaims] = useState<number[]>([]);
+  const [hostSpeaking, setHostSpeaking] = useState(false);
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const announcementTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const bundleService = new BundleService(supabase);
+
+  // Time remaining calculation
+  const getTimeRemaining = useCallback(() => {
+    if (!bundle?.ends_at) return null;
+    const end = new Date(bundle.ends_at);
+    if (end < new Date()) return "Ended";
+    return formatDistanceToNowStrict(end);
+  }, [bundle?.ends_at]);
+
+  const timeRemaining = getTimeRemaining();
+  const isLowStock =
+    liveStats.stock_percentage < 20 && liveStats.stock_percentage > 0;
+  const isSoldOut = liveStats.remaining_stock === 0;
+
+  // Enhanced helper to fetch product details from product_pool
+  const fetchProductImages = useCallback(async () => {
+    if (!bundle?.products) return [];
+
+    let productIds: string[] = [];
+
+    // Handle different bundle types
+    if (
+      bundle.bundle_type === "build_own" &&
+      bundle.products.product_pool &&
+      bundle.products.product_pool.length > 0
+    ) {
+      productIds = bundle.products.product_pool;
+    } else if (bundle.bundle_type === "curated" && bundle.products.items) {
+      productIds = bundle.products.items.map((item: any) => item.product_id);
+    } else if (
+      bundle.bundle_type === "mystery" &&
+      bundle.products.product_pool
+    ) {
+      productIds = bundle.products.product_pool;
+    } else if (bundle.bundle_type === "tiered" && bundle.products.items) {
+      productIds = bundle.products.items.map((item: any) => item.product_id);
+    } else if (bundle.bundle_type === "subscription" && bundle.products.items) {
+      productIds = bundle.products.items.map((item: any) => item.product_id);
+    }
+
+    if (productIds.length === 0) return [];
+
+    // Fetch product images
+    const { data: products } = await supabase
+      .from("products")
+      .select("id, name, images, price")
+      .in("id", productIds.slice(0, 12));
+
+    if (products) {
+      const images = products
+        .filter((p) => p.images?.[0])
+        .map((p) => p.images[0]);
+      setProductImages(images);
+      return images;
+    }
+    return [];
+  }, [bundle, supabase]);
+
+  // Auto-rotate product images for visual interest
+  useEffect(() => {
+    if (productImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % productImages.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [productImages]);
+
+  // Helper to get readable product names for host
+  const getProductNames = useCallback(() => {
+    if (!bundle?.products) return "items";
+
+    // For build-your-own with product pool
+    if (
+      bundle.bundle_type === "build_own" &&
+      bundle.eligible_product_ids &&
+      bundle.eligible_product_ids.length > 0
+    ) {
+      return `${bundle.eligible_product_ids.length} premium products to choose from`;
+    }
+
+    if (Array.isArray(bundle.products)) {
+      return bundle.products.map((p) => p.product_name).join(", ");
+    }
+    if (bundle.products.items) {
+      const names = bundle.products.items.map(
+        (i: any) => i.product_name || `Item ${i.product_id?.slice(0, 8)}`,
+      );
+      return names.join(", ");
+    }
+    if (bundle.products.product_pool) {
+      return `${bundle.products.product_pool.length} mystery items`;
+    }
+    return "selected items";
+  }, [bundle]);
 
   // Load bundle data
   const loadBundle = useCallback(async () => {
@@ -73,9 +232,6 @@ export default function LiveBundlePage() {
       const data = await bundleService.getBundleById(bundleId);
       if (data) {
         setBundle(data);
-        setIsMysteryRevealed(data.is_mystery_revealed || false);
-
-        // Update stats
         setLiveStats((prev) => ({
           ...prev,
           remaining_stock: data.remaining_count ?? 0,
@@ -84,13 +240,14 @@ export default function LiveBundlePage() {
             ? ((data.remaining_count ?? 0) / data.total_available) * 100
             : 100,
         }));
+        await fetchProductImages();
       }
     } catch (error) {
       console.error("Error loading bundle:", error);
     } finally {
       setLoading(false);
     }
-  }, [bundleId, bundleService]);
+  }, [bundleId, bundleService, fetchProductImages]);
 
   // Load recent purchases
   const loadPurchases = useCallback(async () => {
@@ -124,38 +281,49 @@ export default function LiveBundlePage() {
         purchases: formattedPurchases.length,
         total_sold: formattedPurchases.reduce((sum, p) => sum + p.quantity, 0),
       }));
-    }
-  }, [bundleId, supabase]);
 
-  // Setup real-time subscriptions with error handling and cleanup
+      // Track recent claims for hot streak detection
+      const now = Date.now();
+      const tenMinutesAgo = now - 10 * 60 * 1000;
+      const recentCount = formattedPurchases.filter(
+        (p) => new Date(p.created_at).getTime() > tenMinutesAgo,
+      ).length;
+      if (recentCount >= 5 && !showHotStreak) {
+        setShowHotStreak(true);
+        setTimeout(() => setShowHotStreak(false), 8000);
+      }
+    }
+  }, [bundleId, supabase, showHotStreak]);
+
+  // Countdown timer for bundle end
+  useEffect(() => {
+    if (!bundle?.ends_at) return;
+    const updateCountdown = () => {
+      const now = new Date();
+      const end = new Date(bundle.ends_at!);
+      if (end > now) {
+        setCountdown(formatDistanceToNowStrict(end, { addSuffix: true }));
+      } else {
+        setCountdown("Ended");
+      }
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [bundle?.ends_at]);
+
+  // Real-time subscription
   useEffect(() => {
     if (!bundleId) return;
 
     let isMounted = true;
-    let purchaseChannel: any = null;
-    let bundleChannel: any = null;
-    let presenceChannel: any = null;
-    let subscriptionAttempts = 0;
-    const MAX_SUBSCRIPTION_ATTEMPTS = 3;
+    let channel: any = null;
 
-    // First load data
-    loadBundle();
-    loadPurchases();
+    const setupChannel = async () => {
+      channel = supabase.channel(`bundle-live-${bundleId}`);
 
-    // Refresh purchases every 10 seconds (polling fallback)
-    const interval = setInterval(() => {
-      if (isMounted) {
-        loadPurchases();
-      }
-    }, 10000);
-
-    // Setup real-time subscription with retry logic
-    const setupSubscriptions = async (attempt = 0) => {
-      if (!isMounted) return;
-
-      try {
-        // 1. Channel for purchases
-        purchaseChannel = supabase.channel(`bundle-purchases-${bundleId}`).on(
+      channel
+        .on(
           "postgres_changes",
           {
             event: "INSERT",
@@ -163,10 +331,9 @@ export default function LiveBundlePage() {
             table: "bundle_purchases",
             filter: `bundle_id=eq.${bundleId}`,
           },
-          async (payload) => {
+          async (payload: { new: any; old: any }) => {
             if (!isMounted) return;
 
-            // Fetch user name separately
             let userName = "Someone";
             try {
               const { data: user } = await supabase
@@ -175,9 +342,7 @@ export default function LiveBundlePage() {
                 .eq("id", payload.new.user_id)
                 .maybeSingle();
               userName = user?.full_name || "Someone";
-            } catch (userError) {
-              // Silently fail - use default name
-            }
+            } catch (userError) {}
 
             const newPurchase = {
               id: payload.new.id,
@@ -190,19 +355,40 @@ export default function LiveBundlePage() {
             setPurchases((prev) => [newPurchase, ...prev.slice(0, 19)]);
             setLastPurchase(newPurchase);
 
-            // Play purchase sound
+            setShowAnnouncement({
+              userName,
+              action: "just claimed",
+              prize: `${bundle?.name} Bundle`,
+            });
+
+            if (announcementTimeoutRef.current) {
+              clearTimeout(announcementTimeoutRef.current);
+            }
+            announcementTimeoutRef.current = setTimeout(() => {
+              setShowAnnouncement(null);
+            }, 5000);
+
             if (isSoundEnabled && audioRef.current) {
               audioRef.current.play().catch(() => {});
             }
 
+            if (
+              liveStats.purchases > 0 &&
+              (liveStats.purchases + 1) % 5 === 0
+            ) {
+              confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+              });
+            }
+
             setTimeout(() => {
               if (isMounted) setLastPurchase(null);
-            }, 3000);
+            }, 4000);
           },
-        );
-
-        // 2. Channel for bundle updates
-        bundleChannel = supabase.channel(`bundle-updates-${bundleId}`).on(
+        )
+        .on(
           "postgres_changes",
           {
             event: "UPDATE",
@@ -210,14 +396,17 @@ export default function LiveBundlePage() {
             table: "bundles",
             filter: `id=eq.${bundleId}`,
           },
-          (payload) => {
+          (payload: { new: any; old: any }) => {
             if (!isMounted) return;
-
             if (
               payload.new.is_mystery_revealed !==
               payload.old.is_mystery_revealed
             ) {
-              setIsMysteryRevealed(true);
+              setShowAnnouncement({
+                userName: "MYSTERY REVEALED!",
+                action: "The mystery bundle contents are now visible",
+              });
+              setTimeout(() => setShowAnnouncement(null), 8000);
               loadBundle();
             }
             if (payload.new.remaining_count !== payload.old.remaining_count) {
@@ -232,124 +421,42 @@ export default function LiveBundlePage() {
               }));
             }
           },
-        );
-
-        // 3. Presence channel for viewer count (only if not already connected)
-        if (!presenceChannel) {
-          presenceChannel = supabase.channel(
-            `bundle-live-viewers-${bundleId}`,
-            {
-              config: {
-                presence: {
-                  key: `viewer-${Math.random().toString(36).substring(2, 9)}`,
-                },
-              },
-            },
-          );
-
-          presenceChannel
-            .on("presence", { event: "sync" }, () => {
-              if (!isMounted) return;
-              const state = presenceChannel.presenceState();
-              const viewerCount = Object.keys(state).length;
-              setLiveStats((prev) => ({
-                ...prev,
-                viewers: viewerCount,
-              }));
-            })
-            .on("presence", { event: "join" }, () => {
-              if (!isMounted) return;
-              const state = presenceChannel.presenceState();
-              setLiveStats((prev) => ({
-                ...prev,
-                viewers: Object.keys(state).length,
-              }));
-            })
-            .on("presence", { event: "leave" }, () => {
-              if (!isMounted) return;
-              const state = presenceChannel.presenceState();
-              setLiveStats((prev) => ({
-                ...prev,
-                viewers: Object.keys(state).length,
-              }));
-            });
-        }
-
-        // Subscribe with timeout
-        const subscribeWithTimeout = (channel: any, timeout = 10000) => {
-          return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-              reject(new Error("Subscription timeout"));
-            }, timeout);
-
-            channel.subscribe((status: string) => {
-              clearTimeout(timer);
-              if (status === "SUBSCRIBED") {
-                resolve(true);
-              } else if (status === "CHANNEL_ERROR") {
-                reject(new Error("Channel error"));
-              }
-            });
-          });
-        };
-
-        // Attempt to subscribe
-        try {
-          await Promise.all([
-            subscribeWithTimeout(purchaseChannel),
-            subscribeWithTimeout(bundleChannel),
-          ]);
-          console.log("✅ Real-time subscriptions active");
-        } catch (subError) {
-          console.warn("Subscription failed:", subError);
-          // Don't retry if we've exceeded attempts
-          if (attempt < MAX_SUBSCRIPTION_ATTEMPTS) {
-            setTimeout(() => setupSubscriptions(attempt + 1), 5000);
-          }
-        }
-
-        // Track presence separately
-        if (presenceChannel && presenceChannel.state !== "joined") {
-          try {
-            await subscribeWithTimeout(presenceChannel);
-            await presenceChannel.track({
-              user_id: `viewer_${Math.random().toString(36).substring(2, 9)}`,
+        )
+        .on("presence", { event: "sync" }, () => {
+          if (!isMounted) return;
+          const state = channel.presenceState();
+          setLiveStats((prev) => ({
+            ...prev,
+            viewers: Object.keys(state).length,
+          }));
+        })
+        .subscribe(async (status: string) => {
+          if (status === "SUBSCRIBED" && isMounted) {
+            await channel.track({
+              user_id: `host_${Math.random().toString(36).substring(2, 9)}`,
               online_at: new Date().toISOString(),
+              role: "host",
             });
-            console.log("✅ Presence tracking active");
-          } catch (presenceError) {
-            console.warn("Presence tracking failed:", presenceError);
           }
-        }
-      } catch (error) {
-        console.warn("Failed to setup subscriptions:", error);
-        if (attempt < MAX_SUBSCRIPTION_ATTEMPTS && isMounted) {
-          setTimeout(() => setupSubscriptions(attempt + 1), 5000);
-        }
-      }
+        });
+
+      loadBundle();
+      loadPurchases();
     };
 
-    // Start subscriptions
-    setupSubscriptions();
+    setupChannel();
 
-    // Cleanup function
+    const interval = setInterval(() => {
+      if (isMounted) loadPurchases();
+    }, 5000);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
-
-      const cleanupChannel = (channel: any, name: string) => {
-        if (channel) {
-          try {
-            channel.unsubscribe();
-          } catch (e) {
-            console.warn(`Error unsubscribing ${name}:`, e);
-          }
-        }
-      };
-
-      cleanupChannel(purchaseChannel, "purchase");
-      cleanupChannel(bundleChannel, "bundle");
-      cleanupChannel(presenceChannel, "presence");
+      if (announcementTimeoutRef.current) {
+        clearTimeout(announcementTimeoutRef.current);
+      }
+      if (channel) channel.unsubscribe();
     };
   }, [
     bundleId,
@@ -358,26 +465,8 @@ export default function LiveBundlePage() {
     loadPurchases,
     isSoundEnabled,
     bundle?.total_available,
+    liveStats.purchases,
   ]);
-
-  // Countdown timer for bundle end
-  useEffect(() => {
-    if (!bundle?.ends_at) return;
-
-    const updateCountdown = () => {
-      const now = new Date();
-      const end = new Date(bundle.ends_at!);
-      if (end > now) {
-        setCountdown(formatDistanceToNowStrict(end, { addSuffix: true }));
-      } else {
-        setCountdown("Ended");
-      }
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, [bundle?.ends_at]);
 
   // Fullscreen handling
   const toggleFullscreen = useCallback(() => {
@@ -408,69 +497,9 @@ export default function LiveBundlePage() {
     }).format(price);
   };
 
-  const getTimeRemaining = () => {
-    if (!bundle?.ends_at) return null;
-    const end = new Date(bundle.ends_at);
-    if (end < new Date()) return "Ended";
-    return formatDistanceToNowStrict(end);
-  };
-
   const bundleConfig =
     BUNDLE_COLORS[bundle?.bundle_type as keyof typeof BUNDLE_COLORS] ||
     "from-purple-600 to-pink-600";
-  const timeRemaining = getTimeRemaining();
-  const isLowStock =
-    liveStats.stock_percentage < 20 && liveStats.stock_percentage > 0;
-  const isSoldOut = liveStats.remaining_stock === 0;
-
-  // Helper to safely extract products array from bundle, handling both old and new formats
-  const getProductsArray = useCallback((bundle: Bundle | null): any[] => {
-    // Safety check - if bundle is null or undefined
-    if (!bundle || !bundle.products) return [];
-
-    // If it's already an array (for backward compatibility)
-    if (Array.isArray(bundle.products)) {
-      return bundle.products;
-    }
-
-    // Handle the object structure from your admin save
-    const productsObj = bundle.products as any;
-
-    if (productsObj.type === "curated" && productsObj.items) {
-      return productsObj.items;
-    }
-
-    if (productsObj.type === "tiered" && productsObj.items) {
-      return productsObj.items;
-    }
-
-    if (productsObj.type === "subscription" && productsObj.items) {
-      return productsObj.items;
-    }
-
-    if (productsObj.type === "bonus_points" && productsObj.items) {
-      return productsObj.items;
-    }
-
-    if (productsObj.type === "mystery" && productsObj.product_pool) {
-      // For mystery bundles, show product pool or placeholder
-      return productsObj.product_pool.map((productId: string) => ({
-        product_id: productId,
-        quantity: productsObj.quantity || 1,
-        is_mystery: true,
-      }));
-    }
-
-    if (productsObj.type === "build_own") {
-      // Build your own doesn't have fixed products
-      return [];
-    }
-
-    return [];
-  }, []);
-
-  // Then call it safely only when bundle exists
-  const productItems = bundle ? getProductsArray(bundle) : [];
 
   if (loading) {
     return (
@@ -502,10 +531,26 @@ export default function LiveBundlePage() {
       ref={containerRef}
       className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 overflow-hidden"
     >
-      {/* Audio for purchase notifications */}
+      {/* Audio */}
       <audio ref={audioRef} src="/sounds/purchase-chime.mp3" preload="auto" />
 
-      {/* OBS Metadata (hidden, for stream overlays) */}
+      {/* Announcement Banner for Host */}
+      <AnimatePresence>
+        {showAnnouncement && (
+          <AnnouncementBanner
+            userName={showAnnouncement.userName}
+            action={showAnnouncement.action}
+            prize={showAnnouncement.prize}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Hot Streak Notification */}
+      <AnimatePresence>
+        {showHotStreak && <HotStreakNotification count={recentClaims.length} />}
+      </AnimatePresence>
+
+      {/* OBS Metadata */}
       <div className="hidden obs-metadata">
         <div data-title={bundle.name} />
         <div data-type={bundle.bundle_type} />
@@ -513,7 +558,20 @@ export default function LiveBundlePage() {
         <div data-stock={liveStats.remaining_stock} />
         <div data-viewers={liveStats.viewers} />
         <div data-purchases={liveStats.purchases} />
+        <div data-products={getProductNames()} />
       </div>
+
+      {/* Host Speaking Indicator */}
+      <button
+        onClick={() => setHostSpeaking(!hostSpeaking)}
+        className="fixed top-20 right-20 z-50 p-2 rounded-full bg-black/50 hover:bg-black/70 transition-colors"
+      >
+        {hostSpeaking ? (
+          <Mic className="h-5 w-5 text-red-500" />
+        ) : (
+          <MicOff className="h-5 w-5 text-gray-400" />
+        )}
+      </button>
 
       {/* Main Live Display */}
       <div className="relative min-h-screen">
@@ -522,13 +580,19 @@ export default function LiveBundlePage() {
           className={cn("bg-gradient-to-r py-4 px-6 text-white", bundleConfig)}
         >
           <div className="container mx-auto">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center flex-wrap gap-3">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <Radio className="h-4 w-4 text-white animate-pulse" />
                   <span className="text-xs font-mono tracking-wider">
                     LIVE STREAM
                   </span>
+                  {hostSpeaking && (
+                    <Badge className="bg-red-500 text-white animate-pulse ml-2">
+                      <Mic className="h-3 w-3 mr-1" />
+                      HOST SPEAKING
+                    </Badge>
+                  )}
                 </div>
                 <h1 className="text-2xl md:text-3xl font-bold">
                   {bundle.name}
@@ -538,10 +602,9 @@ export default function LiveBundlePage() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {/* Fullscreen Button */}
                 <button
                   onClick={toggleFullscreen}
-                  className="p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+                  className="p-2 rounded-full bg-black/30 hover:bg-black/50"
                 >
                   {isFullscreen ? (
                     <Minimize2 className="h-5 w-5" />
@@ -549,10 +612,9 @@ export default function LiveBundlePage() {
                     <Maximize2 className="h-5 w-5" />
                   )}
                 </button>
-                {/* Sound Toggle */}
                 <button
                   onClick={() => setIsSoundEnabled(!isSoundEnabled)}
-                  className="p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+                  className="p-2 rounded-full bg-black/30 hover:bg-black/50"
                 >
                   {isSoundEnabled ? (
                     <Volume2 className="h-5 w-5" />
@@ -566,10 +628,10 @@ export default function LiveBundlePage() {
         </div>
 
         {/* Live Stats Bar */}
-        <div className="bg-black/50 backdrop-blur border-b border-white/10">
-          <div className="container mx-auto px-6 py-3">
+        <div className="bg-black/50 backdrop-blur border-b border-white/10 py-3 px-6">
+          <div className="container mx-auto">
             <div className="flex flex-wrap justify-between items-center gap-4">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-2 bg-red-500 rounded-full animate-pulse" />
                   <span className="text-white text-sm font-mono">LIVE</span>
@@ -582,7 +644,11 @@ export default function LiveBundlePage() {
                 {timeRemaining && (
                   <div className="flex items-center gap-2 text-white/80 text-sm">
                     <Clock className="h-4 w-4" />
-                    <span>{timeRemaining} remaining</span>
+                    <span
+                      className={isLowStock ? "text-orange-400 font-bold" : ""}
+                    >
+                      {timeRemaining} remaining
+                    </span>
                   </div>
                 )}
               </div>
@@ -597,6 +663,11 @@ export default function LiveBundlePage() {
                   <span className="font-mono">{liveStats.total_sold}</span>
                   <span>items sold</span>
                 </div>
+                <div className="flex items-center gap-2 text-white/80 text-sm">
+                  <Target className="h-4 w-4" />
+                  <span className="font-mono">{liveStats.remaining_stock}</span>
+                  <span>remaining</span>
+                </div>
               </div>
             </div>
           </div>
@@ -604,12 +675,10 @@ export default function LiveBundlePage() {
 
         <div className="container mx-auto px-6 py-6">
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Main Bundle Display - Center/Left */}
+            {/* Main Bundle Display */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Bundle Hero Card */}
               <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur border-purple-500/30">
                 <div className="p-6">
-                  {/* Bundle Type Badge */}
                   <div className="flex items-center justify-between mb-4">
                     <Badge
                       className={cn(
@@ -637,7 +706,6 @@ export default function LiveBundlePage() {
                       )}
                       {bundle.bundle_type.replace("_", " ").toUpperCase()}
                     </Badge>
-
                     {bundle.is_live_exclusive && (
                       <Badge className="bg-red-500 text-white gap-1 animate-pulse">
                         <Zap className="h-3 w-3" />
@@ -646,7 +714,6 @@ export default function LiveBundlePage() {
                     )}
                   </div>
 
-                  {/* Price Display */}
                   <div className="text-center mb-6">
                     {bundle.discounted_price ? (
                       <>
@@ -673,7 +740,6 @@ export default function LiveBundlePage() {
                     )}
                   </div>
 
-                  {/* Stock Meter */}
                   <div className="mb-6">
                     <div className="flex justify-between text-sm mb-2">
                       <span className="text-purple-300">Stock Remaining</span>
@@ -694,18 +760,11 @@ export default function LiveBundlePage() {
                     {isLowStock && !isSoldOut && (
                       <p className="text-orange-400 text-xs mt-2 flex items-center gap-1 animate-pulse">
                         <AlertCircle className="h-3 w-3" />
-                        Almost gone! Only {liveStats.remaining_stock} left!
-                      </p>
-                    )}
-                    {isSoldOut && (
-                      <p className="text-red-400 text-xs mt-2 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        SOLD OUT! This bundle is no longer available.
+                        CRITICAL: Only {liveStats.remaining_stock} left!
                       </p>
                     )}
                   </div>
 
-                  {/* Bonus Points Display */}
                   {bundle.bonus_points > 0 && (
                     <div className="mb-6 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -717,7 +776,6 @@ export default function LiveBundlePage() {
                     </div>
                   )}
 
-                  {/* Purchase Button Overlay (for stream host to click) */}
                   <Button
                     size="lg"
                     className={cn(
@@ -732,19 +790,74 @@ export default function LiveBundlePage() {
                     <ShoppingBag className="h-5 w-5 mr-2" />
                     {isSoldOut ? "SOLD OUT" : "CLAIM THIS BUNDLE →"}
                   </Button>
+
+                  {/* Product Image Carousel for Visual Interest */}
+                  {productImages.length > 0 && (
+                    <div className="mt-4 relative">
+                      <div className="overflow-hidden rounded-lg">
+                        <motion.img
+                          key={currentImageIndex}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.5 }}
+                          src={productImages[currentImageIndex]}
+                          alt="Product preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      </div>
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                        {productImages.slice(0, 6).map((_, idx) => (
+                          <div
+                            key={idx}
+                            className={cn(
+                              "w-1.5 h-1.5 rounded-full transition-all",
+                              idx === currentImageIndex
+                                ? "bg-white w-3"
+                                : "bg-white/50",
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Host Talking Points */}
+                  <div className="mt-4 p-3 rounded-lg bg-white/10">
+                    <p className="text-xs text-white/60 mb-1">
+                      📢 HOST TALKING POINTS:
+                    </p>
+                    <ul className="text-xs text-white/80 space-y-1">
+                      <li>
+                        •{" "}
+                        {bundle.bonus_points > 0
+                          ? `Earn ${bundle.bonus_points} bonus points`
+                          : "Limited time offer"}
+                      </li>
+                      <li>
+                        •{" "}
+                        {isLowStock
+                          ? `Only ${liveStats.remaining_stock} left in stock!`
+                          : `${liveStats.purchases} people have claimed this already!`}
+                      </li>
+                      <li>
+                        •{" "}
+                        {bundle.discounted_price
+                          ? `Save ${Math.round(((bundle.base_price - bundle.discounted_price) / bundle.base_price) * 100)}%`
+                          : "Best value bundle"}
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </Card>
 
               {/* Bundle Contents Preview */}
               {bundle && (
-                <Card className="bg-black/30 backdrop-blur border-white/10 px-2">
-                  {/* Products Display */}
-                  <div className="space-y-3">
-                    <h3 className="text-white font-semibold flex items-center gap-2">
+                <Card className="bg-black/30 backdrop-blur border-white/10">
+                  <div className="p-4">
+                    <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
                       <Package className="h-4 w-4" />
                       What's Inside
                     </h3>
-
                     {bundle.bundle_type === "mystery" &&
                     !bundle.is_mystery_revealed ? (
                       <div className="text-center py-8 bg-white/5 rounded-lg">
@@ -752,10 +865,10 @@ export default function LiveBundlePage() {
                         <p className="text-purple-300">
                           Mystery Bundle - Contents Hidden
                         </p>
-                        {bundle.mystrey_min_value && (
+                        {bundle.mystery_min_value && (
                           <p className="text-sm text-purple-400/70 mt-1">
                             Minimum value: KSH{" "}
-                            {bundle.mystrey_min_value.toLocaleString()}
+                            {bundle.mystery_min_value.toLocaleString()}
                           </p>
                         )}
                       </div>
@@ -765,31 +878,23 @@ export default function LiveBundlePage() {
                         <p className="text-white">Build Your Own Bundle</p>
                         <p className="text-xs text-purple-300">
                           Choose {bundle.min_items_to_select}-
-                          {bundle.max_items_to_select} items
-                        </p>
-                      </div>
-                    ) : productItems.length === 0 ? (
-                      <div className="text-center py-8 bg-white/5 rounded-lg">
-                        <Package className="h-8 w-8 text-purple-400 mx-auto mb-2 opacity-50" />
-                        <p className="text-purple-300">
-                          No products in this bundle
+                          {bundle.max_items_to_select} items from{" "}
+                          {bundle.eligible_product_ids?.length || "many"}{" "}
+                          products
                         </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {productItems
-                          .slice(0, 8)
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {bundle.products?.items
+                          ?.slice(0, 8)
                           .map((item: any, idx: number) => (
                             <div
                               key={idx}
-                              className="text-center p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                              className="text-center p-2 rounded-lg bg-white/5"
                             >
-                              <Package className="h-8 w-8 text-purple-400 mx-auto mb-2" />
+                              <Package className="h-6 w-6 text-purple-400 mx-auto mb-1" />
                               <p className="text-xs text-white truncate">
-                                {item.product_name ||
-                                  item.name ||
-                                  item.product_id?.slice(0, 8) ||
-                                  `Item ${idx + 1}`}
+                                {item.product_name || `Item ${idx + 1}`}
                               </p>
                               <p className="text-xs text-purple-300">
                                 x{item.quantity || 1}
@@ -803,7 +908,7 @@ export default function LiveBundlePage() {
               )}
             </div>
 
-            {/* Live Ticker - Right Sidebar */}
+            {/* Live Ticker Sidebar */}
             <div className="space-y-6">
               {/* Last Purchase Alert */}
               {lastPurchase && (
@@ -833,13 +938,15 @@ export default function LiveBundlePage() {
                 <div className="p-4 border-b border-purple-500/30">
                   <h3 className="text-white font-semibold flex items-center gap-2">
                     <Trophy className="h-4 w-4 text-yellow-400" />
-                    Live Claims
+                    Live Claims Feed
                     <Badge variant="outline" className="ml-2 text-purple-300">
                       {liveStats.purchases} total
                     </Badge>
                   </h3>
+                  <p className="text-xs text-purple-300 mt-1">
+                    🎙️ Announce these names on stream!
+                  </p>
                 </div>
-
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                   {purchases.length === 0 ? (
                     <div className="text-center py-8 text-purple-300">
@@ -848,10 +955,16 @@ export default function LiveBundlePage() {
                     </div>
                   ) : (
                     purchases.map((purchase, idx) => (
-                      <div
+                      <motion.div
                         key={purchase.id}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-white/5 animate-in fade-in slide-in-from-right duration-300"
-                        style={{ animationDelay: `${idx * 20}ms` }}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                        onClick={() => {
+                          navigator.clipboard.writeText(purchase.user_name);
+                          toast.success(`"${purchase.user_name}" copied!`);
+                        }}
                       >
                         <div className="flex-shrink-0">
                           <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
@@ -875,48 +988,87 @@ export default function LiveBundlePage() {
                             {new Date(purchase.created_at).toLocaleTimeString()}
                           </p>
                         </div>
-                      </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(purchase.user_name);
+                            toast.success(`"${purchase.user_name}" copied!`);
+                          }}
+                        >
+                          📋
+                        </Button>
+                      </motion.div>
                     ))
                   )}
                 </div>
               </Card>
 
-              {/* Hot Streak Counter */}
-              {liveStats.purchases > 5 && (
-                <Card className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/30">
-                  <div className="p-4 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <Zap className="h-5 w-5 text-orange-400" />
-                      <span className="text-orange-400 font-bold">
-                        HOT STREAK!
-                      </span>
-                    </div>
-                    <p className="text-white text-sm">
-                      {liveStats.purchases} claims in the last hour!
-                    </p>
-                  </div>
-                </Card>
-              )}
-
-              {/* Call to Action Overlay */}
+              {/* Engagement Tips */}
               <Card className="bg-gradient-to-r from-purple-600 to-pink-600 border-0">
                 <div className="p-4 text-center">
-                  <Gift className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
-                  <h3 className="text-white font-bold">Limited Time!</h3>
-                  <p className="text-sm text-white/80">
-                    {countdown || "Get it before it's gone!"}
-                  </p>
+                  <Mic className="h-8 w-8 text-white mx-auto mb-2" />
+                  <h3 className="text-white font-bold">Host Tips</h3>
+                  <div className="text-xs text-white/80 mt-2 space-y-1 text-left">
+                    <p>
+                      🎙️ "Shout out to{" "}
+                      {purchases[0]?.user_name?.split(" ")[0] ||
+                        "the next claim"}{" "}
+                      for grabbing this bundle!"
+                    </p>
+                    <p>
+                      📢 "Only {liveStats.remaining_stock} left at this price!"
+                    </p>
+                    <p>
+                      ⭐ "
+                      {bundle.bonus_points > 0
+                        ? `Plus you earn ${bundle.bonus_points} bonus points!`
+                        : "Best deal on the stream!"}
+                      "
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* How to claim */}
+              <Card className="bg-black/30 backdrop-blur border-white/10">
+                <div className="px-4 text-center">
+                  <RefreshCw className="h-8 w-8 text-purple-400 mx-auto mb-2" />
+                  <h3 className="text-white font-bold">How to Claim</h3>
+                  <div className="text-xs text-white/80 mt-2 space-y-1">
+                    <p>1. Click the "CLAIM THIS BUNDLE" button</p>
+                    <p>2. Complete your purchase on the website</p>
+                    <p>3. See your name appear live on stream!</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold"
+                    onClick={() =>
+                      window.open(`/bundles/${bundleId}`, "_blank")
+                    }
+                  >
+                    View Bundle Page
+                  </Button>
+                  <div className="text-xs text-purple-300 mt-2">
+                    * Make sure to complete the purchase for your name to show
+                    up!
+                  </div>
+                  <div className="text-xs text-purple-300 mt-1">
+                    * Refresh the page if you don't see your claim immediately.
+                  </div>
                 </div>
               </Card>
             </div>
           </div>
         </div>
 
-        {/* Scrolling Ticker Bar - Bottom */}
+        {/* Scrolling Ticker Bar */}
         {purchases.length > 0 && (
           <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur border-t border-purple-500/30 py-2 overflow-hidden">
             <div className="whitespace-nowrap animate-marquee">
-              {purchases.slice(0, 15).map((purchase, idx) => (
+              {purchases.slice(0, 20).map((purchase, idx) => (
                 <span
                   key={idx}
                   className="inline-block mx-4 text-sm text-white"
@@ -924,8 +1076,7 @@ export default function LiveBundlePage() {
                   🎉 {purchase.user_name} just claimed {bundle.name}! 🎉
                 </span>
               ))}
-              {/* Duplicate for seamless loop */}
-              {purchases.slice(0, 15).map((purchase, idx) => (
+              {purchases.slice(0, 20).map((purchase, idx) => (
                 <span
                   key={`dup-${idx}`}
                   className="inline-block mx-4 text-sm text-white"
@@ -938,7 +1089,6 @@ export default function LiveBundlePage() {
         )}
       </div>
 
-      {/* CSS Animation */}
       <style jsx global>{`
         @keyframes marquee {
           0% {
@@ -949,7 +1099,7 @@ export default function LiveBundlePage() {
           }
         }
         .animate-marquee {
-          animation: marquee 20s linear infinite;
+          animation: marquee 25s linear infinite;
         }
       `}</style>
     </div>

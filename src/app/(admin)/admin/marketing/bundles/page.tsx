@@ -1,10 +1,10 @@
-// app/admin/bundles/page.tsx
+// app/admin/bundles/page.tsx - Complete redesigned version
+
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
-import { BundleService } from "@/lib/services/bundle-service";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -45,19 +37,22 @@ import {
   Package,
   Crown,
   Coins,
-  ExternalLink,
   TrendingUp,
   RefreshCw,
   Star,
   Eye,
   Loader2,
+  Zap,
+  Calendar,
+  Users,
+  ShoppingBag,
+  Copy,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import Link from "next/link";
-import { Bundle, BundleFormData } from "@/types/bundles";
+import { cn } from "@/lib/utils";
 import { ProductSearch } from "@/components/admin/product-search";
-import { formatPrice } from "@/lib/utils";
 
 const BUNDLE_TYPES = [
   {
@@ -100,20 +95,15 @@ const BUNDLE_TYPES = [
 
 export default function AdminBundlesPage() {
   const { supabase, profile } = useAuth();
-  const [bundles, setBundles] = useState<Bundle[]>([]);
+  const [bundles, setBundles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingBundle, setEditingBundle] = useState<Partial<BundleFormData>>(
-    {},
-  );
+  const [editingBundle, setEditingBundle] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
-  const [livePreview, setLivePreview] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const bundleService = new BundleService(supabase);
-
-  // Fetch bundles
   const fetchBundles = useCallback(async () => {
     try {
       setLoading(true);
@@ -132,7 +122,6 @@ export default function AdminBundlesPage() {
     }
   }, [supabase]);
 
-  // Fetch products for selection
   const fetchProducts = useCallback(async () => {
     const { data, error } = await supabase
       .from("products")
@@ -164,13 +153,11 @@ export default function AdminBundlesPage() {
     try {
       setSaving(true);
 
-      // Validate required fields
       if (!editingBundle.name || !editingBundle.bundle_type) {
         toast.error("Please fill in all required fields");
         return;
       }
 
-      // Build products JSON based on bundle type
       let productsJson = {};
 
       if (editingBundle.bundle_type === "curated") {
@@ -184,13 +171,19 @@ export default function AdminBundlesPage() {
           })),
         };
       } else if (editingBundle.bundle_type === "build_own") {
+        // FIX: For Build-Your-Own, we need to collect the selected product IDs
+        const productIds = selectedProducts.map((p) => p.id);
+
         productsJson = {
           type: "build_own",
           categories: editingBundle.eligible_categories,
-          product_pool: editingBundle.eligible_product_ids,
+          product_pool: productIds, // Save selected product IDs here
           min_items: editingBundle.min_items_to_select || 1,
           max_items: editingBundle.max_items_to_select || 5,
         };
+
+        // Also update eligible_product_ids for the database
+        editingBundle.eligible_product_ids = productIds;
       } else if (editingBundle.bundle_type === "tiered") {
         productsJson = {
           type: "tiered",
@@ -220,13 +213,18 @@ export default function AdminBundlesPage() {
           points_per_bundle: editingBundle.bonus_points,
         };
       } else if (editingBundle.bundle_type === "mystery") {
+        // For mystery bundles, collect product pool
+        const productIds = selectedProducts.map((p) => p.id);
+
         productsJson = {
           type: "mystery",
           min_value: editingBundle.mystery_products?.min_value || 0,
           max_value: editingBundle.mystery_products?.max_value || 0,
-          product_pool: editingBundle.eligible_product_ids || [],
+          product_pool: productIds,
           quantity: editingBundle.mystery_products?.quantity || 3,
         };
+
+        editingBundle.eligible_product_ids = productIds;
       }
 
       const bundleData = {
@@ -238,14 +236,12 @@ export default function AdminBundlesPage() {
 
       let error;
       if (editingBundle.id) {
-        // Update existing bundle
         const { error: updateError } = await supabase
           .from("bundles")
           .update(bundleData)
           .eq("id", editingBundle.id);
         error = updateError;
       } else {
-        // Create new bundle
         bundleData.created_by = profile?.id;
         bundleData.current_purchases = 0;
         const { error: insertError } = await supabase
@@ -272,13 +268,11 @@ export default function AdminBundlesPage() {
   };
 
   const handleDeleteBundle = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this bundle?")) return;
+    if (!confirm("Delete this bundle? This action cannot be undone.")) return;
 
     try {
       const { error } = await supabase.from("bundles").delete().eq("id", id);
-
       if (error) throw error;
-
       toast.success("Bundle deleted successfully");
       fetchBundles();
     } catch (error: any) {
@@ -287,51 +281,50 @@ export default function AdminBundlesPage() {
     }
   };
 
-  const toggleProductSelection = (product: any) => {
-    const exists = selectedProducts.find((p) => p.id === product.id);
-    if (exists) {
-      setSelectedProducts(selectedProducts.filter((p) => p.id !== product.id));
-    } else {
-      setSelectedProducts([...selectedProducts, { ...product, quantity: 1 }]);
-    }
+  const copyBundleId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+    toast.success("Bundle ID copied");
   };
 
-  const updateProductQuantity = (productId: string, quantity: number) => {
-    setSelectedProducts((prev) =>
-      prev.map((p) => (p.id === productId ? { ...p, quantity } : p)),
+  const getStatusBadge = (status: string) => {
+    const config: Record<
+      string,
+      {
+        label: string;
+        variant: "default" | "secondary" | "destructive" | "outline";
+      }
+    > = {
+      draft: { label: "Draft", variant: "secondary" },
+      active: { label: "Active", variant: "default" },
+      inactive: { label: "Inactive", variant: "outline" },
+      expired: { label: "Expired", variant: "destructive" },
+      archived: { label: "Archived", variant: "secondary" },
+    };
+    const c = config[status] || config.draft;
+    return <Badge variant={c.variant}>{c.label}</Badge>;
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("en-KE", {
+      style: "currency",
+      currency: "KES",
+      minimumFractionDigits: 0,
+    }).format(price);
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-12 flex justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      </div>
     );
-  };
-
-  const addTier = () => {
-    const tiers = editingBundle.tier_config || [];
-    setEditingBundle({
-      ...editingBundle,
-      tier_config: [...tiers, { min_items: tiers.length + 2, discount: 5 }],
-    });
-  };
-
-  const removeTier = (index: number) => {
-    const tiers = [...(editingBundle.tier_config || [])];
-    tiers.splice(index, 1);
-    setEditingBundle({ ...editingBundle, tier_config: tiers });
-  };
-
-  const openLivePreview = (bundleId: string) => {
-    setLivePreview(bundleId);
-    window.open(`/bundles/live/${bundleId}`, "_blank");
-  };
-
-  const getBundleTypeIcon = (type: string) => {
-    const found = BUNDLE_TYPES.find((t) => t.value === type);
-    if (found) {
-      const Icon = found.icon;
-      return <Icon className="h-4 w-4" />;
-    }
-    return <Package className="h-4 w-4" />;
-  };
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Bundles Management</h1>
@@ -566,13 +559,12 @@ export default function AdminBundlesPage() {
                 </div>
               </div>
 
-              {/* Products Selection - Enhanced with Search */}
+              {/* Products Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold border-b pb-2">
                   Products
                 </h3>
 
-                {/* Product Search Component */}
                 {editingBundle.bundle_type !== "mystery" && (
                   <ProductSearch
                     onProductSelect={(product) => {
@@ -583,7 +575,6 @@ export default function AdminBundlesPage() {
                   />
                 )}
 
-                {/* Selected Products List */}
                 {selectedProducts.length > 0 && (
                   <div className="border rounded-lg overflow-hidden">
                     <div className="bg-muted px-4 py-2 text-sm font-medium">
@@ -622,12 +613,16 @@ export default function AdminBundlesPage() {
                                 type="number"
                                 min="1"
                                 value={product.quantity}
-                                onChange={(e) =>
-                                  updateProductQuantity(
-                                    product.id,
-                                    parseInt(e.target.value),
-                                  )
-                                }
+                                onChange={(e) => {
+                                  const newQuantity = parseInt(e.target.value);
+                                  setSelectedProducts((prev) =>
+                                    prev.map((p) =>
+                                      p.id === product.id
+                                        ? { ...p, quantity: newQuantity }
+                                        : p,
+                                    ),
+                                  );
+                                }}
                                 className="w-20"
                               />
                             </div>
@@ -685,7 +680,7 @@ export default function AdminBundlesPage() {
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {editingBundle.eligible_product_ids?.map(
-                            (productId) => {
+                            (productId: string) => {
                               const product = products.find(
                                 (p) => p.id === productId,
                               );
@@ -703,7 +698,7 @@ export default function AdminBundlesPage() {
                                         ...editingBundle,
                                         eligible_product_ids:
                                           editingBundle.eligible_product_ids?.filter(
-                                            (id) => id !== productId,
+                                            (id: string) => id !== productId,
                                           ),
                                       })
                                     }
@@ -726,57 +721,83 @@ export default function AdminBundlesPage() {
                     Tiered Discounts
                   </h3>
                   <div className="space-y-3">
-                    {(editingBundle.tier_config || []).map((tier, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-4 p-3 border rounded-lg"
-                      >
-                        <div className="flex-1">
-                          <Label className="text-xs">Min Items</Label>
-                          <Input
-                            type="number"
-                            value={tier.min_items}
-                            onChange={(e) => {
-                              const newTiers = [
-                                ...(editingBundle.tier_config || []),
-                              ];
-                              newTiers[idx].min_items = parseInt(
-                                e.target.value,
-                              );
-                              setEditingBundle({
-                                ...editingBundle,
-                                tier_config: newTiers,
-                              });
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <Label className="text-xs">Discount (%)</Label>
-                          <Input
-                            type="number"
-                            value={tier.discount}
-                            onChange={(e) => {
-                              const newTiers = [
-                                ...(editingBundle.tier_config || []),
-                              ];
-                              newTiers[idx].discount = parseInt(e.target.value);
-                              setEditingBundle({
-                                ...editingBundle,
-                                tier_config: newTiers,
-                              });
-                            }}
-                          />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeTier(idx)}
+                    {(editingBundle.tier_config || []).map(
+                      (tier: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-4 p-3 border rounded-lg"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" onClick={addTier}>
+                          <div className="flex-1">
+                            <Label className="text-xs">Min Items</Label>
+                            <Input
+                              type="number"
+                              value={tier.min_items}
+                              onChange={(e) => {
+                                const newTiers = [
+                                  ...(editingBundle.tier_config || []),
+                                ];
+                                newTiers[idx].min_items = parseInt(
+                                  e.target.value,
+                                );
+                                setEditingBundle({
+                                  ...editingBundle,
+                                  tier_config: newTiers,
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <Label className="text-xs">Discount (%)</Label>
+                            <Input
+                              type="number"
+                              value={tier.discount}
+                              onChange={(e) => {
+                                const newTiers = [
+                                  ...(editingBundle.tier_config || []),
+                                ];
+                                newTiers[idx].discount = parseInt(
+                                  e.target.value,
+                                );
+                                setEditingBundle({
+                                  ...editingBundle,
+                                  tier_config: newTiers,
+                                });
+                              }}
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const newTiers = [
+                                ...(editingBundle.tier_config || []),
+                              ];
+                              newTiers.splice(idx, 1);
+                              setEditingBundle({
+                                ...editingBundle,
+                                tier_config: newTiers,
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ),
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const tiers = editingBundle.tier_config || [];
+                        setEditingBundle({
+                          ...editingBundle,
+                          tier_config: [
+                            ...tiers,
+                            { min_items: tiers.length + 2, discount: 5 },
+                          ],
+                        });
+                      }}
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       Add Tier
                     </Button>
@@ -816,6 +837,23 @@ export default function AdminBundlesPage() {
                         }
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Eligible Categories (comma-separated)</Label>
+                    <Input
+                      value={
+                        editingBundle.eligible_categories?.join(", ") || ""
+                      }
+                      onChange={(e) =>
+                        setEditingBundle({
+                          ...editingBundle,
+                          eligible_categories: e.target.value
+                            .split(",")
+                            .map((c) => c.trim()),
+                        })
+                      }
+                      placeholder="electronics, clothing, accessories"
+                    />
                   </div>
                 </div>
               )}
@@ -1131,197 +1169,247 @@ export default function AdminBundlesPage() {
         </Dialog>
       </div>
 
-      {/* Bundles Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Bundle</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Sales</TableHead>
-                <TableHead>Schedule</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-                  </TableCell>
-                </TableRow>
-              ) : bundles.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="text-center py-8 text-muted-foreground"
-                  >
-                    No bundles created yet. Click "Create Bundle" to get
-                    started.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                bundles.map((bundle) => (
-                  <TableRow key={bundle.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {bundle.name}
-                        {bundle.featured && (
-                          <Badge variant="default" className="bg-yellow-500">
-                            Featured
-                          </Badge>
-                        )}
-                        {bundle.badge_text && (
-                          <Badge
-                            style={{
-                              backgroundColor:
-                                bundle.badge_color?.split(" ")[0],
-                            }}
-                          >
-                            {bundle.badge_text}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {getBundleTypeIcon(bundle.bundle_type)}
-                        <span className="capitalize">
-                          {bundle.bundle_type.replace("_", " ")}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      KSH {bundle.base_price.toLocaleString()}
-                      {bundle.discounted_price && (
-                        <span className="text-xs text-muted-foreground line-through ml-1">
-                          {bundle.discounted_price.toLocaleString()}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {bundle.remaining_count !== null ? (
-                        <span
-                          className={
-                            bundle.remaining_count <= 10
-                              ? "text-orange-500"
-                              : ""
-                          }
-                        >
-                          {bundle.remaining_count} / {bundle.total_available}
-                        </span>
-                      ) : (
-                        "Unlimited"
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          bundle.status === "active"
-                            ? "default"
-                            : bundle.status === "draft"
-                              ? "outline"
-                              : "secondary"
-                        }
-                      >
-                        {bundle.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{bundle.current_purchases || 0}</TableCell>
-                    <TableCell className="text-sm">
-                      {bundle.starts_at ? (
-                        <div>
-                          {format(new Date(bundle.starts_at), "MMM d")}
-                          {bundle.ends_at &&
-                            ` → ${format(new Date(bundle.ends_at), "MMM d")}`}
-                        </div>
-                      ) : (
-                        "Always"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openLivePreview(bundle.id)}
-                          title="Live Preview"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            const { data } = await supabase
-                              .from("bundles")
-                              .select("*")
-                              .eq("id", bundle.id)
-                              .single();
-                            setEditingBundle(data);
-                            if (data.products?.items) {
-                              // Load selected products
-                              const productIds = data.products.items.map(
-                                (i: any) => i.product_id,
-                              );
-                              const { data: productsData } = await supabase
-                                .from("products")
-                                .select("*")
-                                .in("id", productIds);
-                              if (productsData) {
-                                setSelectedProducts(
-                                  productsData.map((p) => ({
-                                    ...p,
-                                    quantity:
-                                      data.products.items.find(
-                                        (i: any) => i.product_id === p.id,
-                                      )?.quantity || 1,
-                                  })),
-                                );
-                              }
-                            }
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteBundle(bundle.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Bundles Grid - Card Layout */}
+      {bundles.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No bundles yet</h3>
+          <p className="text-muted-foreground mb-4">
+            Create your first bundle to get started
+          </p>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Bundle
+              </Button>
+            </DialogTrigger>
+          </Dialog>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {bundles.map((bundle) => {
+            const typeConfig = BUNDLE_TYPES.find(
+              (t) => t.value === bundle.bundle_type,
+            );
+            const Icon = typeConfig?.icon || Package;
+            const isLowStock =
+              bundle.remaining_count !== null && bundle.remaining_count <= 10;
 
-      {/* Live Preview Modal */}
-      {livePreview && (
-        <Dialog open={!!livePreview} onOpenChange={() => setLivePreview(null)}>
-          <DialogContent className="max-w-6xl h-[80vh]">
-            <DialogHeader>
-              <DialogTitle>Live Bundle Preview</DialogTitle>
-              <DialogDescription>
-                This is how the bundle appears on the live stream display
-              </DialogDescription>
-            </DialogHeader>
-            <iframe
-              src={`/bundles/live/${livePreview}`}
-              className="w-full h-full rounded-lg"
-            />
-          </DialogContent>
-        </Dialog>
+            return (
+              <Card
+                key={bundle.id}
+                className="overflow-hidden hover:shadow-lg transition-all duration-300 group"
+              >
+                {/* Header with gradient */}
+                <div
+                  className={cn(
+                    "h-32 bg-gradient-to-r p-4 text-white relative",
+                    typeConfig?.color || "from-purple-500 to-pink-500",
+                  )}
+                >
+                  <div className="absolute top-4 right-4">
+                    {getStatusBadge(bundle.status)}
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className="h-5 w-5" />
+                    <span className="text-sm opacity-90 capitalize">
+                      {typeConfig?.label ||
+                        bundle.bundle_type.replace("_", " ")}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold line-clamp-1">
+                    {bundle.name}
+                  </h3>
+                  {bundle.badge_text && (
+                    <Badge className="absolute bottom-4 right-4 bg-white/20 text-white border-0">
+                      {bundle.badge_text}
+                    </Badge>
+                  )}
+                </div>
+
+                <CardContent className="p-4 space-y-4">
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {bundle.description || "No description provided"}
+                  </p>
+
+                  {/* Pricing */}
+                  <div className="flex items-baseline gap-2">
+                    {bundle.discounted_price ? (
+                      <>
+                        <span className="text-2xl font-bold text-primary">
+                          {formatPrice(bundle.discounted_price)}
+                        </span>
+                        <span className="text-sm text-muted-foreground line-through">
+                          {formatPrice(bundle.base_price)}
+                        </span>
+                        <Badge className="bg-green-500 text-white text-xs">
+                          Save{" "}
+                          {Math.round(
+                            ((bundle.base_price - bundle.discounted_price) /
+                              bundle.base_price) *
+                              100,
+                          )}
+                          %
+                        </Badge>
+                      </>
+                    ) : (
+                      <span className="text-2xl font-bold text-primary">
+                        {formatPrice(bundle.base_price)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Bundle Features */}
+                  <div className="flex flex-wrap gap-2">
+                    {bundle.bonus_points > 0 && (
+                      <Badge variant="outline" className="gap-1">
+                        <Star className="h-3 w-3" />+{bundle.bonus_points} pts
+                      </Badge>
+                    )}
+                    {bundle.points_required > 0 && (
+                      <Badge variant="outline" className="gap-1">
+                        <Coins className="h-3 w-3" />
+                        {bundle.points_required} pts
+                      </Badge>
+                    )}
+                    {bundle.is_live_exclusive && (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 bg-red-500/10 text-red-500 border-red-500/30"
+                      >
+                        <Zap className="h-3 w-3" />
+                        Live Exclusive
+                      </Badge>
+                    )}
+                    {bundle.min_items_to_select > 1 && (
+                      <Badge variant="outline" className="gap-1">
+                        <Package className="h-3 w-3" />
+                        Choose {bundle.min_items_to_select}-
+                        {bundle.max_items_to_select}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Stock Status */}
+                  {bundle.total_available !== null && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Stock:</span>
+                      <span
+                        className={cn(
+                          isLowStock ? "text-orange-500 font-medium" : "",
+                        )}
+                      >
+                        {bundle.remaining_count ?? bundle.total_available} /{" "}
+                        {bundle.total_available}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Schedule */}
+                  {bundle.starts_at && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        {format(new Date(bundle.starts_at), "MMM d")}
+                        {bundle.ends_at &&
+                          ` → ${format(new Date(bundle.ends_at), "MMM d")}`}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Sales Info */}
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <ShoppingBag className="h-3 w-3 text-muted-foreground" />
+                      <span>{bundle.current_purchases || 0} sold</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-3 w-3 text-muted-foreground" />
+                      <span>Limit {bundle.max_per_customer}</span>
+                    </div>
+                  </div>
+
+                  {/* Bundle ID */}
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="font-mono truncate">
+                      ID: {bundle.id.slice(0, 8)}...
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => copyBundleId(bundle.id)}
+                    >
+                      {copiedId === bundle.id ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() =>
+                        window.open(`/bundles/live/${bundle.id}`, "_blank")
+                      }
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Live View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const { data } = await supabase
+                          .from("bundles")
+                          .select("*")
+                          .eq("id", bundle.id)
+                          .single();
+                        setEditingBundle(data);
+                        if (data.products?.items) {
+                          const productIds = data.products.items.map(
+                            (i: any) => i.product_id,
+                          );
+                          const { data: productsData } = await supabase
+                            .from("products")
+                            .select("*")
+                            .in("id", productIds);
+                          if (productsData) {
+                            setSelectedProducts(
+                              productsData.map((p) => ({
+                                ...p,
+                                quantity:
+                                  data.products.items.find(
+                                    (i: any) => i.product_id === p.id,
+                                  )?.quantity || 1,
+                              })),
+                            );
+                          }
+                        }
+                        setDialogOpen(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteBundle(bundle.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
     </div>
   );

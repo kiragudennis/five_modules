@@ -373,7 +373,7 @@ export default function SpinLivePage() {
     const interval = setInterval(() => {
       fetchParticipants();
       fetchRecentWinners();
-    }, 30000);
+    }, 60000);
     return () => clearInterval(interval);
   }, [gameId, fetchParticipants, fetchRecentWinners]);
 

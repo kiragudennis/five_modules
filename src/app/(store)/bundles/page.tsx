@@ -68,13 +68,14 @@ export default function BundlesPage() {
     try {
       setLoading(true);
       const data = await bundleService.getActiveBundles();
+      console.log("Fetched bundles:", data);
       setBundles(data);
     } catch (error) {
       console.error("Error fetching bundles:", error);
     } finally {
       setLoading(false);
     }
-  }, [bundleService]);
+  }, []);
 
   useEffect(() => {
     fetchBundles();

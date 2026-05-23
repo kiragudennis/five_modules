@@ -390,15 +390,15 @@ export default function SpinGamePage() {
         usePoints ? "points" : "free",
       );
 
-      // 3. Set the winning segment (this is where the wheel will stop)
+      // 3. Set the winning segment FIRST (before spinning)
       setPrizeNumber(result.segment_index);
 
-      // 4. Start spinning animation
-      setMustSpin(true);
+      // 4. Small delay to ensure prize number is set, then start spinning
+      setTimeout(() => {
+        setMustSpin(true);
+      }, 50);
 
-      // 5. When wheel stops, update UI
-      // The onStopSpinning callback will handle cleanup
-
+      // 5. Update UI after spin completes (onStopSpinning will handle cleanup)
       setLastWin({
         prize: result.prizeDisplay,
         type: result.prize_type,
@@ -406,7 +406,7 @@ export default function SpinGamePage() {
 
       // Play sound
       if (soundEnabled && game.play_sounds) {
-        const audio = new Audio("/sounds/win-chime.mp3");
+        const audio = new Audio("/sounds/claim-chime.mp3");
         audio.volume = 0.3;
         audio.play().catch(() => {});
       }

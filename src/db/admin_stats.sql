@@ -70,7 +70,7 @@ BEGIN
       'completed', (SELECT COUNT(*) FROM challenge_actions WHERE action_type = 'referral_completed'),
       'pending', 0
     ),
-    'points_awarded', COALESCE(SUM(points_awarded), 0)
+    'points_awarded', COALESCE(SUM(participation_points), 0)
   ) INTO v_challenges
   FROM challenges;
 
@@ -78,7 +78,7 @@ BEGIN
   SELECT jsonb_build_object(
     'total', COUNT(*),
     'active', COUNT(*) FILTER (WHERE status = 'open'),
-    'entries', COALESCE(SUM(entry_count), 0),
+    'entries', (SELECT COUNT(*) FROM draw_entries),
     'winners', (SELECT COUNT(*) FROM draw_winners WHERE claim_status = 'claimed'),
     'pending_draws', COUNT(*) FILTER (WHERE status = 'closed' AND draw_time > NOW())
   ) INTO v_draws
@@ -89,7 +89,7 @@ BEGIN
     'total', COUNT(*),
     'active', COUNT(*) FILTER (WHERE status = 'active' AND ends_at > NOW()),
     'units_sold', COALESCE(SUM(total_quantity - remaining_quantity), 0),
-    'revenue', COALESCE(SUM(revenue), 0),
+    'revenue', COALESCE(SUM(deal_price * (total_quantity - remaining_quantity)), 0),
     'expiring_soon', COUNT(*) FILTER (
       WHERE status = 'active' 
       AND ends_at > NOW() 

@@ -24,6 +24,12 @@ import {
   BookOpen,
   Dog,
   ShoppingCart,
+  Gift,
+  Crown,
+  Package,
+  TrendingUp,
+  RefreshCcw,
+  Star,
 } from "lucide-react";
 
 export const scrollableCategories = [
@@ -279,6 +285,51 @@ export const scrollableCategories = [
 
 // Export both for backward compatibility during migration
 export const lightingCategories = scrollableCategories;
+
+export const BUNDLE_CONFIG = {
+  mystery: {
+    icon: Gift,
+    label: "Mystery Bundle",
+    description: "Surprise package with guaranteed value",
+    color: "from-purple-500 to-pink-500",
+    badge: "🎁 Mystery Box",
+  },
+  curated: {
+    icon: Crown,
+    label: "Curated Collection",
+    description: "Hand-picked by our experts",
+    color: "from-amber-500 to-yellow-500",
+    badge: "✨ Curated",
+  },
+  build_own: {
+    icon: Package,
+    label: "Build Your Own",
+    description: "Choose the items you want",
+    color: "from-blue-500 to-cyan-500",
+    badge: "🛠️ Customizable",
+  },
+  tiered: {
+    icon: TrendingUp,
+    label: "Tiered Savings",
+    description: "Save more when you buy more",
+    color: "from-green-500 to-emerald-500",
+    badge: "📈 Tiered Pricing",
+  },
+  subscription: {
+    icon: RefreshCcw,
+    label: "Subscribe & Save",
+    description: "Recurring deliveries",
+    color: "from-indigo-500 to-purple-500",
+    badge: "🔄 Recurring",
+  },
+  bonus_points: {
+    icon: Star,
+    label: "Points Bundle",
+    description: "Earn bonus loyalty points",
+    color: "from-yellow-500 to-orange-500",
+    badge: "⭐ Points Bonus",
+  },
+};
 
 // If you need to keep the icon components mapping separately
 export const categoryIcons = {

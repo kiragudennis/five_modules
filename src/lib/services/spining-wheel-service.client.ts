@@ -267,48 +267,4 @@ export class SpinningWheelClientService {
       return [];
     }
   }
-
-  /**
-   * Subscribe to real-time participant updates
-   * Returns an unsubscribe function
-   */
-  subscribeToParticipants(
-    gameId: string,
-    onNewParticipant: (participant: any) => void,
-  ) {
-    const channel = this.supabase
-      .channel(`participants-${gameId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "spin_attempts",
-          filter: `game_id=eq.${gameId}`,
-        },
-        async (payload) => {
-          // Fetch user details for the new participant
-          const { data: userData } = await this.supabase
-            .from("users")
-            .select("id, full_name")
-            .eq("id", payload.new.user_id)
-            .single();
-
-          if (userData) {
-            onNewParticipant({
-              id: userData.id,
-              name: userData.full_name || "Anonymous",
-              avatar: (userData.full_name?.charAt(0) || "?").toUpperCase(),
-              first_spin_at: payload.new.created_at,
-              spin_count: 1,
-            });
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }
 }

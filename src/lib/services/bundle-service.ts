@@ -13,12 +13,13 @@ export class BundleService {
       .from("bundles")
       .select("*")
       .eq("status", "active")
-      .lte("starts_at", new Date().toISOString())
-      .gte("ends_at", new Date().toISOString())
       .order("featured", { ascending: false })
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error fetching active bundles:", error);
+      return [];
+    }
     return data || [];
   }
 

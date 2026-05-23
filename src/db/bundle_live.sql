@@ -236,11 +236,11 @@ ALTER TABLE bundle_live_ticker ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bundle_reveals ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+
+drop policy if exists "Anyone can view active bundles" on bundles;
 CREATE POLICY "Anyone can view active bundles" ON bundles
     FOR SELECT USING (
-        status = 'active' 
-        AND (starts_at IS NULL OR starts_at <= NOW()) 
-        AND (ends_at IS NULL OR ends_at >= NOW())
+        status = 'active'
     );
 
 CREATE POLICY "Users can view their own purchases" ON bundle_purchases
