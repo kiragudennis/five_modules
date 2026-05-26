@@ -34,28 +34,13 @@ import {
   ShoppingBag,
   Share2,
   CheckCircle,
+  Eye,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { formatDistanceToNowStrict } from "date-fns";
 import confetti from "canvas-confetti";
 import { CompactCountdown } from "@/components/ui/count-down";
-
-interface Draw {
-  id: string;
-  name: string;
-  prize_name: string;
-  prize_description: string;
-  prize_value: number;
-  prize_image_url: string;
-  status: string;
-  entry_starts_at: string;
-  entry_ends_at: string;
-  draw_time: string;
-  entry_config: any;
-  max_entries_total: number | null;
-  consolation_points_amount: number;
-  theme_color: string;
-}
+import { Draw } from "@/types/draws";
 
 interface TickerEntry {
   id: string;
@@ -75,7 +60,7 @@ type DrawPhase = "entry_collection" | "entries_locked" | "winner_reveal";
 
 export default function DrawLivePage() {
   const { drawId } = useParams<{ drawId: string }>();
-  const { supabase } = useAuth();
+  const { supabase, profile } = useAuth();
   const [draw, setDraw] = useState<Draw | null>(null);
   const [phase, setPhase] = useState<DrawPhase>("entry_collection");
   const [ticker, setTicker] = useState<TickerEntry[]>([]);
@@ -95,6 +80,8 @@ export default function DrawLivePage() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [countdownProgress, setCountdownProgress] = useState(100);
   const [participantSet, setParticipantSet] = useState<Set<string>>(new Set());
+  const [liveEntryAwarded, setLiveEntryAwarded] = useState(false);
+  const [showLiveEntryToast, setShowLiveEntryToast] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -102,6 +89,33 @@ export default function DrawLivePage() {
   const drawsService = new DrawsService(supabase);
   const isMountedRef = useRef(true);
   const channelRef = useRef<any>(null);
+
+  // Add effect to award live stream entry when viewing the live page
+  useEffect(() => {
+    const awardLiveStreamEntry = async () => {
+      if (!profile?.id || !drawId || liveEntryAwarded) return;
+
+      // Only award if draw is open
+      if (draw?.status === "open") {
+        try {
+          const result = await drawsService.awardLiveStreamEntry(drawId);
+          if (result.success) {
+            setLiveEntryAwarded(true);
+            setShowLiveEntryToast(true);
+            // Refresh to show updated entries
+            loadAllData();
+            setTimeout(() => setShowLiveEntryToast(false), 5000);
+          }
+        } catch (error) {
+          console.error("Error awarding live entry:", error);
+        }
+      }
+    };
+
+    if (draw) {
+      awardLiveStreamEntry();
+    }
+  }, [draw, drawId, profile?.id, drawsService, liveEntryAwarded]);
 
   // Single function to load all data in one go
   const loadAllData = useCallback(async () => {
@@ -477,14 +491,6 @@ export default function DrawLivePage() {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-KE", {
-      style: "currency",
-      currency: "KES",
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
-
   const getEntryMethodIcon = (method: string) => {
     switch (method) {
       case "purchase":
@@ -520,7 +526,7 @@ export default function DrawLivePage() {
   return (
     <div
       ref={containerRef}
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 overflow-hidden"
+      className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 overflow-hidden relative"
     >
       {/* Audio */}
       <audio ref={audioRef} src="/sounds/entry-chime.mp3" preload="auto" />
@@ -529,7 +535,43 @@ export default function DrawLivePage() {
         src="/sounds/winner-fanfare.mp3"
         preload="auto"
       />
-
+      {showLiveEntryToast && (
+        <motion.div
+          initial={{ x: 100, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          exit={{ x: 100, opacity: 0 }}
+          className="fixed bottom-24 right-4 z-50"
+        >
+          <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 animate-pulse" />
+              <div>
+                <p className="text-sm font-semibold">🎉 Live Stream Bonus!</p>
+                <p className="text-xs opacity-90">
+                  You received +5 entries for watching!
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+      // Add a badge in the stats bar to show live entry status
+      <div className="flex items-center gap-2 text-white/80 text-sm">
+        {liveEntryAwarded ? (
+          <Badge className="bg-green-500/20 text-green-400 border-0 gap-1">
+            <CheckCircle className="h-3 w-3" />
+            Live Entry Claimed
+          </Badge>
+        ) : (
+          profile &&
+          draw?.status === "open" && (
+            <Badge className="bg-purple-500/20 text-purple-400 border-0 animate-pulse gap-1">
+              <Eye className="h-3 w-3" />
+              Watching = Bonus Entry!
+            </Badge>
+          )
+        )}
+      </div>
       {/* OBS Metadata */}
       <div className="hidden obs-metadata">
         <div data-title={draw.name} />
@@ -538,7 +580,6 @@ export default function DrawLivePage() {
         <div data-participants={totalParticipants} />
         <div data-phase={phase} />
       </div>
-
       {/* Celebration Overlay */}
       <AnimatePresence>
         {showCelebration && (
@@ -562,7 +603,6 @@ export default function DrawLivePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 py-4 px-6 text-white">
         <div className="container mx-auto">
@@ -618,7 +658,6 @@ export default function DrawLivePage() {
           </div>
         </div>
       </div>
-
       {/* Phase Indicator */}
       <div className="bg-black/50 backdrop-blur border-b border-white/10 py-2 px-6">
         <div className="container mx-auto">
@@ -668,7 +707,6 @@ export default function DrawLivePage() {
           </div>
         </div>
       </div>
-
       {/* Stats Bar */}
       <div className="bg-black/40 backdrop-blur border-b border-white/10 py-3 px-6">
         <div className="container mx-auto">
@@ -696,7 +734,6 @@ export default function DrawLivePage() {
           </div>
         </div>
       </div>
-
       <div className="container mx-auto px-6 py-8">
         {/* PHASE 1: Entry Collection */}
         {isEntryPhase && (
@@ -729,7 +766,7 @@ export default function DrawLivePage() {
                   <p className="text-purple-300 mt-2">
                     {draw.prize_description}
                   </p>
-                  {draw.prize_value > 0 && (
+                  {draw.prize_value && draw.prize_value > 0 && (
                     <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/20 border border-yellow-500/50">
                       <Trophy className="h-4 w-4 text-yellow-400" />
                       <span className="text-yellow-400 font-bold">
@@ -791,6 +828,45 @@ export default function DrawLivePage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Live Stream Bonus Card */}
+              {draw.entry_calculation?.live_stream?.enabled &&
+                !liveEntryAwarded &&
+                profile && (
+                  <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+                    <CardContent className="p-4 text-center">
+                      <Eye className="h-8 w-8 mx-auto mb-2 animate-pulse" />
+                      <h3 className="font-bold">🎁 Live Stream Bonus!</h3>
+                      <p className="text-sm opacity-90 mt-1">
+                        You're watching! You'll receive{" "}
+                        {draw.entry_config?.live_stream?.entries_per_email || 5}{" "}
+                        bonus entries!
+                      </p>
+                      {!liveEntryAwarded && (
+                        <div className="mt-2">
+                          <div className="flex items-center justify-center gap-1 text-xs">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Processing your bonus...</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+              {liveEntryAwarded && (
+                <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30">
+                  <CardContent className="p-4 text-center">
+                    <CheckCircle className="h-8 w-8 text-green-400 mx-auto mb-2" />
+                    <h3 className="font-bold text-green-400">
+                      ✓ Bonus Claimed!
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You received your live stream bonus entries!
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Leaderboard Preview */}
               {leaderboard.length > 0 && (
@@ -1016,35 +1092,57 @@ export default function DrawLivePage() {
             )}
 
             {/* Consolation Prize Info */}
-            {draw.consolation_points_amount > 0 && (
-              <Card className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30">
-                <CardContent className="p-4 text-center">
-                  <Heart className="h-5 w-5 text-pink-400 mx-auto mb-1" />
-                  <p className="text-sm text-purple-300">
-                    🎁 All participants received{" "}
-                    {draw.consolation_points_amount} loyalty points!
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            {draw.consolation_points_amount &&
+              draw.consolation_points_amount > 0 && (
+                <Card className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-green-500/30">
+                  <CardContent className="p-4 text-center">
+                    <Heart className="h-5 w-5 text-pink-400 mx-auto mb-1" />
+                    <p className="text-sm text-purple-300">
+                      🎁 All participants received{" "}
+                      {draw.consolation_points_amount} loyalty points!
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
           </div>
         )}
       </div>
-
       {/* Scrolling Ticker - Only during entry collection */}
       {isEntryPhase && ticker.length > 0 && (
         <div className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur border-t border-purple-500/30 py-2 overflow-hidden">
           <div className="whitespace-nowrap animate-marquee">
             {ticker.slice(0, 30).map((entry, idx) => (
               <span key={idx} className="inline-block mx-4 text-sm text-white">
-                🎉 {entry.user_name} earned {entry.entry_count} entry (
-                {entry.entry_method}) 🎉
+                {entry.entry_method === "purchase" && (
+                  <>
+                    💰 {entry.user_name} purchased KES{" "}
+                    {(entry.entry_count / 0.05).toLocaleString()} worth - +
+                    {entry.entry_count} entries!
+                  </>
+                )}
+                {entry.entry_method === "referral" && (
+                  <>
+                    🤝 {entry.user_name} referred a friend - +
+                    {entry.entry_count} entries!
+                  </>
+                )}
+                {entry.entry_method === "social_share" && (
+                  <>
+                    📱 {entry.user_name} shared on social media - +
+                    {entry.entry_count} entries!
+                  </>
+                )}
+                {entry.entry_method === "live_stream_entry" && (
+                  <>
+                    🎥 {entry.user_name} joined the live stream - +
+                    {entry.entry_count} entries!
+                  </>
+                )}
               </span>
             ))}
           </div>
         </div>
       )}
-
       {/* Floating Entry Alert */}
       {lastEntry && isEntryPhase && (
         <motion.div
@@ -1068,7 +1166,6 @@ export default function DrawLivePage() {
           </Card>
         </motion.div>
       )}
-
       <style jsx global>{`
         @keyframes marquee {
           0% {

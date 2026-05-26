@@ -249,99 +249,22 @@ export class DrawsService {
   }
 
   /**
-   * Add live stream email entry
+   * Award live stream entry to authenticated user (once per draw)
    */
-  async addLiveStreamEntry(
+  async awardLiveStreamEntry(
     drawId: string,
-    email: string,
-    name?: string,
-  ): Promise<{ entries: number; userCreated: boolean; userId?: string }> {
-    // Check if already entered
-    const { data: existing } = await this.supabase
-      .from("draw_live_entries")
-      .select("id, user_id, is_converted")
-      .eq("draw_id", drawId)
-      .eq("email", email)
-      .maybeSingle();
-
-    if (existing?.is_converted) {
-      return { entries: 0, userCreated: false };
-    }
-
-    // Find or create user
-    let userId: string | null = existing?.user_id || null;
-    let userCreated = false;
-
-    if (!userId) {
-      const { data: existingUser } = await this.supabase
-        .from("users")
-        .select("id")
-        .eq("email", email)
-        .maybeSingle();
-
-      if (existingUser) {
-        userId = existingUser.id;
-      } else {
-        // Create temporary user (will need to complete registration later)
-        const { data: newUser, error } =
-          await this.supabase.auth.admin.createUser({
-            email,
-            email_confirm: true,
-            user_metadata: { full_name: name || email.split("@")[0] },
-          });
-        if (error) throw error;
-        userId = newUser.user.id;
-        userCreated = true;
-      }
-    }
-
-    // Record live entry
-    await this.supabase.from("draw_live_entries").upsert(
-      {
-        draw_id: drawId,
-        email,
-        full_name: name,
-        user_id: userId,
-        entered_at: new Date().toISOString(),
-      },
-      { onConflict: "draw_id,email" },
-    );
-
-    // Get draw config
-    const { data: draw } = await this.supabase
-      .from("draws")
-      .select("entry_config")
-      .eq("id", drawId)
-      .single();
-
-    const entries = draw?.entry_config?.live_stream?.entries_per_email || 1;
-
-    // Add entries
-    const { data: entry } = await this.supabase
-      .from("draw_entries")
-      .insert({
-        draw_id: drawId,
-        user_id: userId,
-        entry_count: entries,
-        entry_method: "live_stream_entry",
-        metadata: { email, source: "live_broadcast" },
-      })
-      .select()
-      .single();
-
-    await this.createTickets(drawId, userId!, entry.id, entries);
-
-    // Add to live ticker
-    await this.supabase.from("draw_live_ticker").insert({
-      draw_id: drawId,
-      user_name: name || email.split("@")[0],
-      entry_count: entries,
-      entry_method: "live_stream",
+  ): Promise<{ success: boolean; entries_awarded: number; message: string }> {
+    const { data, error } = await this.supabase.rpc("award_live_stream_entry", {
+      p_draw_id: drawId,
     });
 
-    return { entries, userCreated, userId: userId! };
+    if (error) {
+      console.error("Error awarding live stream entry:", error);
+      return { success: false, entries_awarded: 0, message: error.message };
+    }
+
+    return data;
   }
-  // src/lib/services/draws-service.ts - Add this method
 
   /**
    * Get all draws with aggregated stats in one query

@@ -59,6 +59,28 @@ ALTER TABLE draws ADD COLUMN IF NOT EXISTS consolation_points_amount integer DEF
 -- Enhanced draws table with advanced features
 ALTER TABLE draws ADD COLUMN IF NOT EXISTS redraw_count INTEGER DEFAULT 0;
 ALTER TABLE draws ADD COLUMN IF NOT EXISTS winner_announcement_text TEXT;
+-- Add entry calculation configuration to draws
+ALTER TABLE draws ADD COLUMN IF NOT EXISTS entry_calculation JSONB DEFAULT '{
+  "purchase": {
+    "enabled": true,
+    "entries_per_ksh": 0.05,
+    "min_purchase": 1000,
+    "max_entries_per_order": 5000
+  },
+  "referral": {
+    "enabled": true,
+    "entries_per_referral": 100,
+    "bonus_for_first_referral": 50
+  },
+  "social_share": {
+    "enabled": true,
+    "entries_per_share": 10
+  },
+  "live_stream": {
+    "enabled": true,
+    "entries_per_entry": 5
+  }
+}'::jsonb;
 
 -- Draw entries
 CREATE TABLE IF NOT EXISTS draw_entries (
@@ -127,6 +149,50 @@ CREATE TABLE IF NOT EXISTS draw_winners (
     created_at timestamptz DEFAULT now()
 );
 
+-- Add claim tracking to draw_winners table
+ALTER TABLE draw_winners 
+ADD COLUMN IF NOT EXISTS claim_details JSONB DEFAULT '{}'::jsonb,
+ADD COLUMN IF NOT EXISTS shipping_address TEXT,
+ADD COLUMN IF NOT EXISTS shipping_city TEXT,
+ADD COLUMN IF NOT EXISTS shipping_county TEXT,
+ADD COLUMN IF NOT EXISTS shipping_postal_code TEXT,
+ADD COLUMN IF NOT EXISTS shipping_phone TEXT,
+ADD COLUMN IF NOT EXISTS special_instructions TEXT,
+ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS delivery_expected_by TIMESTAMPTZ;
+
+-- Create claim verification tokens
+CREATE TABLE IF NOT EXISTS draw_claim_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    draw_id UUID REFERENCES draws(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create function to generate claim token
+CREATE OR REPLACE FUNCTION generate_claim_token(p_draw_id UUID, p_user_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_token TEXT;
+BEGIN
+    v_token := encode(gen_random_bytes(32), 'base64');
+    v_token := replace(v_token, '/', '_');
+    v_token := replace(v_token, '+', '-');
+    v_token := substring(v_token, 1, 32);
+    
+    INSERT INTO draw_claim_tokens (draw_id, user_id, token, expires_at)
+    VALUES (p_draw_id, p_user_id, v_token, NOW() + INTERVAL '7 days');
+    
+    RETURN v_token;
+END;
+$$;
+
 -- Indexes
 CREATE INDEX idx_draws_status_dates ON draws(status, entry_starts_at, entry_ends_at);
 CREATE INDEX idx_draw_entries_draw_user ON draw_entries(draw_id, user_id);
@@ -150,6 +216,11 @@ ALTER TABLE draws ADD COLUMN draw_group_id UUID REFERENCES draw_groups(id);
 ALTER TABLE draw_entries DROP CONSTRAINT IF EXISTS draw_entries_entry_method_check;
 ALTER TABLE draw_entries ADD CONSTRAINT draw_entries_entry_method_check 
     CHECK (entry_method IN ('purchase', 'referral', 'social_share', 'live_stream_entry', 'loyalty_bonus', 'manual', 'points_redeem', 'product_review', 'newsletter_signup'));
+-- Add columns to track draw entries from this order
+ALTER TABLE orders 
+ADD COLUMN IF NOT EXISTS draw_entries_awarded INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS draw_id UUID REFERENCES draws(id),
+ADD COLUMN IF NOT EXISTS draw_entry_details JSONB DEFAULT '{}'::jsonb;
 
 -- Social share tracking table
 CREATE TABLE draw_social_shares (
@@ -409,3 +480,413 @@ $$;
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION get_draws_with_stats(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_draws_with_stats(UUID) TO anon;
+
+-- Function to award draw entries based on purchase
+-- Function to award draw entries based on purchase (Updated with order tracking)
+CREATE OR REPLACE FUNCTION award_draw_entries_on_purchase(
+  p_order_id UUID
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_order RECORD;
+  v_user_id UUID;
+  v_draw RECORD;
+  v_entry_count INTEGER := 0;
+  v_entries_awarded INTEGER := 0;
+  v_result JSON;
+BEGIN
+  -- Get order details
+  SELECT * INTO v_order
+  FROM orders
+  WHERE id = p_order_id AND payment_status = 'completed';
+  
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'Order not found or not paid');
+  END IF;
+  
+  -- Skip if draw entries already awarded for this order
+  IF v_order.draw_entries_awarded > 0 THEN
+    RETURN json_build_object('success', false, 'error', 'Draw entries already awarded', 'already_awarded', true);
+  END IF;
+  
+  v_user_id := v_order.user_id;
+  
+  -- Find the best draw for this user
+  -- Priority: Draws the user has already entered, then draws closing soonest
+  SELECT d.* INTO v_draw
+  FROM draws d
+  WHERE d.status = 'open'
+    AND d.entry_starts_at <= NOW()
+    AND d.entry_ends_at >= NOW()
+    AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
+  ORDER BY 
+    CASE WHEN EXISTS (
+      SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = v_user_id
+    ) THEN 1 ELSE 2 END,
+    d.entry_ends_at ASC
+  LIMIT 1;
+  
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'No active draws accepting purchase entries');
+  END IF;
+  
+  -- Calculate entries based on order amount
+  v_entry_count := FLOOR(
+    v_order.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric
+  );
+  
+  -- Apply minimum purchase requirement
+  IF v_order.total_amount < (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
+    RETURN json_build_object('success', false, 'error', 'Order amount below minimum threshold');
+  END IF;
+  
+  -- Apply max entries per order
+  v_entry_count := LEAST(
+    v_entry_count,
+    (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+  );
+  
+  IF v_entry_count <= 0 THEN
+    RETURN json_build_object('success', false, 'error', 'Entry count too low');
+  END IF;
+  
+  -- Add entries to draw
+  INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
+  VALUES (v_draw.id, v_user_id, v_entry_count, 'purchase', p_order_id::text, jsonb_build_object(
+    'order_id', p_order_id,
+    'order_amount', v_order.total_amount,
+    'order_number', v_order.order_number,
+    'awarded_at', NOW()
+  ));
+  
+  -- Create individual tickets
+  FOR i IN 1..v_entry_count LOOP
+    INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
+    VALUES (v_draw.id, v_user_id, currval('draw_entries_id_seq'), i);
+  END LOOP;
+  
+  -- Add to live ticker
+  INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+  SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
+  FROM users u WHERE u.id = v_user_id;
+  
+  v_entries_awarded := v_entry_count;
+  
+  -- Update order with draw entry information
+  UPDATE orders
+  SET 
+    draw_entries_awarded = v_entries_awarded,
+    draw_id = v_draw.id,
+    draw_entry_details = jsonb_build_object(
+      'draw_name', v_draw.name,
+      'entries_awarded', v_entries_awarded,
+      'calculation', jsonb_build_object(
+        'order_amount', v_order.total_amount,
+        'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
+        'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
+        'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+      ),
+      'awarded_at', NOW()
+    ),
+    metadata = jsonb_set(
+      COALESCE(metadata, '{}'::jsonb),
+      '{draw_entries}',
+      jsonb_build_object(
+        'draw_id', v_draw.id,
+        'draw_name', v_draw.name,
+        'entries_awarded', v_entries_awarded,
+        'awarded_at', NOW()
+      )
+    )
+  WHERE id = p_order_id;
+  
+  RETURN json_build_object(
+    'success', true,
+    'draw_id', v_draw.id,
+    'draw_name', v_draw.name,
+    'entries_awarded', v_entries_awarded,
+    'order_id', p_order_id,
+    'order_number', v_order.order_number
+  );
+END;
+$$;
+
+-- Function to award draw entries on referral conversion
+CREATE OR REPLACE FUNCTION award_draw_entries_on_referral(
+  p_referral_id UUID,
+  p_conversion_type TEXT
+)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_referral RECORD;
+  v_draw RECORD;
+  v_entry_count INTEGER := 0;
+  v_entries_awarded INTEGER := 0;
+BEGIN
+  -- Get referral details
+  SELECT * INTO v_referral
+  FROM referrals
+  WHERE id = p_referral_id;
+  
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'Referral not found');
+  END IF;
+  
+  -- Find the best draw for the referrer
+  SELECT d.* INTO v_draw
+  FROM draws d
+  WHERE d.status = 'open'
+    AND d.entry_starts_at <= NOW()
+    AND d.entry_ends_at >= NOW()
+    AND (d.entry_calculation->'referral'->>'enabled')::boolean = true
+  ORDER BY d.entry_ends_at ASC
+  LIMIT 1;
+  
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'No active draws accepting referral entries');
+  END IF;
+  
+  -- Calculate entries based on referral type
+  IF p_conversion_type = 'signup' THEN
+    v_entry_count := (v_draw.entry_calculation->'referral'->>'entries_per_referral')::integer;
+    
+    -- Bonus for first referral
+    SELECT COUNT(*) INTO v_entry_count
+    FROM referrals r
+    WHERE r.referrer_id = v_referral.referrer_id
+      AND r.status = 'completed'
+      AND r.id != p_referral_id;
+    
+    IF v_entry_count = 0 THEN
+      v_entry_count := v_entry_count + (v_draw.entry_calculation->'referral'->>'bonus_for_first_referral')::integer;
+    END IF;
+    
+  ELSIF p_conversion_type = 'first_purchase' THEN
+    v_entry_count := (v_draw.entry_calculation->'referral'->>'entries_per_purchase')::integer;
+  ELSE
+    RETURN json_build_object('success', false, 'error', 'Invalid conversion type');
+  END IF;
+  
+  IF v_entry_count <= 0 THEN
+    RETURN json_build_object('success', false, 'error', 'Entry count too low');
+  END IF;
+  
+  -- Add entries to draw for referrer
+  INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
+  VALUES (v_draw.id, v_referral.referrer_id, v_entry_count, 'referral', p_referral_id::text, jsonb_build_object(
+    'referral_id', p_referral_id,
+    'conversion_type', p_conversion_type,
+    'referred_user_id', v_referral.referred_user_id
+  ));
+  
+  -- Create individual tickets
+  FOR i IN 1..v_entry_count LOOP
+    INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
+    VALUES (v_draw.id, v_referral.referrer_id, currval('draw_entries_id_seq'), i);
+  END LOOP;
+  
+  -- Add to live ticker
+  INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+  SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'referral'
+  FROM users u WHERE u.id = v_referral.referrer_id;
+  
+  -- Update referral record
+  UPDATE referrals
+  SET draw_entries_awarded = TRUE,
+      draw_entries_count = v_entry_count,
+      draw_id = v_draw.id
+  WHERE id = p_referral_id;
+  
+  v_entries_awarded := v_entry_count;
+  
+  RETURN json_build_object(
+    'success', true,
+    'draw_id', v_draw.id,
+    'draw_name', v_draw.name,
+    'entries_awarded', v_entries_awarded
+  );
+END;
+$$;
+
+-- Trigger on orders when payment completes
+CREATE OR REPLACE FUNCTION trigger_award_draw_entries_on_order()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NEW.payment_status = 'completed' AND (OLD.payment_status IS DISTINCT FROM 'completed') THEN
+    PERFORM award_draw_entries_on_purchase(NEW.id);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_award_draw_entries
+  AFTER UPDATE ON orders
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_award_draw_entries_on_order();
+
+-- Trigger on referrals when they complete
+CREATE OR REPLACE FUNCTION trigger_award_draw_entries_on_referral()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NEW.status = 'completed' AND (OLD.status IS DISTINCT FROM 'completed') THEN
+    PERFORM award_draw_entries_on_referral(NEW.id, NEW.conversion_type);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_award_draw_referral_entries
+  AFTER UPDATE ON referrals
+  FOR EACH ROW
+  WHEN (NEW.status = 'completed')
+  EXECUTE FUNCTION trigger_award_draw_entries_on_referral();
+
+-- RPC function to award live stream entry to authenticated user
+CREATE OR REPLACE FUNCTION award_live_stream_entry(p_draw_id UUID)
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_draw RECORD;
+  v_entry_count INTEGER;
+  v_has_entry BOOLEAN;
+  v_entry_id UUID;
+BEGIN
+  -- Get current authenticated user
+  v_user_id := auth.uid();
+  
+  IF v_user_id IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Not authenticated');
+  END IF;
+  
+  -- Get draw configuration
+  SELECT * INTO v_draw
+  FROM draws
+  WHERE id = p_draw_id 
+    AND status = 'open'
+    AND entry_starts_at <= NOW()
+    AND entry_ends_at >= NOW();
+  
+  IF NOT FOUND THEN
+    RETURN json_build_object('success', false, 'error', 'Draw not open for entries');
+  END IF;
+  
+  -- Check if user already received live stream entry for this draw
+  SELECT EXISTS(
+    SELECT 1 FROM draw_entries 
+    WHERE draw_id = p_draw_id 
+      AND user_id = v_user_id 
+      AND entry_method = 'live_stream_entry'
+  ) INTO v_has_entry;
+  
+  IF v_has_entry THEN
+    RETURN json_build_object('success', false, 'error', 'Live stream entry already awarded');
+  END IF;
+  
+  -- Get entry count from config
+  v_entry_count := COALESCE((v_draw.entry_config->'live_stream'->>'entries_per_email')::INTEGER, 5);
+  
+  -- Add entry to draw
+  INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, metadata)
+  VALUES (p_draw_id, v_user_id, v_entry_count, 'live_stream_entry', jsonb_build_object(
+    'awarded_at', NOW(),
+    'source', 'live_broadcast'
+  ))
+  RETURNING id INTO v_entry_id;
+  
+  -- Create tickets
+  FOR i IN 1..v_entry_count LOOP
+    INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
+    VALUES (p_draw_id, v_user_id, v_entry_id, i);
+  END LOOP;
+  
+  -- Add to live ticker
+  INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+  SELECT p_draw_id, COALESCE(full_name, 'Customer'), v_entry_count, 'live_stream_entry'
+  FROM users WHERE id = v_user_id;
+  
+  RETURN json_build_object(
+    'success', true,
+    'entries_awarded', v_entry_count,
+    'message', 'Live stream entry awarded!'
+  );
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION award_live_stream_entry(UUID) TO authenticated;
+
+-- Create a view to show customers their draw entry history
+-- Drop and recreate the view with winner information
+DROP VIEW IF EXISTS customer_draw_entry_history;
+
+CREATE OR REPLACE VIEW customer_draw_entry_history AS
+SELECT 
+  o.id as order_id,
+  o.order_number,
+  o.created_at as order_date,
+  o.total_amount,
+  o.draw_entries_awarded,
+  o.draw_id,
+  d.name as draw_name,
+  d.draw_time,
+  d.prize_name,
+  d.status as draw_status,
+  o.draw_entry_details,
+  -- Check if user won this draw
+  EXISTS (
+    SELECT 1 FROM draw_winners dw 
+    WHERE dw.draw_id = o.draw_id 
+      AND dw.user_id = o.user_id 
+      AND dw.winner_rank = 1
+  ) as is_winner,
+  -- Get winner rank if they won
+  (
+    SELECT winner_rank FROM draw_winners dw 
+    WHERE dw.draw_id = o.draw_id 
+      AND dw.user_id = o.user_id 
+      AND dw.winner_rank = 1
+    LIMIT 1
+  ) as winner_rank,
+  -- Get claim status if they won
+  (
+    SELECT claim_status FROM draw_winners dw 
+    WHERE dw.draw_id = o.draw_id 
+      AND dw.user_id = o.user_id 
+      AND dw.winner_rank = 1
+    LIMIT 1
+  ) as winner_claim_status
+FROM orders o
+LEFT JOIN draws d ON o.draw_id = d.id
+WHERE o.draw_entries_awarded > 0
+  AND o.user_id = auth.uid()
+ORDER BY o.created_at DESC;
+
+-- Create a view for user's draw statistics
+CREATE OR REPLACE VIEW user_draw_stats AS
+SELECT 
+  u.id as user_id,
+  COUNT(DISTINCT de.draw_id) as total_draws_entered,
+  SUM(de.entry_count) as total_entries,
+  COUNT(DISTINCT dw.id) as total_wins,
+  SUM(CASE WHEN dw.claim_status = 'claimed' THEN 1 ELSE 0 END) as claimed_wins,
+  SUM(CASE WHEN dw.claim_status = 'pending' THEN 1 ELSE 0 END) as pending_wins,
+  MAX(de.created_at) as last_entry_at
+FROM users u
+LEFT JOIN draw_entries de ON u.id = de.user_id
+LEFT JOIN draw_winners dw ON u.id = dw.user_id AND dw.winner_rank = 1
+GROUP BY u.id;

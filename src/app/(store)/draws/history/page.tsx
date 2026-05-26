@@ -17,18 +17,19 @@ import {
   CheckCircle,
   Clock,
   ChevronRight,
-  Star,
-  Filter,
   Search,
   TrendingUp,
   Award,
   Crown,
+  ShoppingBag,
+  Share2,
+  Eye,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 interface DrawHistory {
   id: string;
@@ -57,16 +58,54 @@ interface Winner {
   prize_value: number;
   claim_status: string;
   claimed_at: string | null;
+  draw_name: string;
+  draw_time: string;
+}
+
+interface UserDrawEntry {
+  order_id: string;
+  order_number: string;
+  order_date: string;
+  total_amount: number;
+  draw_entries_awarded: number;
+  draw_id: string;
+  draw_name: string;
+  draw_time: string;
+  prize_name: string;
+  draw_status: string;
+  draw_entry_details: any;
+
+  // New winner fields from the updated view
+  is_winner: boolean;
+  winner_rank: number | null;
+  winner_claim_status: string | null;
+}
+
+interface UserEntryStats {
+  total_entries: number;
+  total_draws_entered: number;
+  total_wins: number;
+  claimed_wins: number;
+  pending_wins: number;
 }
 
 export default function DrawHistoryPage() {
-  const { supabase } = useAuth();
+  const { supabase, profile } = useAuth();
   const [completedDraws, setCompletedDraws] = useState<DrawHistory[]>([]);
   const [winners, setWinners] = useState<Winner[]>([]);
+  const [userEntries, setUserEntries] = useState<UserDrawEntry[]>([]);
+  const [userEntryStats, setUserEntryStats] = useState<UserEntryStats>({
+    total_entries: 0,
+    total_draws_entered: 0,
+    total_wins: 0,
+    claimed_wins: 0,
+    pending_wins: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedPrize, setSelectedPrize] = useState<string>("all");
+  const router = useRouter();
 
   // Fetch completed draws
   const fetchCompletedDraws = useCallback(async () => {
@@ -98,18 +137,13 @@ export default function DrawHistoryPage() {
       return;
     }
 
-    // Transform data
     const drawsWithStats = await Promise.all(
       (data || []).map(async (draw: any) => {
-        // Get total entries count
         const totalEntries = draw.draw_entries?.[0]?.count || 0;
-
-        // Get unique participants count
         const uniqueParticipants = draw.draw_participants
           ? new Set(draw.draw_participants.map((p: any) => p.user_id)).size
           : 0;
 
-        // Get winner name
         let winnerName = null;
         if (draw.winner_id) {
           const { data: winner } = await supabase
@@ -132,7 +166,7 @@ export default function DrawHistoryPage() {
     setCompletedDraws(drawsWithStats);
   }, [supabase]);
 
-  // Fetch all winners for leaderboard
+  // Fetch winners leaderboard
   const fetchWinners = useCallback(async () => {
     const { data, error } = await supabase
       .from("draw_winners")
@@ -181,11 +215,52 @@ export default function DrawHistoryPage() {
     );
   }, [supabase]);
 
+  // Fetch user's personal draw entries using the view
+  const fetchUserEntries = useCallback(async () => {
+    if (!profile?.id) return;
+
+    // Use the customer_draw_entry_history view
+    const { data: entriesData, error: entriesError } = await supabase
+      .from("customer_draw_entry_history")
+      .select("*")
+      .order("order_date", { ascending: false });
+
+    if (entriesError) {
+      console.error("Error fetching user entries:", entriesError);
+      return;
+    }
+
+    // Fetch user stats from the stats view
+    const { data: statsData, error: statsError } = await supabase
+      .from("user_draw_stats")
+      .select("*")
+      .eq("user_id", profile.id)
+      .single();
+
+    if (statsError && statsError.code !== "PGRST116") {
+      console.error("Error fetching user stats:", statsError);
+    }
+
+    setUserEntries(entriesData || []);
+    setUserEntryStats({
+      total_entries:
+        entriesData?.reduce((sum, e) => sum + e.draw_entries_awarded, 0) || 0,
+      total_draws_entered: statsData?.total_draws_entered || 0,
+      total_wins: statsData?.total_wins || 0,
+      claimed_wins: statsData?.claimed_wins || 0,
+      pending_wins: statsData?.pending_wins || 0,
+    });
+  }, [supabase, profile?.id]);
+
   useEffect(() => {
-    Promise.all([fetchCompletedDraws(), fetchWinners()]).finally(() => {
+    Promise.all([
+      fetchCompletedDraws(),
+      fetchWinners(),
+      fetchUserEntries(),
+    ]).finally(() => {
       setLoading(false);
     });
-  }, [fetchCompletedDraws, fetchWinners]);
+  }, [fetchCompletedDraws, fetchWinners, fetchUserEntries]);
 
   // Filter draws
   const filteredDraws = completedDraws.filter((draw) => {
@@ -201,7 +276,6 @@ export default function DrawHistoryPage() {
     return matchesSearch && matchesYear && matchesPrize;
   });
 
-  // Get unique years from draws
   const availableYears = [
     ...new Set(
       completedDraws.map((draw) =>
@@ -212,7 +286,6 @@ export default function DrawHistoryPage() {
     .sort()
     .reverse();
 
-  // Get unique prize categories
   const prizeCategories = [
     ...new Set(completedDraws.map((draw) => draw.prize_name)),
   ].slice(0, 10);
@@ -223,6 +296,21 @@ export default function DrawHistoryPage() {
       currency: "KES",
       minimumFractionDigits: 0,
     }).format(price);
+  };
+
+  const getEntryMethodIcon = (method: string) => {
+    switch (method) {
+      case "purchase":
+        return <ShoppingBag className="h-3 w-3" />;
+      case "referral":
+        return <Users className="h-3 w-3" />;
+      case "social_share":
+        return <Share2 className="h-3 w-3" />;
+      case "live_stream_entry":
+        return <Eye className="h-3 w-3" />;
+      default:
+        return <Ticket className="h-3 w-3" />;
+    }
   };
 
   if (loading) {
@@ -249,318 +337,446 @@ export default function DrawHistoryPage() {
           <Trophy className="h-12 w-12 mx-auto mb-4" />
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Draw History</h1>
           <p className="text-lg opacity-90 max-w-2xl mx-auto">
-            See all our past draws, winners, and prizes. Real people, real wins.
+            See all our past draws, winners, and your personal entry history
           </p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content - Draws List */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Search and Filters */}
-            <div className="flex flex-wrap gap-3 items-center justify-between">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search draws or prizes..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="px-3 py-2 rounded-lg border bg-background text-sm"
-                >
-                  <option value="all">All Years</option>
-                  {availableYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={selectedPrize}
-                  onChange={(e) => setSelectedPrize(e.target.value)}
-                  className="px-3 py-2 rounded-lg border bg-background text-sm max-w-[150px]"
-                >
-                  <option value="all">All Prizes</option>
-                  {prizeCategories.map((prize) => (
-                    <option key={prize} value={prize}>
-                      {prize}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+        <Tabs defaultValue="draws" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="draws">Past Draws</TabsTrigger>
+            <TabsTrigger value="my-entries">My Entries</TabsTrigger>
+          </TabsList>
 
-            {/* Draws List */}
-            {filteredDraws.length === 0 ? (
-              <Card className="p-12 text-center">
-                <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No draws found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm ||
-                  selectedYear !== "all" ||
-                  selectedPrize !== "all"
-                    ? "Try adjusting your filters"
-                    : "No completed draws yet. Check back soon!"}
-                </p>
-              </Card>
-            ) : (
-              filteredDraws.map((draw) => (
-                <Card
-                  key={draw.id}
-                  className="overflow-hidden hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex flex-col md:flex-row">
-                    {/* Prize Image */}
-                    <div className="md:w-48 h-48 bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center p-4">
-                      {draw.prize_image_url ? (
-                        <img
-                          src={draw.prize_image_url}
-                          alt={draw.prize_name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <Gift className="h-12 w-12 text-purple-400" />
-                      )}
-                    </div>
+          {/* Past Draws Tab */}
+          <TabsContent value="draws" className="space-y-6">
+            <div className="grid lg:grid-cols-3 gap-8">
+              {/* Main Content - Draws List */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Search and Filters */}
+                <div className="flex flex-wrap gap-3 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search draws or prizes..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                      className="px-3 py-2 rounded-lg border bg-background text-sm"
+                    >
+                      <option value="all">All Years</option>
+                      {availableYears.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedPrize}
+                      onChange={(e) => setSelectedPrize(e.target.value)}
+                      className="px-3 py-2 rounded-lg border bg-background text-sm max-w-[150px]"
+                    >
+                      <option value="all">All Prizes</option>
+                      {prizeCategories.map((prize) => (
+                        <option key={prize} value={prize}>
+                          {prize}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-                    {/* Draw Details */}
-                    <div className="flex-1 p-6">
-                      <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
-                        <div>
-                          <h3 className="text-xl font-semibold">{draw.name}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {draw.description}
+                {filteredDraws.length === 0 ? (
+                  <Card className="p-12 text-center">
+                    <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      No draws found
+                    </h3>
+                    <p className="text-muted-foreground">
+                      {searchTerm ||
+                      selectedYear !== "all" ||
+                      selectedPrize !== "all"
+                        ? "Try adjusting your filters"
+                        : "No completed draws yet. Check back soon!"}
+                    </p>
+                  </Card>
+                ) : (
+                  filteredDraws.map((draw) => (
+                    <Card
+                      key={draw.id}
+                      className="overflow-hidden hover:shadow-lg transition-shadow"
+                    >
+                      <div className="flex flex-col md:flex-row">
+                        <div className="md:w-48 h-48 bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center p-4">
+                          {draw.prize_image_url ? (
+                            <img
+                              src={draw.prize_image_url}
+                              alt={draw.prize_name}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                          ) : (
+                            <Gift className="h-12 w-12 text-purple-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 p-6">
+                          {/* ... existing draw card content ... */}
+                          <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
+                            <div>
+                              <h3 className="text-xl font-semibold">
+                                {draw.name}
+                              </h3>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {draw.description}
+                              </p>
+                            </div>
+                            <Badge className="bg-green-500 text-white">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Completed
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap gap-4 mb-4">
+                            <div className="flex items-center gap-2">
+                              <Gift className="h-4 w-4 text-purple-500" />
+                              <span className="font-medium">
+                                {draw.prize_name}
+                              </span>
+                              {draw.prize_value > 0 && (
+                                <Badge variant="outline">
+                                  {formatPrice(draw.prize_value)}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">
+                                {format(new Date(draw.draw_time), "PPP")}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-4 mb-4 text-sm">
+                            <div className="flex items-center gap-1">
+                              <Ticket className="h-4 w-4 text-blue-500" />
+                              <span>
+                                {draw.total_entries.toLocaleString()} entries
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Users className="h-4 w-4 text-green-500" />
+                              <span>
+                                {draw.total_participants.toLocaleString()}{" "}
+                                participants
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div className="flex items-center gap-2">
+                                <Trophy className="h-5 w-5 text-yellow-500" />
+                                <span className="font-medium">Winner:</span>
+                                <span>{draw.winner_name || "Anonymous"}</span>
+                              </div>
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/draws/${draw.id}`}>
+                                  View Details
+                                  <ChevronRight className="h-4 w-4 ml-1" />
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              {/* Sidebar - same as before */}
+              <div className="space-y-6">
+                {/* Winners Leaderboard */}
+                <Card>
+                  <div className="p-4 border-b">
+                    <h2 className="font-semibold flex items-center gap-2">
+                      <Crown className="h-5 w-5 text-yellow-500" />
+                      Recent Winners
+                    </h2>
+                  </div>
+                  <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
+                    {winners.slice(0, 20).map((winner, idx) => (
+                      <div
+                        key={winner.id}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50"
+                      >
+                        <div className="flex-shrink-0 w-8 text-center">
+                          {idx === 0 && (
+                            <Trophy className="h-5 w-5 text-yellow-500 mx-auto" />
+                          )}
+                          {idx === 1 && (
+                            <Award className="h-5 w-5 text-gray-400 mx-auto" />
+                          )}
+                          {idx === 2 && (
+                            <Award className="h-5 w-5 text-amber-600 mx-auto" />
+                          )}
+                          {idx > 2 && (
+                            <span className="text-xs text-muted-foreground">
+                              #{idx + 1}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm truncate">
+                            {winner.winner_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {winner.prize_name}
                           </p>
                         </div>
-                        <Badge className="bg-green-500 text-white">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Completed
+                        <Badge variant="outline" className="text-xs">
+                          {winner.claim_status === "claimed"
+                            ? "Claimed"
+                            : "Pending"}
                         </Badge>
                       </div>
+                    ))}
+                  </div>
+                </Card>
 
-                      {/* Prize Info */}
-                      <div className="flex flex-wrap gap-4 mb-4">
-                        <div className="flex items-center gap-2">
-                          <Gift className="h-4 w-4 text-purple-500" />
-                          <span className="font-medium">{draw.prize_name}</span>
-                          {draw.prize_value > 0 && (
-                            <Badge variant="outline">
-                              {formatPrice(draw.prize_value)}
+                {/* Stats Summary */}
+                <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+                  <div className="p-6 text-center">
+                    <TrendingUp className="h-8 w-8 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold mb-1">Total Giveaways</h3>
+                    <p className="text-3xl font-bold">
+                      {completedDraws.length}
+                    </p>
+                    <p className="text-sm opacity-90 mt-2">
+                      {completedDraws
+                        .reduce((sum, d) => sum + d.total_participants, 0)
+                        .toLocaleString()}{" "}
+                      participants
+                    </p>
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* My Entries Tab - NEW */}
+          <TabsContent value="my-entries" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Total Entries
+                    </p>
+                    <p className="text-2xl font-bold">
+                      {userEntryStats.total_entries}
+                    </p>
+                  </div>
+                  <Ticket className="h-8 w-8 text-purple-500 opacity-50" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Draws Entered
+                    </p>
+                    <p className="text-2xl font-bold">
+                      {userEntryStats.total_draws_entered}
+                    </p>
+                  </div>
+                  <Gift className="h-8 w-8 text-orange-500 opacity-50" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Wins</p>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {userEntryStats.total_wins}
+                    </p>
+                  </div>
+                  <Trophy className="h-8 w-8 text-yellow-500 opacity-50" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">
+                      Pending Claims
+                    </p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {userEntryStats.pending_wins}
+                    </p>
+                  </div>
+                  <Clock className="h-8 w-8 text-blue-500 opacity-50" />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Entries List */}
+            {userEntries.length === 0 ? (
+              <Card className="p-12 text-center">
+                <Ticket className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Entries Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  You haven't entered any draws yet. Start earning entries
+                  today!
+                </p>
+                <Button asChild>
+                  <Link href="/draws">Browse Active Draws</Link>
+                </Button>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {userEntries.map((entry) => (
+                  <Card
+                    key={entry.order_id}
+                    className={cn(
+                      "hover:shadow-md transition-shadow",
+                      entry.is_winner &&
+                        "border-yellow-500/50 bg-gradient-to-r from-yellow-500/5 to-orange-500/5",
+                    )}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex flex-wrap justify-between items-start gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <ShoppingBag className="h-4 w-4 text-green-500" />
+                            <h3 className="font-semibold">{entry.draw_name}</h3>
+                            {entry.is_winner && (
+                              <Badge className="bg-yellow-500 text-white">
+                                <Trophy className="h-3 w-3 mr-1" />
+                                Winner! Rank #{entry.winner_rank}
+                              </Badge>
+                            )}
+                            <Badge
+                              variant={
+                                entry.draw_status === "completed"
+                                  ? "secondary"
+                                  : "default"
+                              }
+                            >
+                              {entry.draw_status === "completed"
+                                ? "Ended"
+                                : "Active"}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Prize: {entry.prize_name}
+                          </p>
+                          <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Draw:{" "}
+                              {format(new Date(entry.draw_time), "MMM d, yyyy")}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Earned:{" "}
+                              {formatDistanceToNow(new Date(entry.order_date), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-purple-600">
+                            {entry.draw_entries_awarded}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Entries
+                          </p>
+                          {entry.is_winner &&
+                            entry.winner_claim_status === "pending" && (
+                              <Badge className="mt-1 bg-yellow-500 text-white text-xs animate-pulse">
+                                Awaiting Claim
+                              </Badge>
+                            )}
+                          {entry.is_winner &&
+                            entry.winner_claim_status === "claimed" && (
+                              <Badge className="mt-1 bg-green-500 text-white text-xs">
+                                ✓ Claimed
+                              </Badge>
+                            )}
+                          {!entry.is_winner && (
+                            <Badge variant="outline" className="mt-1 text-xs">
+                              via Purchase
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {format(new Date(draw.draw_time), "PPP")}
-                          </span>
-                        </div>
                       </div>
 
-                      {/* Stats */}
-                      <div className="flex flex-wrap gap-4 mb-4 text-sm">
-                        <div className="flex items-center gap-1">
-                          <Ticket className="h-4 w-4 text-blue-500" />
-                          <span>
-                            {draw.total_entries.toLocaleString()} entries
+                      {/* Order Details */}
+                      <div className="mt-3 pt-2 border-t text-xs text-muted-foreground">
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-1">
+                            <ShoppingBag className="h-3 w-3" />
+                            Order #{entry.order_number}
                           </span>
+                          <span>{formatPrice(entry.total_amount)}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Users className="h-4 w-4 text-green-500" />
-                          <span>
-                            {draw.total_participants.toLocaleString()}{" "}
-                            participants
-                          </span>
-                        </div>
-                        {draw.consolation_points_amount > 0 && (
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 text-yellow-500" />
-                            <span>
-                              {draw.consolation_points_amount} pts consolation
-                            </span>
+                        {entry.draw_entry_details?.calculation && (
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            Every KSH{" "}
+                            {Math.round(
+                              entry.total_amount / entry.draw_entries_awarded,
+                            )}{" "}
+                            spent = 1 entry
                           </div>
                         )}
                       </div>
 
-                      {/* Winner */}
-                      <div className="p-3 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="h-5 w-5 text-yellow-500" />
-                            <span className="font-medium">Winner:</span>
-                            <span>{draw.winner_name || "Anonymous"}</span>
+                      {/* Winner Action Button */}
+                      {entry.is_winner &&
+                        entry.winner_claim_status === "pending" && (
+                          <div className="mt-3 pt-2 border-t">
+                            <Button
+                              size="sm"
+                              className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+                              onClick={() => {
+                                // Handle prize claim
+                                router.push(`/draws/${entry.draw_id}/claim`);
+                              }}
+                            >
+                              <Trophy className="h-3 w-3 mr-1" />
+                              Claim Your Prize
+                            </Button>
                           </div>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/draws/${draw.id}`}>
-                              View Details
-                              <ChevronRight className="h-4 w-4 ml-1" />
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Winners Leaderboard */}
-            <Card>
-              <div className="p-4 border-b">
-                <h2 className="font-semibold flex items-center gap-2">
-                  <Crown className="h-5 w-5 text-yellow-500" />
-                  Recent Winners
-                </h2>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Latest grand prize winners
-                </p>
-              </div>
-              <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
-                {winners.slice(0, 20).map((winner, idx) => (
-                  <div
-                    key={winner.id}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-shrink-0 w-8 text-center">
-                      {idx === 0 && (
-                        <Trophy className="h-5 w-5 text-yellow-500 mx-auto" />
-                      )}
-                      {idx === 1 && (
-                        <Award className="h-5 w-5 text-gray-400 mx-auto" />
-                      )}
-                      {idx === 2 && (
-                        <Award className="h-5 w-5 text-amber-600 mx-auto" />
-                      )}
-                      {idx > 2 && (
-                        <span className="text-xs text-muted-foreground">
-                          #{idx + 1}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {winner.winner_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {winner.prize_name}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-xs">
-                        {winner.claim_status === "claimed"
-                          ? "Claimed"
-                          : "Pending"}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatDistanceToNow(new Date(winner.draw_time), {
-                          addSuffix: true,
-                        })}
-                      </p>
-                    </div>
-                  </div>
+                        )}
+                    </CardContent>
+                  </Card>
                 ))}
-                {winners.length === 0 && (
-                  <p className="text-center text-muted-foreground py-8">
-                    No winners yet
-                  </p>
-                )}
               </div>
-            </Card>
-
-            {/* Stats Summary */}
-            <Card className="bg-gradient-to-r from-purple-600 to-pink-600 text-white">
-              <div className="p-6 text-center">
-                <TrendingUp className="h-8 w-8 mx-auto mb-3" />
-                <h3 className="text-lg font-bold mb-1">Total Giveaways</h3>
-                <p className="text-3xl font-bold">{completedDraws.length}</p>
-                <p className="text-sm opacity-90 mt-2">
-                  {completedDraws
-                    .reduce((sum, d) => sum + d.total_participants, 0)
-                    .toLocaleString()}{" "}
-                  participants
-                </p>
-                <p className="text-xs opacity-75 mt-1">
-                  {completedDraws
-                    .reduce((sum, d) => sum + d.total_entries, 0)
-                    .toLocaleString()}{" "}
-                  total entries
-                </p>
-              </div>
-            </Card>
-
-            {/* Trust Badges */}
-            <Card>
-              <div className="p-4">
-                <h3 className="font-semibold mb-3">Why Trust Our Draws?</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Transparent Winners</p>
-                      <p className="text-xs text-muted-foreground">
-                        All winners are publicly displayed with draw details
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Random Selection</p>
-                      <p className="text-xs text-muted-foreground">
-                        Winners are randomly selected using verifiable methods
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Real Prizes</p>
-                      <p className="text-xs text-muted-foreground">
-                        All prizes are delivered to verified winners
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-medium text-sm">Consolation Points</p>
-                      <p className="text-xs text-muted-foreground">
-                        Every participant receives loyalty points
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            )}
 
             {/* Call to Action */}
-            <Card className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border-orange-500/30">
-              <div className="p-4 text-center">
-                <Clock className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-                <h3 className="font-semibold">Want to be a winner?</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-3">
-                  Check out our active draws and enter to win!
-                </p>
-                <Button asChild className="w-full">
-                  <Link href="/draws">
-                    View Active Draws
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Link>
-                </Button>
-              </div>
-            </Card>
-          </div>
-        </div>
+            {userEntries.length > 0 && (
+              <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+                <CardContent className="p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Want more entries? Check out our active draws!
+                  </p>
+                  <Button asChild className="mt-2">
+                    <Link href="/draws">View Active Draws</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

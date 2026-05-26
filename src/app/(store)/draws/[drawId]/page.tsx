@@ -47,6 +47,7 @@ import {
   Star,
   AlertCircle,
   Trophy,
+  Eye,
 } from "lucide-react";
 import { GiOpenTreasureChest } from "react-icons/gi";
 import { format, formatDistanceToNow } from "date-fns";
@@ -96,6 +97,7 @@ export default function DrawDetailPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const drawsService = new DrawsService(supabase);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [liveEntryAwarded, setLiveEntryAwarded] = useState(false);
 
   // Add this state near the top of the component
   const [timeLeft, setTimeLeft] = useState({
@@ -104,6 +106,11 @@ export default function DrawDetailPage() {
     minutes: 0,
     seconds: 0,
   });
+
+  const isEntryOpen =
+    draw?.status === "open" &&
+    new Date(draw.entry_starts_at) <= new Date() &&
+    new Date(draw.entry_ends_at) >= new Date();
 
   // Add this useEffect to handle the countdown
   useEffect(() => {
@@ -133,6 +140,38 @@ export default function DrawDetailPage() {
     const interval = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(interval);
   }, [draw?.draw_time]);
+
+  // Auto-award live stream entry when page loads (once per draw, using RPC)
+  useEffect(() => {
+    const awardLiveStreamEntry = async () => {
+      if (!profile?.id || !drawId || liveEntryAwarded) return;
+
+      // Only award if draw is open and live stream entries are enabled
+      if (isEntryOpen && draw?.entry_calculation?.live_stream?.enabled) {
+        try {
+          const result = await drawsService.awardLiveStreamEntry(drawId);
+          if (result.success) {
+            setLiveEntryAwarded(true);
+            toast.success(
+              `🎥 Live stream entry awarded! +${result.entries_awarded} entries`,
+              {
+                description: "Thanks for watching the live broadcast!",
+              },
+            );
+            loadData(); // Refresh to show updated entry count
+          } else if (result.message !== "Live stream entry already awarded") {
+            console.log("Live stream entry not awarded:", result.message);
+          }
+        } catch (error) {
+          console.error("Error awarding live entry:", error);
+        }
+      }
+    };
+
+    if (draw) {
+      awardLiveStreamEntry();
+    }
+  }, [draw, drawId, profile?.id, drawsService, liveEntryAwarded, isEntryOpen]);
 
   const loadData = useCallback(async () => {
     if (!drawId) return;
@@ -334,25 +373,6 @@ export default function DrawDetailPage() {
     }
   };
 
-  const handleLiveStreamEntry = async () => {
-    if (!liveEmail.trim()) {
-      toast.error("Please enter your email");
-      return;
-    }
-    setEntering(true);
-    try {
-      await drawsService.addLiveStreamEntry(drawId, liveEmail, liveName);
-      toast.success("Live stream entries added! Check your email.");
-      setLiveEmail("");
-      setLiveName("");
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setEntering(false);
-    }
-  };
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("en-KE", {
       style: "currency",
@@ -361,10 +381,6 @@ export default function DrawDetailPage() {
     }).format(price);
   };
 
-  const isEntryOpen =
-    draw?.status === "open" &&
-    new Date(draw.entry_starts_at) <= new Date() &&
-    new Date(draw.entry_ends_at) >= new Date();
   const isDrawCompleted = draw?.status === "completed";
   const timeRemaining = draw?.entry_ends_at
     ? formatDistanceToNow(new Date(draw.entry_ends_at), { addSuffix: true })
@@ -982,33 +998,54 @@ export default function DrawDetailPage() {
                     <TabsContent value="live" className="space-y-4">
                       <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
                         <Radio className="h-4 w-4 text-red-500 inline mr-2" />
-                        <span className="text-sm">
-                          Enter your email during the live broadcast
+                        <span className="text-sm font-medium">
+                          Live Stream Bonus Entry
                         </span>
-                      </div>
-                      <Input
-                        placeholder="Your name"
-                        value={liveName}
-                        onChange={(e) => setLiveName(e.target.value)}
-                      />
-                      <Input
-                        type="email"
-                        placeholder="Your email"
-                        value={liveEmail}
-                        onChange={(e) => setLiveEmail(e.target.value)}
-                      />
-                      <Button
-                        className="w-full"
-                        onClick={handleLiveStreamEntry}
-                        disabled={entering}
-                      >
-                        {entering ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Radio className="h-4 w-4 mr-2" />
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {liveEntryAwarded
+                            ? "✓ You've already received your live stream bonus entry!"
+                            : "Watch the live broadcast and get free entries automatically!"}
+                        </p>
+                        {draw.entry_config?.live_stream?.entries_per_email && (
+                          <p className="text-xs text-green-600 mt-1">
+                            🎁 +
+                            {draw.entry_config.live_stream.entries_per_email}{" "}
+                            entries for watching!
+                          </p>
                         )}
-                        Join Live Stream
-                      </Button>
+                      </div>
+
+                      {/* Live Broadcast Buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          className="flex-1 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700"
+                          onClick={() =>
+                            window.open(`/draws/live/${drawId}`, "_blank")
+                          }
+                        >
+                          <Eye className="h-4 w-4 mr-2 animate-pulse" />
+                          Watch Live Broadcast
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            const liveUrl = `${window.location.origin}/draws/live/${drawId}`;
+                            navigator.clipboard.writeText(liveUrl);
+                            toast.success("Live stream link copied!");
+                          }}
+                        >
+                          <Share2 className="h-4 w-4 mr-2" />
+                          Share Stream
+                        </Button>
+                      </div>
+
+                      {!liveEntryAwarded && (
+                        <p className="text-xs text-center text-muted-foreground">
+                          💡 Simply visit this page during a live broadcast to
+                          automatically receive bonus entries!
+                        </p>
+                      )}
                     </TabsContent>
                   </Tabs>
                 </CardContent>

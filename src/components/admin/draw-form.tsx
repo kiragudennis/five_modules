@@ -40,6 +40,27 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
         live_stream: { entries_per_email: 1 },
         loyalty_tier: { bronze: 1, silver: 2, gold: 5, platinum: 10 },
       },
+      entry_calculation: {
+        purchase: {
+          enabled: true,
+          entries_per_ksh: 0.05,
+          min_purchase: 1000,
+          max_entries_per_order: 5000,
+        },
+        referral: {
+          enabled: true,
+          entries_per_referral: 100,
+          bonus_for_first_referral: 50,
+        },
+        social_share: {
+          enabled: true,
+          entries_per_share: 10,
+        },
+        live_stream: {
+          enabled: true,
+          entries_per_entry: 5,
+        },
+      },
       max_entries_per_user: "",
       max_entries_total: "",
       entry_starts_at: new Date().toISOString().slice(0, 16),
@@ -98,6 +119,7 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
           <TabsTrigger value="basic">Basic</TabsTrigger>
           <TabsTrigger value="prize">Prize</TabsTrigger>
           <TabsTrigger value="entries">Entries</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="advanced">Advanced</TabsTrigger>
         </TabsList>
@@ -356,6 +378,225 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
                 }
                 placeholder="Unlimited"
               />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4 mt-4">
+          {/* Entry Calculation Settings */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold border-b pb-2">
+              Entry Calculation Rules
+            </h3>
+
+            {/* Purchase Entries */}
+            <div className="space-y-3 p-4 border rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-semibold">
+                    Purchase-based Entries
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Award entries when customers make purchases
+                  </p>
+                </div>
+                <Switch
+                  checked={
+                    formData.entry_calculation?.purchase?.enabled ?? true
+                  }
+                  onCheckedChange={(checked) => {
+                    setFormData({
+                      ...formData,
+                      entry_calculation: {
+                        ...formData.entry_calculation,
+                        purchase: {
+                          ...formData.entry_calculation?.purchase,
+                          enabled: checked,
+                        },
+                      },
+                    });
+                  }}
+                />
+              </div>
+
+              {formData.entry_calculation?.purchase?.enabled && (
+                <div className="grid grid-cols-3 gap-4 ml-6">
+                  <div>
+                    <Label>Entries per KSH</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={
+                        formData.entry_calculation?.purchase?.entries_per_ksh ??
+                        0.05
+                      }
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          entry_calculation: {
+                            ...formData.entry_calculation,
+                            purchase: {
+                              ...formData.entry_calculation?.purchase,
+                              entries_per_ksh: parseFloat(e.target.value),
+                            },
+                          },
+                        })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      e.g., 0.05 = 50 entries per KSH 1000
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Min Purchase (KES)</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.entry_calculation?.purchase?.min_purchase ??
+                        1000
+                      }
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          entry_calculation: {
+                            ...formData.entry_calculation,
+                            purchase: {
+                              ...formData.entry_calculation?.purchase,
+                              min_purchase: parseFloat(e.target.value),
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Max Entries per Order</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.entry_calculation?.purchase
+                          ?.max_entries_per_order ?? 5000
+                      }
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          entry_calculation: {
+                            ...formData.entry_calculation,
+                            purchase: {
+                              ...formData.entry_calculation?.purchase,
+                              max_entries_per_order: parseInt(e.target.value),
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Referral Entries */}
+            <div className="space-y-3 p-4 border rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="font-semibold">
+                    Referral-based Entries
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Award entries when referrals convert
+                  </p>
+                </div>
+                <Switch
+                  checked={
+                    formData.entry_calculation?.referral?.enabled ?? true
+                  }
+                  onCheckedChange={(checked) => {
+                    setFormData({
+                      ...formData,
+                      entry_calculation: {
+                        ...formData.entry_calculation,
+                        referral: {
+                          ...formData.entry_calculation?.referral,
+                          enabled: checked,
+                        },
+                      },
+                    });
+                  }}
+                />
+              </div>
+
+              {formData.entry_calculation?.referral?.enabled && (
+                <div className="grid grid-cols-2 gap-4 ml-6">
+                  <div>
+                    <Label>Entries per Referral (Signup)</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.entry_calculation?.referral
+                          ?.entries_per_referral ?? 100
+                      }
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          entry_calculation: {
+                            ...formData.entry_calculation,
+                            referral: {
+                              ...formData.entry_calculation?.referral,
+                              entries_per_referral: parseInt(e.target.value),
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Bonus for First Referral</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.entry_calculation?.referral
+                          ?.bonus_for_first_referral ?? 50
+                      }
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          entry_calculation: {
+                            ...formData.entry_calculation,
+                            referral: {
+                              ...formData.entry_calculation?.referral,
+                              bonus_for_first_referral: parseInt(
+                                e.target.value,
+                              ),
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Entries per Referral (Purchase)</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.entry_calculation?.referral
+                          ?.entries_per_purchase ?? 200
+                      }
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          entry_calculation: {
+                            ...formData.entry_calculation,
+                            referral: {
+                              ...formData.entry_calculation?.referral,
+                              entries_per_purchase: parseInt(e.target.value),
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </TabsContent>

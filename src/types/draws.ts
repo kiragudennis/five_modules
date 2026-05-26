@@ -11,6 +11,7 @@ export interface Draw {
   prize_value: number | null;
 
   entry_config: EntryConfig;
+  entry_calculation: EntryCalculation;
   max_entries_total: number | null;
   max_entries_per_user: number | null;
 
@@ -68,6 +69,28 @@ export interface EntryConfig {
     silver: number;
     gold: number;
     platinum: number;
+  };
+}
+
+export interface EntryCalculation {
+  purchase: {
+    enabled: boolean;
+    entries_per_ksh: number;
+    min_purchase: number;
+    max_entries_per_order: number;
+  };
+  referral: {
+    enabled: boolean;
+    entries_per_referral: number;
+    bonus_for_first_referral: number;
+  };
+  social_share: {
+    enabled: number;
+    entries_per_share: number;
+  };
+  live_stream: {
+    enabled: boolean;
+    entries_per_entry: 5;
   };
 }
 
