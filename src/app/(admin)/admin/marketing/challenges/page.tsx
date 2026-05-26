@@ -55,6 +55,12 @@ import {
   Heart,
   Save,
   Archive,
+  X,
+  Medal,
+  Tag,
+  Truck,
+  Package,
+  Gift,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -589,6 +595,88 @@ function ChallengeForm({
   const handleSubmit = async () => {
     setSaving(true);
     try {
+      // Validate prize tiers
+      if (formData.prize_tiers && formData.prize_tiers.length > 0) {
+        for (const tier of formData.prize_tiers) {
+          // Validate discount percentage (0-100)
+          if (tier.prize_type === "discount") {
+            const discountValue = parseInt(tier.prize_value);
+            if (
+              isNaN(discountValue) ||
+              discountValue < 0 ||
+              discountValue > 100
+            ) {
+              toast.error(
+                `Rank ${tier.rank}: Discount must be between 0% and 100%`,
+              );
+              setSaving(false);
+              return;
+            }
+          }
+
+          // Validate points amount (must be positive)
+          if (tier.prize_type === "points") {
+            const pointsValue = parseInt(tier.prize_value);
+            if (isNaN(pointsValue) || pointsValue < 0) {
+              toast.error(
+                `Rank ${tier.rank}: Points amount must be a positive number`,
+              );
+              setSaving(false);
+              return;
+            }
+          }
+
+          // Validate product UUID format (if provided)
+          if (tier.prize_type === "product" && tier.product_id) {
+            const uuidRegex =
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(tier.product_id)) {
+              toast.error(`Rank ${tier.rank}: Invalid product UUID format`);
+              setSaving(false);
+              return;
+            }
+          }
+
+          // Validate bundle UUID format (if provided)
+          if (tier.prize_type === "bundle" && tier.bundle_id) {
+            const uuidRegex =
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(tier.bundle_id)) {
+              toast.error(`Rank ${tier.rank}: Invalid bundle UUID format`);
+              setSaving(false);
+              return;
+            }
+          }
+
+          // Validate free shipping minimum purchase (must be positive)
+          if (tier.prize_type === "free_shipping") {
+            if (!tier.min_purchase) {
+              toast.error("Min purchase amount must not be empty");
+              return;
+            }
+
+            const minPurchase = parseFloat(tier.min_purchase);
+            if (isNaN(minPurchase) || minPurchase < 0) {
+              toast.error(
+                `Rank ${tier.rank}: Minimum purchase amount must be a positive number`,
+              );
+              setSaving(false);
+              return;
+            }
+          }
+
+          // Validate badge name (if provided)
+          if (
+            tier.prize_type === "badge" &&
+            (!tier.prize_value || tier.prize_value.trim() === "")
+          ) {
+            toast.error(`Rank ${tier.rank}: Badge name is required`);
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
       const slug = formData.slug || generateSlug(formData.name);
       const { error } = await supabase
         .from("challenges")
@@ -609,6 +697,96 @@ function ChallengeForm({
       toast.error(error.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Helper to render prize value input based on prize type
+  const renderPrizeValueInput = (tier: any, idx: number) => {
+    switch (tier.prize_type) {
+      case "points":
+        return (
+          <Input
+            type="number"
+            placeholder="Points amount"
+            value={tier.prize_value}
+            onChange={(e) =>
+              updatePrizeTier(idx, "prize_value", parseInt(e.target.value))
+            }
+            className="w-32"
+          />
+        );
+
+      case "discount":
+        return (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              placeholder="Discount %"
+              value={tier.prize_value}
+              onChange={(e) =>
+                updatePrizeTier(idx, "prize_value", parseInt(e.target.value))
+              }
+              className="w-24"
+            />
+          </div>
+        );
+
+      case "free_shipping":
+        return (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              placeholder="Min purchase (optional)"
+              value={tier.min_purchase || ""}
+              onChange={(e) =>
+                updatePrizeTier(idx, "min_purchase", parseFloat(e.target.value))
+              }
+              className="w-32"
+            />
+          </div>
+        );
+
+      case "product":
+        return (
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="Product UUID"
+              value={tier.min_purchase || ""}
+              onChange={(e) =>
+                updatePrizeTier(idx, "product_id", parseFloat(e.target.value))
+              }
+              className="w-32"
+            />
+          </div>
+        );
+
+      case "bundle":
+        return (
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="Bundle UUID"
+              value={tier.min_purchase || ""}
+              onChange={(e) =>
+                updatePrizeTier(idx, "bundle_id", parseFloat(e.target.value))
+              }
+              className="w-32"
+            />
+          </div>
+        );
+
+      default:
+        return (
+          <Input
+            placeholder="Value"
+            value={tier.prize_value}
+            onChange={(e) =>
+              updatePrizeTier(idx, "prize_value", e.target.value)
+            }
+            className="w-32"
+          />
+        );
     }
   };
 
@@ -1073,53 +1251,78 @@ function ChallengeForm({
           </div>
         </TabsContent>
 
-        {/* Prizes Tab */}
+        {/* Prizes Tab - Enhanced */}
         <TabsContent value="prizes" className="space-y-4 mt-4">
           <div className="space-y-3">
             {formData.prize_tiers.map((tier: any, idx: number) => (
               <div
                 key={idx}
-                className="flex gap-3 items-center p-3 border rounded-lg"
+                className="flex flex-wrap gap-3 items-center p-4 border rounded-lg bg-muted/30"
               >
+                {/* Rank */}
                 <div className="w-16">
-                  <Label className="text-sm">Rank {tier.rank}</Label>
+                  <div className="flex items-center gap-1">
+                    {tier.rank === 1 && (
+                      <Crown className="h-4 w-4 text-yellow-500" />
+                    )}
+                    {tier.rank === 2 && (
+                      <Medal className="h-4 w-4 text-gray-400" />
+                    )}
+                    {tier.rank === 3 && (
+                      <Medal className="h-4 w-4 text-amber-600" />
+                    )}
+                    <Label className="text-sm">Rank {tier.rank}</Label>
+                  </div>
                 </div>
+
+                {/* Prize Type */}
                 <Select
                   value={tier.prize_type}
                   onValueChange={(value) =>
                     updatePrizeTier(idx, "prize_type", value)
                   }
                 >
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-36">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="points">Points</SelectItem>
-                    <SelectItem value="discount">Discount %</SelectItem>
-                    <SelectItem value="free_shipping">Free Shipping</SelectItem>
-                    <SelectItem value="product">Product</SelectItem>
-                    <SelectItem value="bundle">Bundle</SelectItem>
-                    <SelectItem value="badge">Badge</SelectItem>
+                    <SelectItem value="points">
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4" />
+                        Points
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="discount">
+                      <div className="flex items-center gap-2">
+                        <Tag className="h-4 w-4" />
+                        Discount %
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="free_shipping">
+                      <div className="flex items-center gap-2">
+                        <Truck className="h-4 w-4" />
+                        Free Shipping
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="product">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Product
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="bundle">
+                      <div className="flex items-center gap-2">
+                        <Gift className="h-4 w-4" />
+                        Bundle
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
-                <Input
-                  placeholder="Value"
-                  value={tier.prize_value}
-                  onChange={(e) =>
-                    updatePrizeTier(idx, "prize_value", e.target.value)
-                  }
-                  className="w-32"
-                />
-                {tier.prize_type === "badge" && (
-                  <Input
-                    placeholder="Badge name"
-                    value={tier.badge}
-                    onChange={(e) =>
-                      updatePrizeTier(idx, "badge", e.target.value)
-                    }
-                    className="flex-1"
-                  />
-                )}
+
+                {/* Prize Value Input (dynamic based on type) */}
+                {renderPrizeValueInput(tier, idx)}
+
+                {/* Delete Button */}
                 <Button
                   type="button"
                   variant="ghost"
@@ -1131,6 +1334,7 @@ function ChallengeForm({
                 </Button>
               </div>
             ))}
+
             <Button
               type="button"
               variant="outline"
@@ -1141,6 +1345,37 @@ function ChallengeForm({
               Add Prize Tier
             </Button>
           </div>
+
+          {/* Prize Distribution Preview */}
+          {formData.prize_tiers.length > 0 && (
+            <div className="mt-4 p-4 rounded-lg bg-primary/5">
+              <h4 className="text-sm font-semibold mb-2">
+                Prize Distribution Preview
+              </h4>
+              <div className="space-y-1">
+                {formData.prize_tiers.map((tier: any, idx: number) => (
+                  <div key={idx} className="flex justify-between text-sm">
+                    <span className="font-medium">
+                      {tier.rank === 1 && "🥇 "}
+                      {tier.rank === 2 && "🥈 "}
+                      {tier.rank === 3 && "🥉 "}
+                      Rank {tier.rank}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {tier.prize_type === "points" &&
+                        `${tier.prize_value} points`}
+                      {tier.prize_type === "discount" &&
+                        `${tier.prize_value}% off`}
+                      {tier.prize_type === "free_shipping" && "Free Shipping"}
+                      {tier.prize_type === "product" && tier.prize_value}
+                      {tier.prize_type === "bundle" && tier.prize_value}
+                      {tier.prize_type === "badge" && tier.prize_value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* Schedule Tab */}

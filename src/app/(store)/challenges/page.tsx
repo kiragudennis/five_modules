@@ -9,7 +9,6 @@ import { ChallengesService } from "@/lib/services/challenges-service";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -21,16 +20,10 @@ import {
   UsersRound,
   Sparkles,
   Crown,
-  Coins,
-  Calendar,
   Clock,
   Target,
-  Zap,
   ArrowRight,
   TrendingUp,
-  Award,
-  Star,
-  Gift,
   Heart,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
