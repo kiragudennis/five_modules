@@ -8,6 +8,7 @@ import { AuthProvider } from "@/lib/context/AuthContext";
 import { StoreProvider } from "@/lib/context/StoreContext";
 import { Toaster } from "sonner";
 import { GlobalLoader } from "@/components/GlobalLoader";
+import { StreakTrackerProvider } from "@/components/challenges/providers/StreakTrackProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -160,17 +161,19 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <StoreProvider>
-              <div className="flex flex-col min-h-screen w-full">
-                <Header />
-                <main className="flex-grow">
-                  {children}
-                  <GlobalLoader /> {/* shows on every route transition */}
-                  <Toaster position="top-right" richColors closeButton />
-                </main>
-                <Footer />
-              </div>
-            </StoreProvider>
+            <StreakTrackerProvider>
+              <StoreProvider>
+                <div className="flex flex-col min-h-screen w-full">
+                  <Header />
+                  <main className="flex-grow">
+                    {children}
+                    <GlobalLoader /> {/* shows on every route transition */}
+                    <Toaster position="top-right" richColors closeButton />
+                  </main>
+                  <Footer />
+                </div>
+              </StoreProvider>
+            </StreakTrackerProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

@@ -154,27 +154,6 @@ CREATE TABLE IF NOT EXISTS challenges (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- User challenge progress
-CREATE TABLE IF NOT EXISTS user_challenges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    coupon_id UUID REFERENCES coupons(id) ON DELETE SET NULL,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    challenge_id UUID REFERENCES challenges(id) ON DELETE CASCADE,
-    status VARCHAR(50) CHECK (status IN ('in_progress', 'completed', 'reward_claimed', 'expired')),
-    progress INTEGER DEFAULT 0,
-    target INTEGER,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    reward_claimed_at TIMESTAMP WITH TIME ZONE,
-    loyalty_points_awarded INTEGER DEFAULT 0,
-    loyalty_transaction_id UUID REFERENCES loyalty_transactions(id),
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_challenges_user ON user_challenges(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_challenges_status ON user_challenges(status);
-
 -- Referrals table
 CREATE TABLE IF NOT EXISTS referrals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

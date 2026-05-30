@@ -630,6 +630,29 @@ export class ChallengesService {
     };
   }
 
+  async getStreakLeaderboard(challengeId: string, limit: number = 50) {
+    const { data, error } = await this.supabase.rpc(
+      "get_streak_leaderboard_with_tiebreaker",
+      {
+        p_challenge_id: challengeId,
+        p_limit: limit,
+      },
+    );
+
+    if (error) throw error;
+    return data;
+  }
+
+  async checkAndUpdateStreak(challengeId: string, userId: string) {
+    const { data, error } = await this.supabase.rpc("check_daily_streak", {
+      p_challenge_id: challengeId,
+      p_user_id: userId,
+    });
+
+    if (error) throw error;
+    return data;
+  }
+
   async getLiveTicker(challengeId: string, limit: number = 20): Promise<any> {
     const cacheKey = `ticker-${challengeId}`;
     const cached = this.cache.get(cacheKey);

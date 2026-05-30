@@ -1,14 +1,32 @@
-// app/(store)/challenges/[challengeId]/page.tsx
+// app/(store)/challenges/[challengeId]/page.tsx (REFACTORED)
 // Challenge Detail Page - View challenge details, join, track progress, and interact with the challenge.
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { ChallengesService } from "@/lib/services/challenges-service";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Trophy,
   Users,
@@ -30,23 +48,40 @@ import {
   Eye,
   Facebook,
   Twitter,
-  Plus,
+  Instagram,
+  Music,
+  Globe,
+  Youtube,
+  Send,
+  ArrowRight,
+  Search,
+  MessageCircle,
+  UserCheck,
+  Brain,
+  Zap,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import { FaYoutube } from "react-icons/fa";
 
-const CHALLENGE_ICONS: Record<string, any> = {
+// ─── Types ──────────────────────────────────────────────
+type SocialPlatform =
+  | "twitter"
+  | "x"
+  | "facebook"
+  | "linkedin"
+  | "whatsapp"
+  | "reddit"
+  | "instagram"
+  | "youtube"
+  | "tiktok";
+
+const CHALLENGE_ICONS: Record<
+  string,
+  { icon: any; color: string; label: string }
+> = {
   referral: {
     icon: Users,
     color: "from-blue-500 to-cyan-500",
@@ -82,12 +117,35 @@ const CHALLENGE_ICONS: Record<string, any> = {
     color: "from-pink-500 to-rose-500",
     label: "Social Challenge",
   },
+  trivia: {
+    icon: Brain,
+    color: "from-yellow-500 to-orange-500",
+    label: "Trivia Challenge",
+  },
 };
 
+const getSocialIcon = (platform: string) => {
+  const icons: Record<string, any> = {
+    twitter: Twitter,
+    x: Twitter,
+    facebook: Facebook,
+    linkedin: Globe,
+    whatsapp: MessageCircle,
+    reddit: Globe,
+    instagram: Instagram,
+    youtube: Youtube,
+    tiktok: Music,
+  };
+  return icons[platform] || Globe;
+};
+
+// ─── Component ──────────────────────────────────────────
 export default function ChallengeDetailPage() {
   const { challengeId } = useParams<{ challengeId: string }>();
   const router = useRouter();
   const { supabase, profile } = useAuth();
+
+  // ─── Core State ───────────────────────────────────────
   const [challenge, setChallenge] = useState<any>(null);
   const [participant, setParticipant] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -96,47 +154,51 @@ export default function ChallengeDetailPage() {
     score: number;
     pointsToNext: number;
   } | null>(null);
-  const [trackedCompetitor, setTrackedCompetitor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
-  const [teamCode, setTeamCode] = useState("");
+
+  // ─── Type-Specific Data (single object) ───────────────
+  const [typeData, setTypeData] = useState<Record<string, any>>({});
+
+  // ─── UI State ─────────────────────────────────────────
+  const [copied, setCopied] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const [showTeamDialog, setShowTeamDialog] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [referralLink, setReferralLink] = useState("");
-  const [sharePlatform, setSharePlatform] = useState<
-    "facebook" | "twitter" | "whatsapp"
-  >("facebook");
-  const [showShareDialog, setShowShareDialog] = useState(false);
-  const [dailyLogin, setDailyLogin] = useState(false);
+
+  // ─── Social submission form state ─────────────────────
+  const [socialForm, setSocialForm] = useState({
+    postUrl: "",
+    caption: "",
+    screenshot: "",
+    platform: "facebook",
+  });
+  const [submittingSocial, setSubmittingSocial] = useState(false);
 
   const challengesService = new ChallengesService(supabase);
 
+  // ─── Data Loaders ─────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!challengeId) return;
-
     try {
-      // Fetch challenge details
-      const { data: challengeData } = await supabase
+      const { data: ch } = await supabase
         .from("challenges")
         .select("*")
         .eq("id", challengeId)
         .single();
-      setChallenge(challengeData);
+      setChallenge(ch);
 
-      // Fetch leaderboard
       const board = await challengesService.getLeaderboard(challengeId, 20);
       setLeaderboard(board);
 
-      // If user is logged in, fetch their participation and rank
       if (profile?.id) {
-        const { data: participantData } = await supabase
+        const { data: part } = await supabase
           .from("challenge_participants")
           .select("*")
           .eq("challenge_id", challengeId)
           .eq("user_id", profile.id)
           .maybeSingle();
-        setParticipant(participantData);
+        setParticipant(part);
 
         const rank = await challengesService.getUserRank(
           challengeId,
@@ -144,42 +206,134 @@ export default function ChallengeDetailPage() {
         );
         setUserRank(rank);
 
-        // Check if tracking someone
-        const tracked = await challengesService.getTrackedCompetitor(
-          challengeId,
-          profile.id,
-        );
-        setTrackedCompetitor(tracked);
-
-        // Get referral link for share challenge
-        if (challengeData?.challenge_type === "share") {
+        if (ch?.challenge_type === "share") {
           const { data: user } = await supabase
             .from("users")
             .select("referral_code")
             .eq("id", profile.id)
             .single();
-          setReferralLink(
-            `${window.location.origin}/signup?ref=${user?.referral_code || profile.id}`,
-          );
+          setTypeData((prev) => ({
+            ...prev,
+            referralLink: `${window.location.origin}/signup?ref=${user?.referral_code || profile.id}`,
+          }));
         }
       }
-    } catch (error) {
-      console.error("Error loading challenge:", error);
+    } catch (err) {
+      console.error("Error loading challenge:", err);
     } finally {
       setLoading(false);
     }
-  }, [challengeId, supabase, profile?.id, challengesService]);
+  }, [challengeId, supabase, profile?.id]);
 
+  // ─── Type-Specific Loaders ────────────────────────────
+  const loadTypeData = useCallback(
+    async (type: string) => {
+      if (!challengeId || !profile?.id) return;
+      const d: Record<string, any> = {};
+
+      if (type === "referral") {
+        const [{ data: stats }, { data: lb }, { data: user }] =
+          await Promise.all([
+            supabase.rpc("get_user_referral_challenge_stats", {
+              p_challenge_id: challengeId,
+              p_user_id: profile.id,
+            }),
+            supabase.rpc("get_referral_challenge_leaderboard", {
+              p_challenge_id: challengeId,
+              p_limit: 20,
+            }),
+            supabase
+              .from("users")
+              .select("referral_code")
+              .eq("id", profile.id)
+              .single(),
+          ]);
+        d.referralStats = stats?.[0] || null;
+        d.referralLeaderboard = lb || [];
+        d.referralLink = `${window.location.origin}/signup?ref=${user?.referral_code || profile.id}`;
+      }
+
+      if (type === "purchase") {
+        const productId = challenge?.scoring_config?.product_id;
+        const [{ data: prod }, { data: lb }] = await Promise.all([
+          productId
+            ? supabase
+                .from("products")
+                .select("id, name, price, image_url, category")
+                .eq("id", productId)
+                .single()
+            : Promise.resolve({ data: null }),
+          supabase.rpc("get_purchase_challenge_leaderboard", {
+            p_challenge_id: challengeId,
+            p_limit: 10,
+          }),
+        ]);
+        d.targetProduct = prod;
+        d.purchaseLeaderboard = lb || [];
+      }
+
+      if (type === "team" && participant?.team_id) {
+        const [{ data: spending }, { data: allTeams }, { count: memberCount }] =
+          await Promise.all([
+            supabase
+              .from("challenge_team_spending")
+              .select("amount_spent")
+              .eq("team_id", participant.team_id),
+            supabase
+              .from("challenge_teams")
+              .select("id, total_team_spending")
+              .eq("challenge_id", challengeId)
+              .order("total_team_spending", { ascending: false }),
+            supabase
+              .from("challenge_participants")
+              .select("*", { count: "exact" })
+              .eq("team_id", participant.team_id),
+          ]);
+        d.teamStats = {
+          total_spending:
+            spending?.reduce((s, r) => s + r.amount_spent, 0) || 0,
+          member_count: memberCount || 0,
+          rank:
+            (allTeams?.findIndex((t) => t.id === participant.team_id) ?? -1) +
+            1,
+        };
+      }
+
+      if (type === "social") {
+        const { data: subs } = await supabase
+          .from("challenge_social_submissions")
+          .select("*")
+          .eq("challenge_id", challengeId)
+          .eq("user_id", profile.id)
+          .order("created_at", { ascending: false });
+        d.socialSubmissions = subs || [];
+      }
+
+      setTypeData((prev) => ({ ...prev, ...d }));
+    },
+    [challengeId, supabase, profile?.id, challenge, participant],
+  );
+
+  // ─── Initial Load & Real-time ─────────────────────────
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Real-time updates for leaderboard and participant
+  useEffect(() => {
+    if (challenge?.challenge_type && profile?.id)
+      loadTypeData(challenge.challenge_type);
+  }, [
+    challenge?.challenge_type,
+    participant?.team_id,
+    profile?.id,
+    loadTypeData,
+  ]);
+
+  // Single real-time channel
   useEffect(() => {
     if (!challengeId) return;
-
-    const channel = supabase
-      .channel(`challenge-${challengeId}`)
+    const ch = supabase
+      .channel(`challenge-detail-${challengeId}`)
       .on(
         "postgres_changes",
         {
@@ -188,257 +342,159 @@ export default function ChallengeDetailPage() {
           table: "challenge_participants",
           filter: `challenge_id=eq.${challengeId}`,
         },
-        () => {
-          loadData();
-        },
+        () => loadData(),
       )
       .subscribe();
-
     return () => {
-      channel.unsubscribe();
+      ch.unsubscribe();
     };
   }, [challengeId, supabase, loadData]);
 
+  // ─── Actions ──────────────────────────────────────────
   const handleJoinChallenge = async () => {
     if (!profile) {
       router.push("/login");
       return;
     }
-
     setJoining(true);
     try {
       await challengesService.joinChallenge(challengeId, profile.id);
-      toast.success("Successfully joined the challenge!");
+      toast.success("Joined!");
       loadData();
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       setJoining(false);
     }
   };
 
-  const handleCreateTeam = async () => {
-    if (!newTeamName.trim()) {
-      toast.error("Please enter a team name");
-      return;
-    }
-
+  const handleSocialSubmission = async () => {
     if (!profile) {
       router.push("/login");
       return;
     }
-
-    setJoining(true);
-    try {
-      const team = await challengesService.createTeam(
-        challengeId,
-        profile.id,
-        newTeamName,
-      );
-      toast.success(`Team "${team.team_name}" created!`);
-      setShowTeamDialog(false);
-      setNewTeamName("");
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setJoining(false);
-    }
-  };
-
-  const handleJoinTeam = async () => {
-    if (!teamCode.trim()) {
-      toast.error("Please enter a team code");
+    if (!socialForm.postUrl.trim()) {
+      toast.error("Post URL required");
       return;
     }
-
-    if (!profile) {
-      router.push("/login");
-      return;
-    }
-
-    setJoining(true);
+    setSubmittingSocial(true);
     try {
-      await challengesService.joinTeamByCode(teamCode, profile?.id);
-      toast.success("Successfully joined the team!");
-      setTeamCode("");
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
+      await supabase.from("challenge_social_submissions").insert({
+        challenge_id: challengeId,
+        user_id: profile.id,
+        post_url: socialForm.postUrl,
+        platform: socialForm.platform,
+        hashtag: challenge?.scoring_config?.target_hashtag || "Challenge",
+        caption: socialForm.caption,
+        screenshot_url: socialForm.screenshot,
+        status: "pending",
+      });
+      toast.success("Submitted for review!");
+      setSocialForm({
+        postUrl: "",
+        caption: "",
+        screenshot: "",
+        platform: "facebook",
+      });
+      loadTypeData("social");
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
-      setJoining(false);
+      setSubmittingSocial(false);
     }
   };
 
-  const handleTrackCompetitor = async (userId: string) => {
-    if (!profile) return;
-
-    try {
-      await challengesService.trackCompetitor(challengeId, profile.id, userId);
-      toast.success("Now tracking this competitor!");
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
-    }
-  };
-
-  const handleDailyLogin = async () => {
-    if (!profile) {
-      router.push("/login");
-      return;
-    }
-
-    setDailyLogin(true);
-    try {
-      const result = await challengesService.recordAction(
-        challengeId,
-        profile.id,
-        "daily_login",
-        undefined,
-        { date: new Date().toISOString() },
-      );
-      toast.success(`+${result.pointsAwarded} points for daily login!`);
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setDailyLogin(false);
-    }
-  };
-
-  const handleSocialShare = async () => {
-    if (!profile) return;
-
-    const shareUrl = `${window.location.origin}/challenges/${challengeId}`;
-    const shareText = `I'm participating in ${challenge?.name}! Join me and win amazing prizes!`;
-
-    let shareLink = "";
-    switch (sharePlatform) {
-      case "facebook":
-        shareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
-        break;
-      case "twitter":
-        shareLink = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-        break;
-      case "whatsapp":
-        shareLink = `https://wa.me/?text=${encodeURIComponent(shareText + " " + shareUrl)}`;
-        break;
-    }
-
-    window.open(shareLink, "_blank");
-
-    try {
-      const result = await challengesService.recordAction(
-        challengeId,
-        profile.id,
-        "share_posted",
-        undefined,
-        { platform: sharePlatform, share_url: shareUrl },
-      );
-      toast.success(`+${result.pointsAwarded} points for sharing!`);
-      setShowShareDialog(false);
-      loadData();
-    } catch (error: any) {
-      toast.error(error.message);
-    }
+  const shareReferral = (platform: string) => {
+    const link = typeData.referralLink || "";
+    const text = `Join me on ${window.location.hostname}! Use my referral link: `;
+    const urls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(text + " " + link)}`,
+    };
+    window.open(urls[platform] || link, "_blank");
   };
 
   const copyReferralLink = () => {
-    navigator.clipboard.writeText(referralLink);
+    navigator.clipboard.writeText(typeData.referralLink || "");
     setCopied(true);
-    toast.success("Referral link copied!");
+    toast.success("Link copied!");
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // ─── Derived Values ───────────────────────────────────
   const isActive =
     challenge?.status === "active" &&
     new Date(challenge.starts_at) <= new Date() &&
     new Date(challenge.ends_at) >= new Date();
-
   const hasJoined = !!participant;
-  const isTeamChallenge = challenge?.allow_teams;
   const config = challenge
-    ? CHALLENGE_ICONS[challenge.challenge_type]
+    ? CHALLENGE_ICONS[challenge.challenge_type] || CHALLENGE_ICONS.purchase
     : CHALLENGE_ICONS.purchase;
-  const Icon = config?.icon || Target;
+  const Icon = config.icon;
   const timeRemaining = challenge?.ends_at
     ? formatDistanceToNow(new Date(challenge.ends_at), { addSuffix: true })
     : null;
   const isUrgent =
     challenge?.ends_at &&
-    new Date(challenge.ends_at).getTime() - Date.now() < 24 * 60 * 60 * 1000;
+    new Date(challenge.ends_at).getTime() - Date.now() < 864e5;
+  const td = typeData; // shorthand
 
-  if (loading) {
+  // ─── Loading / Not Found ──────────────────────────────
+  if (loading)
     return (
       <div className="container mx-auto px-4 py-12 flex justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
       </div>
     );
-  }
-
-  if (!challenge) {
+  if (!challenge)
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h2 className="text-xl font-semibold mb-2">Challenge Not Found</h2>
-        <p className="text-muted-foreground mb-4">
-          This challenge doesn't exist or has been removed.
-        </p>
         <Button onClick={() => router.push("/challenges")}>
           Browse Challenges
         </Button>
       </div>
     );
-  }
 
+  // ─── Render ───────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      {/* Hero Section */}
-      <div
-        className={cn(
-          "bg-gradient-to-r text-white py-12",
-          config?.color || "from-purple-600 to-pink-600",
-        )}
-      >
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="h-5 w-5" />
-                <Badge className="bg-white/20 text-white border-0">
-                  {config?.label}
+      {/* Hero */}
+      <div className={cn("bg-gradient-to-r text-white py-12", config.color)}>
+        <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Icon className="h-5 w-5" />
+              <Badge className="bg-white/20 text-white border-0">
+                {config.label}
+              </Badge>
+              {isUrgent && (
+                <Badge className="bg-red-500 text-white border-0 animate-pulse">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Ends {timeRemaining}
                 </Badge>
-                {isUrgent && (
-                  <Badge className="bg-red-500 text-white border-0 animate-pulse">
-                    <Clock className="h-3 w-3 mr-1" />
-                    Ends {timeRemaining}
-                  </Badge>
-                )}
-              </div>
-              <h1 className="text-3xl md:text-4xl font-bold">
-                {challenge.name}
-              </h1>
-              <p className="opacity-90 mt-2 max-w-2xl">
-                {challenge.description}
-              </p>
+              )}
             </div>
-
-            {!hasJoined && isActive && (
-              <Button
-                size="lg"
-                className="bg-white text-purple-600 hover:bg-gray-100"
-                onClick={handleJoinChallenge}
-                disabled={joining}
-              >
-                {joining ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Target className="h-4 w-4 mr-2" />
-                )}
-                Join Challenge
-              </Button>
-            )}
+            <h1 className="text-3xl md:text-4xl font-bold">{challenge.name}</h1>
+            <p className="opacity-90 mt-2 max-w-2xl">{challenge.description}</p>
           </div>
+          {!hasJoined && isActive && (
+            <Button
+              size="lg"
+              className="bg-white text-purple-600 hover:bg-gray-100"
+              onClick={handleJoinChallenge}
+              disabled={joining}
+            >
+              {joining ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Target className="h-4 w-4 mr-2" />
+              )}
+              Join Challenge
+            </Button>
+          )}
         </div>
       </div>
 
@@ -446,106 +502,239 @@ export default function ChallengeDetailPage() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Your Stats Card */}
+            {/* Progress Card */}
             {hasJoined && (
               <Card>
-                <CardContent>
+                <CardContent className="p-6">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Target className="h-5 w-5 text-purple-500" />
                     Your Progress
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center p-3 rounded-lg bg-muted/50">
-                      <p className="text-2xl font-bold text-purple-600">
-                        {participant?.current_score || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Total Points
-                      </p>
-                    </div>
-                    <div className="text-center p-3 rounded-lg bg-muted/50">
-                      <p className="text-2xl font-bold">
-                        #{userRank?.rank || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Your Rank</p>
-                    </div>
+                    <StatBox
+                      label="Total Points"
+                      value={participant?.current_score || 0}
+                      color="text-purple-600"
+                    />
+                    <StatBox
+                      label="Your Rank"
+                      value={`#${userRank?.rank || 0}`}
+                    />
                     {challenge.challenge_type === "streak" && (
-                      <div className="text-center p-3 rounded-lg bg-muted/50">
-                        <p className="text-2xl font-bold text-orange-500">
-                          {participant?.current_streak || 0}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Day Streak
-                        </p>
-                      </div>
+                      <StatBox
+                        label="Day Streak"
+                        value={participant?.current_streak || 0}
+                        color="text-orange-500"
+                      />
                     )}
-                    <div className="text-center p-3 rounded-lg bg-muted/50">
-                      <p className="text-2xl font-bold">
-                        {userRank?.pointsToNext || 0}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Points to Next Rank
-                      </p>
-                    </div>
+                    <StatBox
+                      label="To Next Rank"
+                      value={userRank?.pointsToNext || 0}
+                    />
+
+                    {/* Type-specific stats */}
+                    {challenge.challenge_type === "purchase" && (
+                      <StatBox
+                        label="Units Purchased"
+                        value={
+                          participant?.metadata?.total_units_purchased || 0
+                        }
+                        color="text-green-600"
+                      />
+                    )}
+                    {challenge.challenge_type === "referral" && (
+                      <StatBox
+                        label="Total Referrals"
+                        value={td.referralStats?.total_referrals || 0}
+                        color="text-blue-600"
+                      />
+                    )}
+                    {challenge.challenge_type === "referral" && (
+                      <StatBox
+                        label="Signups"
+                        value={td.referralStats?.signup_referrals || 0}
+                        color="text-green-600"
+                      />
+                    )}
+                    {challenge.challenge_type === "referral" && (
+                      <StatBox
+                        label="Purchases"
+                        value={td.referralStats?.purchase_referrals || 0}
+                        color="text-purple-600"
+                      />
+                    )}
+                    {challenge.challenge_type === "streak" && (
+                      <StatBox
+                        label="Best Streak"
+                        value={participant?.best_streak || 0}
+                        color="text-purple-500"
+                      />
+                    )}
                   </div>
 
-                  {/* Tracked Competitor */}
-                  {trackedCompetitor && (
-                    <div className="mt-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        <Eye className="h-4 w-4 text-blue-500" />
-                        Tracking: {trackedCompetitor.full_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Need {trackedCompetitor.points_needed_to_overtake}{" "}
-                        points to overtake!
-                      </p>
+                  {/* Referral Progress */}
+                  {challenge.challenge_type === "referral" &&
+                    td.referralStats && (
+                      <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium">
+                            Referral Progress
+                          </p>
+                          <Badge variant="outline" className="text-xs">
+                            {td.referralStats.pending_referrals || 0} pending
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <ProgressRow
+                            label="Signup Conversions"
+                            done={td.referralStats.signup_referrals || 0}
+                            total={td.referralStats.total_referrals || 1}
+                          />
+                          <ProgressRow
+                            label="Purchase Conversions"
+                            done={td.referralStats.purchase_referrals || 0}
+                            total={td.referralStats.total_referrals || 1}
+                            className="bg-purple-200"
+                          />
+                        </div>
+                        {td.referralStats.conversion_rate > 0 && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Conversion rate: {td.referralStats.conversion_rate}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                  {/* Streak Calendar */}
+                  {challenge.challenge_type === "streak" && (
+                    <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium">
+                          <Flame className="h-4 w-4 text-orange-500 inline mr-1" />
+                          Streak Progress
+                        </p>
+                        {challenge.require_active_status && (
+                          <Badge variant="outline" className="text-xs">
+                            Active Only
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        {Array.from({
+                          length: challenge.scoring_config?.days_required || 7,
+                        }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "flex-1 h-8 rounded",
+                              i < (participant?.current_streak || 0)
+                                ? "bg-gradient-to-b from-orange-500 to-red-500"
+                                : "bg-gray-200 dark:bg-gray-700",
+                            )}
+                            title={`Day ${i + 1}`}
+                          />
+                        ))}
+                      </div>
+                      {challenge.scoring_config?.bonus_milestones &&
+                        Object.keys(challenge.scoring_config.bonus_milestones)
+                          .length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {Object.entries(
+                              challenge.scoring_config.bonus_milestones,
+                            ).map(([day, bonus]) => (
+                              <div
+                                key={day}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <Star className="h-3 w-3 text-yellow-500" />
+                                <span className="text-muted-foreground">
+                                  Day {day}: +{bonus as number} bonus
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                     </div>
                   )}
+
+                  {/* Team Stats */}
+                  {challenge.allow_teams &&
+                    participant?.team_id &&
+                    td.teamStats && (
+                      <div className="mt-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium">
+                            <UsersRound className="h-4 w-4 text-purple-500 inline mr-1" />
+                            Team Stats
+                          </p>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link
+                              href={`/challenges/${challengeId}/teams/manage`}
+                            >
+                              View Team
+                              <ArrowRight className="h-3 w-3 ml-1" />
+                            </Link>
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <MiniStat
+                            label="Team KSH"
+                            value={
+                              td.teamStats.total_spending?.toLocaleString() || 0
+                            }
+                            color="text-purple-600"
+                          />
+                          <MiniStat
+                            label="Members"
+                            value={`${td.teamStats.member_count}/${challenge.max_team_size}`}
+                          />
+                          <MiniStat
+                            label="Rank"
+                            value={`#${td.teamStats.rank || "?"}`}
+                            color="text-yellow-600"
+                          />
+                        </div>
+                      </div>
+                    )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Action Buttons */}
+            {/* Actions Card */}
             {hasJoined && isActive && (
               <Card>
                 <CardContent className="p-6">
                   <h3 className="font-semibold mb-4">Take Action</h3>
 
+                  {/* ─── TYPE-SPECIFIC ACTIONS ─── */}
+
+                  {/* REFERRAL */}
                   {challenge.challenge_type === "referral" && (
-                    <div className="space-y-3">
-                      <Button className="w-full" asChild>
-                        <Link href="/account/referrals">
-                          <Users className="h-4 w-4 mr-2" />
-                          Refer a Friend
-                        </Link>
-                      </Button>
-                    </div>
-                  )}
-
-                  {challenge.challenge_type === "purchase" && (
-                    <Button className="w-full" asChild>
-                      <Link href="/shop">
-                        <ShoppingBag className="h-4 w-4 mr-2" />
-                        Shop Now
-                      </Link>
-                    </Button>
-                  )}
-
-                  {challenge.challenge_type === "share" && (
-                    <div className="space-y-3">
-                      <Button
-                        className="w-full"
-                        onClick={() => setShowShareDialog(true)}
+                    <div className="space-y-4">
+                      <InfoBox
+                        icon={Users}
+                        color="text-blue-500"
+                        title="How to Earn"
                       >
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Share Challenge
-                      </Button>
+                        <li>Share your referral link with friends</li>
+                        <li>
+                          {challenge.scoring_config?.referral_type === "signup"
+                            ? "Points when they become active"
+                            : challenge.scoring_config?.referral_type ===
+                                "first_purchase"
+                              ? "Points on first purchase"
+                              : "Points for signups & purchases"}
+                        </li>
+                        <li>
+                          {challenge.scoring_config?.points_per_referral || 100}{" "}
+                          pts per referral
+                        </li>
+                      </InfoBox>
                       <div className="flex gap-2">
                         <Input
-                          value={referralLink}
+                          value={td.referralLink || ""}
                           readOnly
-                          className="flex-1"
+                          className="font-mono text-sm flex-1"
                         />
                         <Button variant="outline" onClick={copyReferralLink}>
                           {copied ? (
@@ -555,92 +744,380 @@ export default function ChallengeDetailPage() {
                           )}
                         </Button>
                       </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => shareReferral("facebook")}
+                        >
+                          <Facebook className="h-4 w-4 mr-1" />
+                          Facebook
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => shareReferral("twitter")}
+                        >
+                          <Twitter className="h-4 w-4 mr-1" />
+                          Twitter
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => shareReferral("whatsapp")}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          WhatsApp
+                        </Button>
+                      </div>
+                      {td.referralLeaderboard?.length > 0 && (
+                        <MiniLeaderboard
+                          title="Top Referrers"
+                          entries={td.referralLeaderboard.slice(0, 5)}
+                          valueKey="total_referrals"
+                          valueSuffix=" refs"
+                          currentUserId={profile?.id}
+                        />
+                      )}
                     </div>
                   )}
 
+                  {/* PURCHASE */}
+                  {challenge.challenge_type === "purchase" && (
+                    <div className="space-y-4">
+                      {td.targetProduct && (
+                        <div className="p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                          <h4 className="font-semibold mb-2">
+                            <ShoppingBag className="h-4 w-4 text-green-500 inline mr-1" />
+                            Target Product
+                          </h4>
+                          <div className="flex items-center gap-3">
+                            {td.targetProduct.image_url && (
+                              <img
+                                src={td.targetProduct.image_url}
+                                alt=""
+                                className="w-16 h-16 rounded-lg object-cover"
+                              />
+                            )}
+                            <div>
+                              <p className="font-medium">
+                                {td.targetProduct.name}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                KSH {td.targetProduct.price?.toLocaleString()}
+                              </p>
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                {challenge.scoring_config?.points_per_unit ||
+                                  10}{" "}
+                                pts/unit
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <Button className="w-full" size="lg" asChild>
+                        <Link
+                          href={`/?product=${challenge.scoring_config?.product_id}`}
+                        >
+                          <ShoppingBag className="h-4 w-4 mr-2" />
+                          Buy Now & Earn Points
+                        </Link>
+                      </Button>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[1, 3, 5].map((qty) => (
+                          <Button
+                            key={qty}
+                            variant="outline"
+                            size="sm"
+                            className="relative"
+                            asChild
+                          >
+                            <Link
+                              href={`/?product=${challenge.scoring_config?.product_id}&qty=${qty}`}
+                            >
+                              <div className="text-center">
+                                <p className="font-bold">{qty}x</p>
+                                <p className="text-xs">
+                                  +
+                                  {(challenge.scoring_config?.points_per_unit ||
+                                    10) * qty}{" "}
+                                  pts
+                                </p>
+                              </div>
+                            </Link>
+                          </Button>
+                        ))}
+                      </div>
+                      {td.purchaseLeaderboard?.length > 0 && (
+                        <MiniLeaderboard
+                          title="Top Buyers"
+                          entries={td.purchaseLeaderboard.slice(0, 3)}
+                          valueKey="total_units"
+                          valueSuffix=" units"
+                          currentUserId={profile?.id}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  {/* STREAK */}
                   {challenge.challenge_type === "streak" && (
                     <Button
                       className="w-full"
-                      onClick={handleDailyLogin}
-                      disabled={dailyLogin}
+                      onClick={async () => {
+                        if (!profile) {
+                          router.push("/login");
+                          return;
+                        }
+                        try {
+                          const r = await challengesService.recordAction(
+                            challengeId,
+                            profile.id,
+                            "daily_login",
+                            undefined,
+                            { date: new Date().toISOString() },
+                          );
+                          toast.success(`+${r.pointsAwarded} pts!`);
+                          loadData();
+                        } catch (e: any) {
+                          toast.error(e.message);
+                        }
+                      }}
                     >
                       <Flame className="h-4 w-4 mr-2" />
-                      {dailyLogin ? "Processing..." : "Daily Login"}
+                      Daily Login
                     </Button>
                   )}
 
+                  {/* SOCIAL */}
                   {challenge.challenge_type === "social" && (
-                    <div className="space-y-3">
-                      <Input
-                        placeholder="Post your hashtag link"
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            if (!profile) {
-                              router.push("/login");
-                              return;
-                            }
-
-                            challengesService
-                              .recordAction(
-                                challengeId,
-                                profile.id,
-                                "social_hashtag",
-                                undefined,
-                                {
-                                  hashtag:
-                                    challenge.scoring_config?.target_hashtag,
-                                  post_url: e.target.value,
-                                },
-                              )
-                              .then(() => {
-                                toast.success("Points awarded!");
-                                loadData();
-                              });
+                    <div className="space-y-4">
+                      <InfoBox
+                        icon={Heart}
+                        color="text-pink-500"
+                        title="How to Participate"
+                      >
+                        <li>
+                          1. Create a post on social media with the hashtag
+                        </li>
+                        <li>2. Submit the post URL below for verification</li>
+                        <li>3. Wait for admin approval to earn points</li>
+                      </InfoBox>
+                      <div>
+                        <Label>Target Hashtag</Label>
+                        <p className="text-lg font-bold text-purple-600 mt-1">
+                          #
+                          {challenge.scoring_config?.target_hashtag ||
+                            "Challenge"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label>Platform</Label>
+                        <Select
+                          value={socialForm.platform}
+                          onValueChange={(v) =>
+                            setSocialForm((p) => ({ ...p, platform: v }))
                           }
-                        }}
-                      />
-                      <p className="text-xs text-muted-foreground text-center">
-                        Use hashtag:{" "}
-                        {challenge.scoring_config?.target_hashtag ||
-                          "#Challenge"}
-                      </p>
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              "facebook",
+                              "twitter",
+                              "instagram",
+                              "tiktok",
+                              "linkedin",
+                              "youtube",
+                            ].map((p) => (
+                              <SelectItem key={p} value={p}>
+                                <div className="flex items-center gap-2">
+                                  {React.createElement(getSocialIcon(p), {
+                                    className: "h-4 w-4",
+                                  })}
+                                  {p}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Post URL *</Label>
+                        <Input
+                          placeholder="https://..."
+                          value={socialForm.postUrl}
+                          onChange={(e) =>
+                            setSocialForm((p) => ({
+                              ...p,
+                              postUrl: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label>Caption</Label>
+                        <Textarea
+                          placeholder="What did you write?"
+                          value={socialForm.caption}
+                          onChange={(e) =>
+                            setSocialForm((p) => ({
+                              ...p,
+                              caption: e.target.value,
+                            }))
+                          }
+                          rows={2}
+                        />
+                      </div>
+                      <div>
+                        <Label>Screenshot URL</Label>
+                        <Input
+                          placeholder="https://..."
+                          value={socialForm.screenshot}
+                          onChange={(e) =>
+                            setSocialForm((p) => ({
+                              ...p,
+                              screenshot: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                      <Button
+                        className="w-full"
+                        onClick={handleSocialSubmission}
+                        disabled={!socialForm.postUrl || submittingSocial}
+                      >
+                        {submittingSocial ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-2" />
+                        )}
+                        Submit for Review
+                      </Button>
+                      {td.socialSubmissions?.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold">Your Submissions</h4>
+                          {td.socialSubmissions.map((sub: any) => (
+                            <div
+                              key={sub.id}
+                              className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                            >
+                              <div className="flex items-center gap-2">
+                                {React.createElement(
+                                  getSocialIcon(sub.platform),
+                                  { className: "h-4 w-4" },
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium truncate max-w-[200px]">
+                                    {sub.post_url}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(
+                                      new Date(sub.created_at),
+                                      { addSuffix: true },
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {sub.status === "approved" && (
+                                  <Badge className="bg-green-100 text-green-700">
+                                    +
+                                    {(sub.points_awarded || 0) +
+                                      (sub.bonus_points || 0)}{" "}
+                                    pts
+                                  </Badge>
+                                )}
+                                <Badge
+                                  variant={
+                                    sub.status === "approved"
+                                      ? "default"
+                                      : sub.status === "rejected"
+                                        ? "destructive"
+                                        : "secondary"
+                                  }
+                                >
+                                  {sub.status}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Team Section */}
-            {isTeamChallenge && !hasJoined && isActive && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4 flex items-center gap-2">
-                    <UsersRound className="h-5 w-5" />
-                    Join or Create a Team
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter team code"
-                        value={teamCode}
-                        onChange={(e) => setTeamCode(e.target.value)}
-                      />
-                      <Button onClick={handleJoinTeam} disabled={joining}>
-                        Join Team
+                  {/* TEAM */}
+                  {challenge.challenge_type === "team" && (
+                    <div className="space-y-3">
+                      {!participant?.team_id ? (
+                        <>
+                          <Button className="w-full" asChild>
+                            <Link
+                              href={`/challenges/${challengeId}/teams/discover`}
+                            >
+                              <UsersRound className="h-4 w-4 mr-2" />
+                              Find or Create a Team
+                            </Link>
+                          </Button>
+                          <p className="text-sm text-muted-foreground text-center">
+                            Team up with {challenge.min_team_size || 2}-
+                            {challenge.max_team_size || 5} others!
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Button className="w-full" asChild>
+                            <Link
+                              href={`/challenges/${challengeId}/teams/manage`}
+                            >
+                              <UsersRound className="h-4 w-4 mr-2" />
+                              Manage Your Team
+                            </Link>
+                          </Button>
+                          <Button className="w-full" variant="outline" asChild>
+                            <Link href="/">
+                              <ShoppingBag className="h-4 w-4 mr-2" />
+                              Shop to Help Your Team
+                            </Link>
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TRIVIA */}
+                  {challenge.challenge_type === "trivia" && (
+                    <div className="space-y-3">
+                      <InfoBox
+                        icon={Brain}
+                        color="text-yellow-500"
+                        title="How It Works"
+                      >
+                        <li>Get a ticket via Spin & Win</li>
+                        <li>Host calls participants in order</li>
+                        <li>Answer correctly to earn points</li>
+                        <li>Top 3 win prizes!</li>
+                      </InfoBox>
+                      {challenge.scoring_config.spin_game_id && (
+                        <Button className="w-full" asChild>
+                          <Link
+                            href={`/spin/${challenge.scoring_config.spin_game_id}`}
+                          >
+                            <Brain className="h-4 w-4 mr-2" />
+                            Spin to participate
+                          </Link>
+                        </Button>
+                      )}
+                      <Button className="w-full" asChild>
+                        <Link href={`/challenges/${challengeId}/trivia`}>
+                          <Brain className="h-4 w-4 mr-2" />
+                          Go to Trivia
+                        </Link>
                       </Button>
                     </div>
-                    <div className="text-center">
-                      <span className="text-sm text-muted-foreground">or</span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => setShowTeamDialog(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create New Team
-                    </Button>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -648,7 +1125,6 @@ export default function ChallengeDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Leaderboard Preview */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
@@ -656,11 +1132,6 @@ export default function ChallengeDetailPage() {
                     <Trophy className="h-5 w-5 text-yellow-500" />
                     Leaderboard
                   </h3>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/challenges/${challengeId}/leaderboard`}>
-                      View All
-                    </Link>
-                  </Button>
                 </div>
                 <div className="space-y-2">
                   {leaderboard.slice(0, 5).map((entry, idx) => (
@@ -673,36 +1144,27 @@ export default function ChallengeDetailPage() {
                     >
                       <div className="flex items-center gap-2">
                         <span className="w-6 text-center font-bold">
-                          {idx === 0 && (
+                          {idx === 0 ? (
                             <Crown className="h-4 w-4 text-yellow-500" />
-                          )}
-                          {idx === 1 && (
+                          ) : idx === 1 ? (
                             <Award className="h-4 w-4 text-gray-400" />
-                          )}
-                          {idx === 2 && (
+                          ) : idx === 2 ? (
                             <Award className="h-4 w-4 text-amber-600" />
+                          ) : (
+                            `#${idx + 1}`
                           )}
-                          {idx > 2 && `#${idx + 1}`}
                         </span>
                         <span className="text-sm truncate max-w-[120px]">
                           {entry.users?.full_name || "Anonymous"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold">{entry.current_score}</span>
-                        {entry.user_id === profile?.id && (
-                          <Badge variant="outline" className="text-xs">
-                            You
-                          </Badge>
-                        )}
-                      </div>
+                      <span className="font-bold">{entry.current_score}</span>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Prize Tiers */}
             <Card>
               <CardContent className="p-6">
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
@@ -725,75 +1187,37 @@ export default function ChallengeDetailPage() {
                         <span className="font-medium">Rank {tier.rank}</span>
                       </div>
                       <Badge variant="outline">
-                        {tier.prize_type === "points" &&
-                          `${tier.prize_value} points`}
-                        {tier.prize_type === "discount" &&
-                          `${tier.prize_value}% off`}
-                        {tier.prize_type === "badge" && tier.prize_value}
+                        {tier.prize_type === "points"
+                          ? `${tier.prize_value} pts`
+                          : tier.prize_type === "discount"
+                            ? `${tier.prize_value}% off`
+                            : tier.prize_value}
                       </Badge>
                     </div>
                   ))}
                 </div>
-
-                {challenge.participation_points > 0 && (
-                  <div className="mt-4 pt-3 border-t">
-                    <div className="flex justify-between items-center text-sm">
-                      <span>Participation Prize</span>
-                      <Badge variant="outline">
-                        {challenge.participation_points} points
-                      </Badge>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
-            {/* Challenge Info */}
             <Card>
               <CardContent className="p-6 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Starts</span>
-                  <span>{format(new Date(challenge.starts_at), "PPP")}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Ends</span>
-                  <span className={isUrgent ? "text-red-500 font-medium" : ""}>
-                    {format(new Date(challenge.ends_at), "PPP")}
-                  </span>
-                </div>
+                <InfoRow
+                  label="Starts"
+                  value={format(new Date(challenge.starts_at), "PPP")}
+                />
+                <InfoRow
+                  label="Ends"
+                  value={format(new Date(challenge.ends_at), "PPP")}
+                  urgent={isUrgent}
+                />
                 {challenge.allow_teams && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Teams</span>
-                    <span>Up to {challenge.max_team_size} members</span>
-                  </div>
+                  <InfoRow
+                    label="Teams"
+                    value={`Up to ${challenge.max_team_size} members`}
+                  />
                 )}
               </CardContent>
             </Card>
-
-            {/* Track Competitor */}
-            {hasJoined && leaderboard.length > 1 && profile?.id && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-3">Track a Competitor</h3>
-                  <select
-                    className="w-full rounded-lg border p-2 text-sm"
-                    onChange={(e) => handleTrackCompetitor(e.target.value)}
-                    value=""
-                  >
-                    <option value="">Select a player to track</option>
-                    {leaderboard
-                      .filter((p) => p.user_id !== profile.id)
-                      .slice(0, 10)
-                      .map((p) => (
-                        <option key={p.user_id} value={p.user_id}>
-                          {p.users?.full_name || "Anonymous"} -{" "}
-                          {p.current_score} pts
-                        </option>
-                      ))}
-                  </select>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </div>
       </div>
@@ -803,43 +1227,27 @@ export default function ChallengeDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Share Challenge</DialogTitle>
-            <DialogDescription>
-              Share this challenge and earn points!
-            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex gap-2 justify-center">
+          <div className="flex gap-2 justify-center py-4">
+            {["facebook", "twitter", "whatsapp"].map((p) => (
               <Button
+                key={p}
                 variant="outline"
                 onClick={() => {
-                  setSharePlatform("facebook");
-                  handleSocialShare();
+                  shareReferral(p);
+                  setShowShareDialog(false);
                 }}
               >
-                <Facebook className="h-4 w-4 mr-2" />
-                Facebook
+                {p === "facebook" ? (
+                  <Facebook className="h-4 w-4 mr-2" />
+                ) : p === "twitter" ? (
+                  <Twitter className="h-4 w-4 mr-2" />
+                ) : (
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                )}
+                {p}
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSharePlatform("twitter");
-                  handleSocialShare();
-                }}
-              >
-                <Twitter className="h-4 w-4 mr-2" />
-                Twitter
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSharePlatform("whatsapp");
-                  handleSocialShare();
-                }}
-              >
-                <div className="h-4 w-4 mr-2">📱</div>
-                WhatsApp
-              </Button>
-            </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
@@ -849,9 +1257,6 @@ export default function ChallengeDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create a Team</DialogTitle>
-            <DialogDescription>
-              Give your team a name to start competing together
-            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <Input
@@ -860,8 +1265,28 @@ export default function ChallengeDetailPage() {
               onChange={(e) => setNewTeamName(e.target.value)}
             />
             <Button
-              onClick={handleCreateTeam}
               className="w-full"
+              onClick={async () => {
+                if (!newTeamName.trim()) {
+                  toast.error("Enter a name");
+                  return;
+                }
+                setJoining(true);
+                try {
+                  await challengesService.createTeam(
+                    challengeId,
+                    profile!.id,
+                    newTeamName,
+                  );
+                  toast.success("Team created!");
+                  setShowTeamDialog(false);
+                  loadData();
+                } catch (e: any) {
+                  toast.error(e.message);
+                } finally {
+                  setJoining(false);
+                }
+              }}
               disabled={joining}
             >
               {joining ? (
@@ -874,6 +1299,151 @@ export default function ChallengeDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ─── Helper Sub-Components ──────────────────────────────
+function StatBox({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color?: string;
+}) {
+  return (
+    <div className="text-center p-3 rounded-lg bg-muted/50">
+      <p className={cn("text-2xl font-bold", color || "")}>{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+function MiniStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string | number;
+  color?: string;
+}) {
+  return (
+    <div>
+      <p className={cn("text-lg font-bold", color || "")}>{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+function InfoRow({
+  label,
+  value,
+  urgent,
+}: {
+  label: string;
+  value: string;
+  urgent?: boolean;
+}) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={urgent ? "text-red-500 font-medium" : ""}>{value}</span>
+    </div>
+  );
+}
+function ProgressRow({
+  label,
+  done,
+  total,
+  className,
+}: {
+  label: string;
+  done: number;
+  total: number;
+  className?: string;
+}) {
+  return (
+    <div>
+      <div className="flex justify-between text-xs mb-1">
+        <span>{label}</span>
+        <span>{done} completed</span>
+      </div>
+      <Progress
+        value={total > 0 ? (done / total) * 100 : 0}
+        className={cn("h-2", className)}
+      />
+    </div>
+  );
+}
+function InfoBox({
+  icon: Icon,
+  color,
+  title,
+  children,
+}: {
+  icon: any;
+  color: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="p-4 rounded-lg bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
+      <h4 className="font-semibold mb-2 flex items-center gap-2">
+        <Icon className={cn("h-4 w-4", color)} />
+        {title}
+      </h4>
+      <ul className="text-sm space-y-1 text-muted-foreground">{children}</ul>
+    </div>
+  );
+}
+function MiniLeaderboard({
+  title,
+  entries,
+  valueKey,
+  valueSuffix,
+  currentUserId,
+}: {
+  title: string;
+  entries: any[];
+  valueKey: string;
+  valueSuffix: string;
+  currentUserId?: string;
+}) {
+  return (
+    <div className="mt-4 p-4 rounded-lg bg-muted/50">
+      <h4 className="font-semibold mb-2 flex items-center gap-2">
+        <Trophy className="h-4 w-4 text-yellow-500" />
+        {title}
+      </h4>
+      <div className="space-y-2">
+        {entries.map((entry, idx) => (
+          <div
+            key={entry.user_id}
+            className="flex items-center justify-between text-sm"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">
+                {["🥇", "🥈", "🥉"][idx] || `#${idx + 1}`}
+              </span>
+              <span
+                className={cn(
+                  entry.user_id === currentUserId && "font-bold text-blue-600",
+                )}
+              >
+                {entry.full_name}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">
+                {entry[valueKey]}
+                {valueSuffix}
+              </span>
+              <span className="font-bold">{entry.current_score} pts</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

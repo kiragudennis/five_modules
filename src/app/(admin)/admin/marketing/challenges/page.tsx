@@ -1,5 +1,4 @@
-// app/(admin)/admin/marketing/challenges/page.tsx (Enhanced Version)
-
+// app/(admin)/admin/marketing/challenges/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -61,12 +60,15 @@ import {
   Truck,
   Package,
   Gift,
+  Brain,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Challenge } from "@/types/challenges";
+import { ProductPreviewCard } from "@/components/challenges/product-preview";
+import { TriviaHostControls } from "@/components/challenges/TriviaHostControls";
 
 const CHALLENGE_TYPES = [
   {
@@ -105,6 +107,13 @@ const CHALLENGE_TYPES = [
     description: "Compete as a team",
   },
   {
+    value: "trivia",
+    label: "Live Trivia Challenge",
+    icon: Brain,
+    color: "from-yellow-500 to-orange-500",
+    description: "Live quiz show with spinning wheel selections",
+  },
+  {
     value: "combo",
     label: "Combo Challenge",
     icon: Sparkles,
@@ -132,6 +141,15 @@ export default function AdminChallengesPage() {
   const [selectedLiveChallenge, setSelectedLiveChallenge] =
     useState<Challenge | null>(null);
   const [participantStats, setParticipantStats] = useState<any>(null);
+  const [triviaHostOpen, setTriviaHostOpen] = useState(false);
+  const [triviaHostChallenge, setTriviaHostChallenge] =
+    useState<Challenge | null>(null);
+
+  // Add function:
+  const openTriviaHost = async (challenge: Challenge) => {
+    setTriviaHostChallenge(challenge);
+    setTriviaHostOpen(true);
+  };
 
   const fetchChallenges = useCallback(async () => {
     const { data } = await supabase
@@ -361,13 +379,18 @@ export default function AdminChallengesPage() {
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <UsersRound className="h-3 w-3" />
                     <span>
-                      Team challenge • Max {challenge.max_team_size} per team
+                      Team • {challenge.min_team_size}-{challenge.max_team_size}{" "}
+                      members
                     </span>
+                    {challenge.scoring_config?.small_team_category && (
+                      <Badge variant="outline" className="text-xs ml-1">
+                        Multi-Category
+                      </Badge>
+                    )}
                   </div>
                 )}
-
                 {/* Actions */}
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2 overflow-x-auto scrollbar-hide">
                   <Button
                     variant="outline"
                     size="sm"
@@ -382,6 +405,18 @@ export default function AdminChallengesPage() {
                       Live
                     </Link>
                   </Button>
+                  {challenge.challenge_type === "trivia" &&
+                    challenge.status === "active" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-gradient-to-r from-yellow-500/10 to-orange-500/10"
+                        onClick={() => openTriviaHost(challenge)}
+                      >
+                        <Brain className="h-4 w-4 mr-1" />
+                        Host Trivia
+                      </Button>
+                    )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -473,9 +508,31 @@ export default function AdminChallengesPage() {
         </Card>
       )}
 
+      <Dialog open={triviaHostOpen} onOpenChange={setTriviaHostOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-yellow-500" />
+              Trivia Host Panel - {triviaHostChallenge?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Control the trivia game flow. Select participants, show questions,
+              and manage the live experience.
+            </DialogDescription>
+          </DialogHeader>
+
+          {triviaHostChallenge && (
+            <TriviaHostControls
+              challenge={triviaHostChallenge}
+              onClose={() => setTriviaHostOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Live Controls Dialog */}
       <Dialog open={liveControlsOpen} onOpenChange={setLiveControlsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Live Controls: {selectedLiveChallenge?.name}
@@ -524,6 +581,21 @@ function ChallengeForm({
       scoring_config: {
         points_per_ksh: 1,
         min_spend: 0,
+        // Streak defaults
+        points_per_day: 50,
+        days_required: 7,
+        bonus_milestones: {}, // {3: 100, 7: 250, 14: 500}
+        small_team_category: false,
+        // Referral defaults
+        points_per_referral: 100,
+        min_referrals_to_qualify: 1,
+        referral_type: "all",
+        first_referral_bonus: 50,
+        power_referrer_bonus: 200,
+        bonus_for_top_referrer: 500,
+        unique_referrals_only: true,
+        exclude_self_referrals: true,
+        require_active_referrer: false,
       },
       prize_tiers: [
         { rank: 1, prize_type: "points", prize_value: 5000, badge: "champion" },
@@ -540,8 +612,13 @@ function ChallengeForm({
       allow_teams: false,
       max_team_size: 5,
       allow_team_switching: false,
+
+      // Streak-specific fields
       streak_reset_on_miss: true,
       streak_grace_days: 0,
+      require_active_status: false,
+      tiebreaker_type: "score",
+      streak_action_type: "daily_login",
       cover_image_url: "",
       theme_color: "#3B82F6",
       show_leaderboard: true,
@@ -683,6 +760,10 @@ function ChallengeForm({
         .upsert({
           ...formData,
           slug,
+          // Ensure streak-specific fields are included
+          require_active_status: formData.require_active_status || false,
+          tiebreaker_type: formData.tiebreaker_type || "score",
+          streak_action_type: formData.streak_action_type || "daily_login",
           updated_at: new Date().toISOString(),
         })
         .select();
@@ -910,220 +991,1177 @@ function ChallengeForm({
         {/* Scoring Tab */}
         <TabsContent value="scoring" className="space-y-4 mt-4">
           {formData.challenge_type === "referral" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Referral Challenge Configuration
+                </h4>
+
+                {/* Referral Type Selection */}
                 <div>
-                  <Label>Points per Referral</Label>
-                  <Input
-                    type="number"
-                    value={formData.scoring_config.points_per_referral || 100}
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "points_per_referral",
-                        parseInt(e.target.value),
-                      )
+                  <Label>Referral Type</Label>
+                  <Select
+                    value={formData.scoring_config.referral_type || "all"}
+                    onValueChange={(value) =>
+                      updateScoringConfig("referral_type", value)
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        All Referrals (Signup + Purchase)
+                      </SelectItem>
+                      <SelectItem value="signup">
+                        Signup Referrals Only
+                      </SelectItem>
+                      <SelectItem value="first_purchase">
+                        Purchase Referrals Only
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formData.scoring_config.referral_type === "signup" &&
+                      "Counts when referred user's account becomes active (makes first purchase)"}
+                    {formData.scoring_config.referral_type ===
+                      "first_purchase" &&
+                      "Counts when referred user completes their first order payment"}
+                    {formData.scoring_config.referral_type === "all" &&
+                      "Counts both signup activations and first purchases"}
+                  </p>
                 </div>
-                <div>
-                  <Label>Bonus for Top Referrer</Label>
-                  <Input
-                    type="number"
-                    value={formData.scoring_config.bonus_for_top_referrer || 0}
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "bonus_for_top_referrer",
-                        parseInt(e.target.value),
-                      )
-                    }
-                    placeholder="Optional"
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Points per Referral</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.points_per_referral || 100}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "points_per_referral",
+                          parseInt(e.target.value),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Base points awarded for each successful referral
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Minimum Referrals to Qualify</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.scoring_config.min_referrals_to_qualify || 1
+                      }
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "min_referrals_to_qualify",
+                          parseInt(e.target.value),
+                        )
+                      }
+                      min={0}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Set to 0 for no minimum requirement
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bonus Points */}
+                <div className="space-y-3">
+                  <Label>Bonus Points Configuration</Label>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm">First Referral Bonus</Label>
+                      <Input
+                        type="number"
+                        value={
+                          formData.scoring_config.first_referral_bonus || 0
+                        }
+                        onChange={(e) =>
+                          updateScoringConfig(
+                            "first_referral_bonus",
+                            parseInt(e.target.value),
+                          )
+                        }
+                        placeholder="Optional bonus"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">
+                        Power Referrer Bonus (5+)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={
+                          formData.scoring_config.power_referrer_bonus || 0
+                        }
+                        onChange={(e) =>
+                          updateScoringConfig(
+                            "power_referrer_bonus",
+                            parseInt(e.target.value),
+                          )
+                        }
+                        placeholder="Bonus at 5+ referrals"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm">Top 3 Leader Bonus</Label>
+                      <Input
+                        type="number"
+                        value={
+                          formData.scoring_config.bonus_for_top_referrer || 0
+                        }
+                        onChange={(e) =>
+                          updateScoringConfig(
+                            "bonus_for_top_referrer",
+                            parseInt(e.target.value),
+                          )
+                        }
+                        placeholder="Bonus for rank 1-3"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm">Milestone Multiplier</Label>
+                      <Select
+                        value={
+                          formData.scoring_config.milestone_multiplier || "none"
+                        }
+                        onValueChange={(value) =>
+                          updateScoringConfig("milestone_multiplier", value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Multiplier</SelectItem>
+                          <SelectItem value="1.5">
+                            1.5x at 10 referrals
+                          </SelectItem>
+                          <SelectItem value="2">2x at 20 referrals</SelectItem>
+                          <SelectItem value="3">3x at 50 referrals</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Qualification Rules */}
+                <div className="space-y-2">
+                  <Label>Qualification Rules</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm">
+                          Require Unique Customers Only
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          Same person can't be referred multiple times
+                        </p>
+                      </div>
+                      <Switch
+                        checked={
+                          formData.scoring_config.unique_referrals_only || true
+                        }
+                        onCheckedChange={(checked) =>
+                          updateScoringConfig("unique_referrals_only", checked)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm">Exclude Self-Referrals</span>
+                        <p className="text-xs text-muted-foreground">
+                          Users can't refer themselves with different emails
+                        </p>
+                      </div>
+                      <Switch
+                        checked={
+                          formData.scoring_config.exclude_self_referrals || true
+                        }
+                        onCheckedChange={(checked) =>
+                          updateScoringConfig("exclude_self_referrals", checked)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm">Require Active Referrer</span>
+                        <p className="text-xs text-muted-foreground">
+                          Only active customers (purchased in 30 days) can
+                          participate
+                        </p>
+                      </div>
+                      <Switch
+                        checked={
+                          formData.scoring_config.require_active_referrer ||
+                          false
+                        }
+                        onCheckedChange={(checked) =>
+                          updateScoringConfig(
+                            "require_active_referrer",
+                            checked,
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Referral Challenge Summary */}
+              <div className="p-4 rounded-lg bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-500" />
+                  Referral Challenge Summary
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    • Type: {formData.scoring_config.referral_type || "all"}{" "}
+                    referrals
+                  </p>
+                  <p>
+                    • {formData.scoring_config.points_per_referral || 100}{" "}
+                    points per successful referral
+                  </p>
+                  <p>
+                    • Minimum{" "}
+                    {formData.scoring_config.min_referrals_to_qualify || 1}{" "}
+                    referral(s) to qualify
+                  </p>
+                  {formData.scoring_config.first_referral_bonus > 0 && (
+                    <p>
+                      • +{formData.scoring_config.first_referral_bonus} bonus
+                      for first referral
+                    </p>
+                  )}
+                  {formData.scoring_config.power_referrer_bonus > 0 && (
+                    <p>
+                      • +{formData.scoring_config.power_referrer_bonus} bonus at
+                      5+ referrals
+                    </p>
+                  )}
+                  <p>• Top referrers win prizes based on position</p>
                 </div>
               </div>
             </div>
           )}
 
           {formData.challenge_type === "purchase" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Product Purchase Challenge
+                </h4>
+
                 <div>
-                  <Label>Points per KSH Spent</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.scoring_config.points_per_ksh || 1}
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "points_per_ksh",
-                        parseFloat(e.target.value),
-                      )
-                    }
-                  />
+                  <Label>Target Product UUID *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Paste product UUID from catalogue"
+                      value={formData.scoring_config.product_id || ""}
+                      onChange={(e) =>
+                        updateScoringConfig("product_id", e.target.value)
+                      }
+                      className="font-mono text-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Open product selector or show help
+                        toast.info(
+                          "Copy UUID from Products > select product > click Copy UUID",
+                        );
+                      }}
+                    >
+                      Help
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Copy the product UUID from the Products catalogue dashboard
+                  </p>
                 </div>
-                <div>
-                  <Label>Minimum Spend to Qualify</Label>
-                  <Input
-                    type="number"
-                    value={formData.scoring_config.min_spend || 0}
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "min_spend",
-                        parseFloat(e.target.value),
-                      )
-                    }
+
+                {/* Product Preview - if UUID is valid */}
+                {formData.scoring_config.product_id && (
+                  <ProductPreviewCard
+                    productId={formData.scoring_config.product_id}
+                    supabase={supabase}
                   />
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Points per Unit Purchased</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.points_per_unit || 10}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "points_per_unit",
+                          parseInt(e.target.value),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Points awarded for each unit of the product purchased
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Minimum Units to Qualify</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.min_units || 1}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "min_units",
+                          parseInt(e.target.value),
+                        )
+                      }
+                      min={1}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Minimum units required to appear on leaderboard
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Bonus Points for Top 3 Position</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.scoring_config.bonus_points_for_leader || 0
+                      }
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "bonus_points_for_leader",
+                          parseInt(e.target.value),
+                        )
+                      }
+                      placeholder="Optional"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Extra points when participant reaches top 3
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Maximum Units Counted</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.max_units || 0}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "max_units",
+                          parseInt(e.target.value),
+                        )
+                      }
+                      placeholder="0 = unlimited"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Limit units per customer (0 = no limit)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Double Points Configuration */}
+                <div>
+                  <Label>Double Points Schedule</Label>
+                  <div className="space-y-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Weekend Double Points</span>
+                      <Switch
+                        checked={
+                          formData.scoring_config.weekend_double_points || false
+                        }
+                        onCheckedChange={(checked) =>
+                          updateScoringConfig("weekend_double_points", checked)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">
+                        First Purchase Bonus (2x points)
+                      </span>
+                      <Switch
+                        checked={
+                          formData.scoring_config.first_purchase_bonus || false
+                        }
+                        onCheckedChange={(checked) =>
+                          updateScoringConfig("first_purchase_bonus", checked)
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">
+                        Bulk Purchase Bonus (5+ units)
+                      </span>
+                      <Switch
+                        checked={
+                          formData.scoring_config.bulk_purchase_bonus || false
+                        }
+                        onCheckedChange={(checked) =>
+                          updateScoringConfig("bulk_purchase_bonus", checked)
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <Label>Double Points Hours (comma-separated, 0-23)</Label>
-                <Input
-                  placeholder="e.g., 18,19,20"
-                  value={
-                    formData.scoring_config.double_points_hours?.join(",") || ""
-                  }
-                  onChange={(e) =>
-                    updateScoringConfig(
-                      "double_points_hours",
-                      e.target.value.split(",").map(Number),
-                    )
-                  }
-                />
+              {/* Challenge Summary */}
+              <div className="p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4 text-green-500" />
+                  Purchase Challenge Summary
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    • Target Product:{" "}
+                    {formData.scoring_config.product_id
+                      ? "✓ Selected"
+                      : "✗ Not set"}
+                  </p>
+                  <p>
+                    • {formData.scoring_config.points_per_unit || 10} points per
+                    unit
+                  </p>
+                  <p>
+                    • Minimum {formData.scoring_config.min_units || 1} unit(s)
+                    to qualify
+                  </p>
+                  {formData.scoring_config.bonus_points_for_leader > 0 && (
+                    <p>
+                      • +{formData.scoring_config.bonus_points_for_leader} bonus
+                      points for top 3
+                    </p>
+                  )}
+                  {formData.scoring_config.max_units > 0 && (
+                    <p>
+                      • Maximum {formData.scoring_config.max_units} units
+                      counted per customer
+                    </p>
+                  )}
+                  <p>• Winner: Customer with most units purchased</p>
+                </div>
               </div>
             </div>
           )}
 
           {formData.challenge_type === "streak" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Points per Day</Label>
-                  <Input
-                    type="number"
-                    value={formData.scoring_config.points_per_day || 50}
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "points_per_day",
-                        parseInt(e.target.value),
-                      )
-                    }
-                  />
+            <div className="space-y-6">
+              {/* Basic Streak Configuration */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Streak Configuration
+                </h4>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Points per Day</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.points_per_day || 50}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "points_per_day",
+                          parseInt(e.target.value),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Base points awarded for each day of streak maintained
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Days Required for Full Streak</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.days_required || 7}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "days_required",
+                          parseInt(e.target.value),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total consecutive days needed to complete the challenge
+                    </p>
+                  </div>
                 </div>
+
+                {/* Streak Action Type */}
                 <div>
-                  <Label>Days Required for Full Streak</Label>
-                  <Input
-                    type="number"
-                    value={formData.scoring_config.days_required || 7}
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "days_required",
-                        parseInt(e.target.value),
-                      )
+                  <Label>What counts as a streak day?</Label>
+                  <Select
+                    value={formData.streak_action_type || "daily_login"}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, streak_action_type: value })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily_login">Daily Login</SelectItem>
+                      <SelectItem value="daily_purchase">
+                        Daily Purchase (any amount)
+                      </SelectItem>
+                      <SelectItem value="custom">Custom Action</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formData.streak_action_type === "daily_login" &&
+                      "Users must visit the site daily to maintain their streak"}
+                    {formData.streak_action_type === "daily_purchase" &&
+                      "Users must make at least one purchase per day"}
+                    {formData.streak_action_type === "custom" &&
+                      "Define a custom action that counts towards the streak"}
+                  </p>
+                </div>
+
+                {/* Custom Action Description (if custom selected) */}
+                {formData.streak_action_type === "custom" && (
+                  <div>
+                    <Label>Custom Action Description</Label>
+                    <Input
+                      value={
+                        formData.scoring_config.custom_action_description || ""
+                      }
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "custom_action_description",
+                          e.target.value,
+                        )
+                      }
+                      placeholder="e.g., Post a review, share on social media..."
+                    />
+                  </div>
+                )}
+
+                {/* Milestone Bonuses */}
+                <div>
+                  <Label>Milestone Bonuses (Optional)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Award bonus points when users reach specific streak
+                    milestones
+                  </p>
+                  <div className="space-y-2">
+                    {[3, 7, 14, 30].map((milestone) => {
+                      const bonus =
+                        formData.scoring_config.bonus_milestones?.[milestone] ||
+                        0;
+                      return (
+                        <div
+                          key={milestone}
+                          className="flex items-center gap-3"
+                        >
+                          <Label className="w-20 text-sm">
+                            Day {milestone}
+                          </Label>
+                          <Input
+                            type="number"
+                            placeholder="Bonus points"
+                            value={bonus}
+                            onChange={(e) => {
+                              const newMilestones = {
+                                ...(formData.scoring_config.bonus_milestones ||
+                                  {}),
+                                [milestone]: parseInt(e.target.value) || 0,
+                              };
+                              updateScoringConfig(
+                                "bonus_milestones",
+                                newMilestones,
+                              );
+                            }}
+                            className="w-32"
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            points bonus
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <Label>Reset streak on missed day</Label>
-                <Switch
-                  checked={formData.streak_reset_on_miss}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, streak_reset_on_miss: checked })
-                  }
-                />
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Streak Rules
+                </h4>
+
+                {/* Reset on Miss */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Reset streak on missed day</Label>
+                    <p className="text-xs text-muted-foreground">
+                      If enabled, missing a day will reset the streak to 0
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.streak_reset_on_miss}
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        streak_reset_on_miss: checked,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Grace Days */}
+                <div>
+                  <Label>Grace Days</Label>
+                  <Input
+                    type="number"
+                    value={formData.streak_grace_days || 0}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        streak_grace_days: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Number of days a user can miss without resetting their
+                    streak
+                    {formData.streak_grace_days > 0 &&
+                      ` (Users can miss up to ${formData.streak_grace_days} day(s) and keep their streak)`}
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <Label>Grace Days (days allowed to miss without reset)</Label>
-                <Input
-                  type="number"
-                  value={formData.streak_grace_days || 0}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      streak_grace_days: parseInt(e.target.value),
-                    })
-                  }
-                />
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Participation & Eligibility
+                </h4>
+
+                {/* Require Active Status */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Require Active Customer Status</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Only customers who've made a purchase in the last 30 days
+                      can participate (users.status = 'active')
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.require_active_status || false}
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        require_active_status: checked,
+                      })
+                    }
+                  />
+                </div>
+
+                {/* Tiebreaker Configuration */}
+                <div>
+                  <Label>Tiebreaker Method</Label>
+                  <Select
+                    value={formData.tiebreaker_type || "score"}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, tiebreaker_type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="score">Highest Score</SelectItem>
+                      <SelectItem value="duration">
+                        Longest Site Duration (account age)
+                      </SelectItem>
+                      <SelectItem value="random">Random Selection</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {formData.tiebreaker_type === "score" &&
+                      "When tied, the user with the highest total points wins"}
+                    {formData.tiebreaker_type === "duration" &&
+                      "When tied, the user who's been registered longer wins (favors loyal customers)"}
+                    {formData.tiebreaker_type === "random" &&
+                      "When tied, a winner is selected randomly"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Summary Card */}
+              <div className="p-4 rounded-lg bg-gradient-to-r from-orange-500/10 to-red-500/10 border">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  Streak Challenge Summary
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    • Users earn{" "}
+                    <strong>
+                      {formData.scoring_config.points_per_day || 50} points
+                    </strong>{" "}
+                    per day
+                  </p>
+                  <p>
+                    • Must maintain streak for{" "}
+                    <strong>
+                      {formData.scoring_config.days_required || 7} days
+                    </strong>
+                  </p>
+                  <p>
+                    • Action required:{" "}
+                    <strong>
+                      {formData.streak_action_type?.replace("_", " ") ||
+                        "daily login"}
+                    </strong>
+                  </p>
+                  {formData.require_active_status && (
+                    <p>
+                      • Only <strong>active customers</strong> (purchased within
+                      30 days) can participate
+                    </p>
+                  )}
+                  {formData.streak_reset_on_miss ? (
+                    <p className="text-red-600">
+                      • Streak resets on missed day
+                    </p>
+                  ) : (
+                    <p>
+                      • {formData.streak_grace_days || 0} grace day(s) allowed
+                    </p>
+                  )}
+                  {Object.entries(
+                    formData.scoring_config.bonus_milestones || {},
+                  ).length > 0 && (
+                    <p>• Milestone bonuses available at specific days</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {formData.challenge_type === "team" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Points per Member Action</Label>
-                  <Input
-                    type="number"
-                    value={
-                      formData.scoring_config.points_per_member_action || 50
-                    }
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "points_per_member_action",
-                        parseInt(e.target.value),
-                      )
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Bonus for Complete Team</Label>
-                  <Input
-                    type="number"
-                    value={
-                      formData.scoring_config.bonus_for_complete_team || 200
-                    }
-                    onChange={(e) =>
-                      updateScoringConfig(
-                        "bonus_for_complete_team",
-                        parseInt(e.target.value),
-                      )
-                    }
-                  />
-                </div>
-              </div>
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Team Configuration
+                </h4>
 
-              <div className="flex items-center justify-between">
-                <Label>Allow Teams</Label>
-                <Switch
-                  checked={formData.allow_teams}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, allow_teams: checked })
-                  }
-                />
-              </div>
-
-              {formData.allow_teams && (
-                <>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Max Team Size</Label>
+                    <Label>Points per KSH Spent</Label>
                     <Input
                       type="number"
-                      value={formData.max_team_size || 5}
+                      value={
+                        formData.scoring_config.points_per_member_action || 1
+                      }
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          max_team_size: parseInt(e.target.value),
-                        })
+                        updateScoringConfig(
+                          "points_per_member_action",
+                          parseInt(e.target.value),
+                        )
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Points awarded per KSH spent by team members
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Bonus for Complete Team</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.scoring_config.bonus_for_complete_team || 500
+                      }
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "bonus_for_complete_team",
+                          parseInt(e.target.value),
+                        )
                       }
                     />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Allow Team Switching</Label>
-                    <Switch
-                      checked={formData.allow_team_switching}
-                      onCheckedChange={(checked) =>
-                        setFormData({
-                          ...formData,
-                          allow_team_switching: checked,
-                        })
+                </div>
+
+                <div>
+                  <Label>Challenge Duration</Label>
+                  <Select
+                    value={
+                      formData.scoring_config.challenge_duration || "monthly"
+                    }
+                    onValueChange={(value) =>
+                      updateScoringConfig("challenge_duration", value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="biweekly">Bi-Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Longer durations give teams more time to accumulate spending
+                  </p>
+                </div>
+
+                {/* Team Size & Rules */}
+                <div className="flex items-center justify-between">
+                  <Label>Allow Teams</Label>
+                  <Switch
+                    checked={formData.allow_teams}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, allow_teams: checked })
+                    }
+                  />
+                </div>
+
+                {formData.allow_teams && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Max Team Size</Label>
+                        <Input
+                          type="number"
+                          value={formData.max_team_size || 5}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              max_team_size: parseInt(e.target.value),
+                            })
+                          }
+                          min={2}
+                          max={20}
+                        />
+                      </div>
+                      <div>
+                        <Label>Min Team Size</Label>
+                        <Input
+                          type="number"
+                          value={formData.min_team_size || 2}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              min_team_size: parseInt(e.target.value),
+                            })
+                          }
+                          min={1}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label>Allow Team Switching</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Members can leave and join other teams during the
+                          challenge
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.allow_team_switching}
+                        onCheckedChange={(checked) =>
+                          setFormData({
+                            ...formData,
+                            allow_team_switching: checked,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {/* Team Categories */}
+                    <div>
+                      <Label>Team Categories</Label>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {[
+                          "competitive",
+                          "casual",
+                          "newbie_friendly",
+                          "high_rollers",
+                          "balanced",
+                        ].map((category) => (
+                          <label
+                            key={category}
+                            className="flex items-center gap-2"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={
+                                formData.allowed_team_categories?.includes(
+                                  category,
+                                ) || false
+                              }
+                              onChange={(e) => {
+                                const current =
+                                  formData.allowed_team_categories || [];
+                                const updated = e.target.checked
+                                  ? [...current, category]
+                                  : current.filter(
+                                      (c: string) => c !== category,
+                                    );
+                                setFormData({
+                                  ...formData,
+                                  allowed_team_categories: updated,
+                                });
+                              }}
+                            />
+                            <span className="text-sm capitalize">
+                              {category.replace("_", " ")}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Fair Play Rules */}
+                    <div className="space-y-2">
+                      <Label>Fair Play Categories</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Create separate winner categories to give smaller teams
+                        a chance
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">
+                          Small Teams ({formData.min_team_size}-2 members)
+                        </span>
+                        <Switch
+                          checked={
+                            formData.scoring_config.small_team_category || false
+                          }
+                          onCheckedChange={(checked) =>
+                            updateScoringConfig("small_team_category", checked)
+                          }
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">
+                          New Teams (joined in last 30 days)
+                        </span>
+                        <Switch
+                          checked={
+                            formData.scoring_config.new_team_category || false
+                          }
+                          onCheckedChange={(checked) =>
+                            updateScoringConfig("new_team_category", checked)
+                          }
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Team Challenge Summary */}
+              <div className="p-4 rounded-lg bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <UsersRound className="h-4 w-4 text-purple-500" />
+                  Team Challenge Summary
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    • Teams of {formData.min_team_size || 2}-
+                    {formData.max_team_size || 5} members
+                  </p>
+                  <p>
+                    • {formData.scoring_config.points_per_member_action || 1}{" "}
+                    points per KSH spent
+                  </p>
+                  <p>
+                    • Duration:{" "}
+                    {formData.scoring_config.challenge_duration || "monthly"}
+                  </p>
+                  {formData.scoring_config.small_team_category && (
+                    <p>
+                      • Separate category for small teams (more chances to win)
+                    </p>
+                  )}
+                  {formData.scoring_config.new_team_category && (
+                    <p>• New team bonus category enabled</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {formData.challenge_type === "trivia" && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Trivia Challenge Configuration
+                </h4>
+
+                {/* Spin Game Integration */}
+                <div>
+                  <Label>Spin Game for Participant Selection</Label>
+                  <Input
+                    type="text"
+                    value={formData.scoring_config.spin_game_id || ""}
+                    placeholder="Enter spin game UUID"
+                    onChange={(e) =>
+                      updateScoringConfig("spin_game_id", e.target.value)
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The spinning wheel will randomly select participants to
+                    answer questions
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Base Points per Question</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.base_points || 100}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "base_points",
+                          parseInt(e.target.value),
+                        )
                       }
                     />
                   </div>
-                </>
-              )}
+                  <div>
+                    <Label>Time Limit (seconds)</Label>
+                    <Input
+                      type="number"
+                      value={formData.scoring_config.time_limit || 5}
+                      onChange={(e) =>
+                        updateScoringConfig(
+                          "time_limit",
+                          parseInt(e.target.value),
+                        )
+                      }
+                      min={3}
+                      max={30}
+                    />
+                  </div>
+                </div>
+
+                {/* Speed Bonus */}
+                <div className="space-y-2">
+                  <Label>Speed Bonus Points</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">Lightning (&lt;1s)</Label>
+                      <Input
+                        type="number"
+                        value={
+                          formData.scoring_config.speed_bonus_lightning || 50
+                        }
+                        onChange={(e) =>
+                          updateScoringConfig(
+                            "speed_bonus_lightning",
+                            parseInt(e.target.value),
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Quick (&lt;2s)</Label>
+                      <Input
+                        type="number"
+                        value={formData.scoring_config.speed_bonus_quick || 25}
+                        onChange={(e) =>
+                          updateScoringConfig(
+                            "speed_bonus_quick",
+                            parseInt(e.target.value),
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Good (&lt;3s)</Label>
+                      <Input
+                        type="number"
+                        value={formData.scoring_config.speed_bonus_good || 10}
+                        onChange={(e) =>
+                          updateScoringConfig(
+                            "speed_bonus_good",
+                            parseInt(e.target.value),
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Streak Bonus */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Enable Streak Bonuses</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Bonus points for consecutive correct answers (3+ streak =
+                      bonus)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={
+                      formData.scoring_config.streak_bonus_enabled || true
+                    }
+                    onCheckedChange={(checked) =>
+                      updateScoringConfig("streak_bonus_enabled", checked)
+                    }
+                  />
+                </div>
+
+                {/* Question Management */}
+                <div className="border-t pt-4">
+                  <Label>Trivia Questions</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Add questions with multiple choice answers (up to 4 options)
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      toast("You need to save the challenge first!")
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Manage Questions ({formData.trivia_questions?.length || 0})
+                  </Button>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="p-4 rounded-lg bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border">
+                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-yellow-500" />
+                  Trivia Challenge Summary
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p>
+                    • {formData.scoring_config.base_points || 100} points per
+                    correct answer
+                  </p>
+                  <p>
+                    • {formData.scoring_config.time_limit || 5} second time
+                    limit
+                  </p>
+                  <p>• Speed bonuses for fast answers</p>
+                  <p>• Streak bonuses after 3 consecutive correct answers</p>
+                  <p>• Participants selected via spinning wheel</p>
+                  <p>
+                    • Winner: Highest total score (correct answers + bonuses)
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1471,6 +2509,7 @@ function ChallengeForm({
   );
 }
 
+// app/(admin)/admin/marketing/challenges/page.tsx
 // Live Controls Component
 function LiveControls({
   challenge,

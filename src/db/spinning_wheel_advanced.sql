@@ -780,3 +780,17 @@ GRANT EXECUTE ON FUNCTION get_user_allocation(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_user_spin_state(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_game_participant_stats(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_game_participants(UUID, INT) TO authenticated;
+
+-- TODO
+-- const handleSpinWinTrivia = async (spinResult: any) => {
+--   const { data } = await supabase
+--     .rpc("add_trivia_participant_from_spin", {
+--       p_challenge_id: triviaChallengeId,
+--       p_user_id: spinResult.user_id,
+--       p_spin_attempt_id: spinResult.id,
+--     });
+  
+--   if (data?.success) {
+--     toast.success(`Ticket #${data.ticket_number} - You're in the trivia challenge!`);
+--   }
+-- };

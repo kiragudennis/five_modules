@@ -171,6 +171,40 @@ export async function POST(request: Request) {
       );
     }
 
+    const { data: teamResult } = await supabaseAdmin.rpc(
+      "process_team_spending",
+      {
+        p_order_id: orderId,
+        p_user_id: order.user_id,
+        p_amount: order.total_amount,
+      },
+    );
+
+    if (teamResult?.success) {
+      console.log(`Team spending processed: ${JSON.stringify(teamResult)}`);
+
+      // Check for team achievements
+      // await supabase
+      //   .rpc("check_team_achievements", {
+      //     p_team_id: teamResult.team_id,
+      //     p_challenge_id: teamResult.challenge_id,
+      //   });
+    }
+
+    // Process purchase challenge
+    const { data: purchaseResult } = await supabaseAdmin.rpc(
+      "process_purchase_challenge",
+      {
+        p_order_id: orderId,
+      },
+    );
+
+    if (purchaseResult?.success && purchaseResult?.challenges_processed > 0) {
+      console.log(
+        `Processed ${purchaseResult.challenges_processed} purchase challenges`,
+      );
+    }
+
     if (order?.metadata?.bundle) {
       try {
         await recordBundlePurchases(order);
