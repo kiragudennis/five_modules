@@ -220,28 +220,6 @@ BEGIN
 END;
 $$;
 
--- Record spin win
-CREATE OR REPLACE FUNCTION record_spin_win(
-    p_ticker_id UUID,
-    p_prize_text TEXT
-)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-    UPDATE spin_live_ticker
-    SET action_type = 'win',
-        prize_text = p_prize_text,
-        is_spinning = FALSE
-    WHERE id = p_ticker_id;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION record_spin_start(UUID, UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION record_spin_win(UUID, TEXT) TO authenticated;
-
-
 CREATE OR REPLACE FUNCTION increment_spin_usage(
   p_user_id uuid,
   p_game_id uuid,
@@ -373,7 +351,9 @@ BEGIN
 END;
 $$;
 
--- Main spin function - FIXED VERSION
+-- ============================================
+-- UPDATED: perform_spin with trivia integration
+-- ============================================
 CREATE OR REPLACE FUNCTION perform_spin(
   p_game_id UUID,
   p_spin_type TEXT  -- 'free', 'points', 'purchase', 'bonus'
@@ -400,6 +380,8 @@ DECLARE
   v_prize_config JSONB;
   v_num_prizes INT;
   v_user_name TEXT;
+  -- Trivia variables
+  v_trivia_result JSON;
 BEGIN
   -- Get current user from auth
   v_user_id := auth.uid();
@@ -470,7 +452,7 @@ BEGIN
     WHERE user_id = v_user_id;
   END IF;
   
-  -- Select prize based on probability using jsonb_array_length
+  -- Select prize based on probability
   v_prize_config := v_game.prize_config;
   v_num_prizes := jsonb_array_length(v_prize_config);
   v_random := RANDOM() * 100;
@@ -491,7 +473,6 @@ BEGIN
       v_points_awarded := (v_selected_prize->>'value')::INT;
       v_prize_display := v_points_awarded || ' points';
       
-      -- Award points
       INSERT INTO loyalty_points (user_id, points, tier)
       VALUES (v_user_id, v_points_awarded, 'bronze')
       ON CONFLICT (user_id) 
@@ -509,9 +490,13 @@ BEGIN
       
     WHEN 'bundle' THEN
       v_prize_display := 'Free ' || (v_selected_prize->>'value') || ' Bundle';
+
+    WHEN 'trivia_ticket' THEN
+      v_prize_display := COALESCE(v_selected_prize->>'label', 'Trivia Challenge Entry');
+      
   END CASE;
   
-  -- FIRST: Record spin attempt
+  -- Record spin attempt
   INSERT INTO spin_attempts (
     game_id, user_id, spin_type, prize_type, prize_value,
     points_awarded, points_spent, segment_index, landed_at
@@ -523,7 +508,7 @@ BEGIN
   )
   RETURNING id INTO v_attempt_id;
   
-  -- SECOND: Update allocation
+  -- Update allocation
   UPDATE user_spin_allocations
   SET spins_used_today = spins_used_today + 1,
       spins_used_this_week = spins_used_this_week + 1,
@@ -531,7 +516,7 @@ BEGIN
       last_spin_at = NOW()
   WHERE user_id = v_user_id AND game_id = p_game_id AND date = v_today;
   
-  -- THIRD: Update single prize if claimed
+  -- Update single prize if claimed
   IF v_game.is_single_prize AND p_spin_type != 'points' THEN
     UPDATE spin_games
     SET single_prize_claimed = true,
@@ -539,7 +524,29 @@ BEGIN
     WHERE id = p_game_id;
   END IF;
   
-  -- In perform_spin, replace the direct INSERT with:
+  -- ============================================
+  -- TRIVIA INTEGRATION: Auto-add to trivia challenge
+  -- ============================================
+  IF v_selected_prize->>'type' = 'trivia_ticket' AND v_game.linked_challenge_id IS NOT NULL THEN
+    BEGIN
+      SELECT * INTO v_trivia_result
+      FROM add_trivia_participant_from_spin(
+        v_game.linked_challenge_id,
+        v_user_id,
+        v_attempt_id
+      );
+      
+      -- Enhance prize display with ticket number
+      IF v_trivia_result->>'success' = 'true' THEN
+        v_prize_display := v_prize_display || ' - Ticket #' || (v_trivia_result->>'ticket_number');
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      -- Log but don't fail the spin if trivia add fails
+      RAISE WARNING 'Failed to add trivia participant: %', SQLERRM;
+    END;
+  END IF;
+  
+  -- Record the win in live ticker
   PERFORM record_spin_win(v_attempt_id, v_prize_display);
   
   -- Return result
@@ -550,12 +557,85 @@ BEGIN
     'prize_display', v_prize_display,
     'points_awarded', v_points_awarded,
     'points_spent', v_points_spent,
-    'segment_index', v_prize_index
+    'segment_index', v_prize_index,
+    'trivia_ticket', CASE 
+      WHEN v_selected_prize->>'type' = 'trivia_ticket' AND v_trivia_result->>'success' = 'true' 
+      THEN jsonb_build_object(
+        'ticket_number', v_trivia_result->>'ticket_number',
+        'challenge_id', v_game.linked_challenge_id
+      )
+      ELSE NULL 
+    END
   ) INTO v_result;
   
   RETURN v_result;
 END;
 $$;
+
+
+-- ============================================
+-- UPDATED: record_spin_win with trivia awareness
+-- ============================================
+CREATE OR REPLACE FUNCTION record_spin_win(
+    p_attempt_id UUID,
+    p_prize_text TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_attempt spin_attempts%ROWTYPE;
+    v_game spin_games%ROWTYPE;
+    v_user_name TEXT;
+    v_ticker_id UUID;
+BEGIN
+    -- Get attempt details
+    SELECT * INTO v_attempt
+    FROM spin_attempts
+    WHERE id = p_attempt_id;
+    
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+    
+    -- Get user name
+    SELECT COALESCE(full_name, 'Customer') INTO v_user_name
+    FROM users
+    WHERE id = v_attempt.user_id;
+    
+    -- Get game details (for linked challenge)
+    SELECT * INTO v_game
+    FROM spin_games
+    WHERE id = v_attempt.game_id;
+    
+    -- Insert into spin live ticker
+    INSERT INTO spin_live_ticker (
+        game_id, user_name, user_id, prize_text, action_type, is_spinning
+    ) VALUES (
+        v_attempt.game_id, v_user_name, v_attempt.user_id,
+        p_prize_text, 'win', FALSE
+    )
+    RETURNING id INTO v_ticker_id;
+    
+    -- If this was a trivia ticket, also add to challenge live ticker
+    IF v_attempt.prize_type = 'trivia_ticket' AND v_game.linked_challenge_id IS NOT NULL THEN
+        INSERT INTO challenge_live_ticker (
+            challenge_id, user_name, action_text, points_awarded
+        ) VALUES (
+            v_game.linked_challenge_id, v_user_name,
+            'Won trivia entry via Spin & Win! 🎡 ' || p_prize_text,
+            0
+        );
+    END IF;
+END;
+$$;
+
+-- ============================================
+-- GRANT PERMISSIONS
+-- ============================================
+GRANT EXECUTE ON FUNCTION perform_spin(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION record_spin_win(UUID, TEXT) TO authenticated;
 
 -- Create a database function to get participant stats efficiently
 -- Returns default stats even when no data exists

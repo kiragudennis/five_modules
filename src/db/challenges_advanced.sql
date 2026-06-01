@@ -602,7 +602,6 @@ END;
 $$;
 
 -- Enhanced team system for challenges
-
 -- Team invitations/requests table
 CREATE TABLE IF NOT EXISTS challenge_team_invitations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -764,7 +763,6 @@ CREATE POLICY "Team members can send messages" ON challenge_team_messages
     );
 
 -- Functions for team management
-
 -- Function to process team spending (called when order is completed)
 CREATE OR REPLACE FUNCTION process_team_spending(
     p_order_id UUID,
@@ -937,28 +935,28 @@ ADD COLUMN IF NOT EXISTS team_avatar_url TEXT,
 ADD COLUMN IF NOT EXISTS is_recruiting BOOLEAN DEFAULT TRUE,
 ADD COLUMN IF NOT EXISTS min_spend_requirement NUMERIC DEFAULT 0,
 ADD COLUMN IF NOT EXISTS total_team_spending NUMERIC DEFAULT 0,
-ADD COLUMN IF NOT EXISTS team_category TEXT CHECK (team_category IN ('competitive', 'casual', 'newbie_friendly', 'high_rollers', 'balanced')),
 ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
-
--- Add any missing team-related columns to challenges table
-ALTER TABLE challenges 
-ADD COLUMN IF NOT EXISTS min_team_size INTEGER DEFAULT 2,
-ADD COLUMN IF NOT EXISTS allowed_team_categories TEXT[] DEFAULT '{competitive,casual,newbie_friendly,high_rollers,balanced}';
 
 -- Update the challenge_teams table
 ALTER TABLE challenge_teams
 ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;
 
--- Create team categories enum if needed
+
+-- First, create the team category enum if needed
 DO $$ BEGIN
-    CREATE TYPE team_category AS ENUM ('competitive', 'casual', 'newbie_friendly', 'high_rollers', 'balanced');
+    CREATE TYPE team_category_enum AS ENUM ('competitive', 'casual', 'newbie_friendly', 'high_rollers', 'balanced');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- Add category column if not exists
+-- Add columns to challenges table
+ALTER TABLE challenges 
+ADD COLUMN IF NOT EXISTS min_team_size INTEGER DEFAULT 2,
+ADD COLUMN IF NOT EXISTS allowed_team_categories TEXT[] DEFAULT '{competitive,casual,newbie_friendly,high_rollers,balanced}';
+
+-- Add team_category column to challenge_teams table using the enum type
 ALTER TABLE challenge_teams 
-ALTER COLUMN team_category TYPE team_category USING team_category::team_category;
+ADD COLUMN IF NOT EXISTS team_category team_category_enum DEFAULT 'balanced';
 
 -- Function to process purchase challenge when order is completed
 CREATE OR REPLACE FUNCTION process_purchase_challenge(

@@ -443,8 +443,11 @@ export default function ChallengeDetailPage() {
   // ─── Loading / Not Found ──────────────────────────────
   if (loading)
     return (
-      <div className="container mx-auto px-4 py-12 flex justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      <div className="container mx-auto px-2 py-8">
+        <div className="flex flex-col justify-center items-center h-64 space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading challenge...</p>
+        </div>
       </div>
     );
   if (!challenge)

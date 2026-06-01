@@ -103,21 +103,12 @@ export async function POST(request: Request) {
 
     if (order?.referred_by) {
       // Award referral points if applicable
-
       // 🔥 CALL RPC FUNCTION TO AWARD REFERRAL POINTS
-      const { data: referralResult, error: referralError } =
-        await supabaseAdmin.rpc("award_referral_points_on_order_complete", {
-          p_order_id: orderId,
-        });
-
-      if (referralError) {
-        console.error("RPC error:", referralError);
-        // Continue anyway, don't fail the webhook
-      } else if (referralResult && !referralResult.success) {
-        console.log("Referral points not awarded:", referralResult.error);
-      } else if (referralResult && referralResult.success) {
-        console.log("Referral points awarded:", referralResult);
-      }
+      // const { data: referralResult, error: referralError } =
+      //   await supabaseAdmin.rpc("award_referral_points_on_order_complete", {
+      //     p_order_id: orderId,
+      //   });
+      // Now handled by award_loyalty_points() via a trigger
     }
 
     // Convert transaction date to timestamp if available
@@ -168,40 +159,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Failed to update order" },
         { status: 500 },
-      );
-    }
-
-    const { data: teamResult } = await supabaseAdmin.rpc(
-      "process_team_spending",
-      {
-        p_order_id: orderId,
-        p_user_id: order.user_id,
-        p_amount: order.total_amount,
-      },
-    );
-
-    if (teamResult?.success) {
-      console.log(`Team spending processed: ${JSON.stringify(teamResult)}`);
-
-      // Check for team achievements
-      // await supabase
-      //   .rpc("check_team_achievements", {
-      //     p_team_id: teamResult.team_id,
-      //     p_challenge_id: teamResult.challenge_id,
-      //   });
-    }
-
-    // Process purchase challenge
-    const { data: purchaseResult } = await supabaseAdmin.rpc(
-      "process_purchase_challenge",
-      {
-        p_order_id: orderId,
-      },
-    );
-
-    if (purchaseResult?.success && purchaseResult?.challenges_processed > 0) {
-      console.log(
-        `Processed ${purchaseResult.challenges_processed} purchase challenges`,
       );
     }
 

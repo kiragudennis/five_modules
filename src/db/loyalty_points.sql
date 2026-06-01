@@ -708,11 +708,12 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Order not found');
   END IF;
   
-  IF v_order.payment_status != 'completed' OR v_order.status != 'completed' THEN
+  IF v_order.payment_status != 'paid' OR v_order.status != 'completed' THEN
     RETURN json_build_object('success', false, 'error', 'Order not completed');
   END IF;
   
   -- Check if order has referral
+  -- Endpoint already checks but just in case
   IF v_order.referred_by IS NULL OR v_order.referral_product_id IS NULL THEN
     RETURN json_build_object('success', false, 'error', 'No referral data');
   END IF;
@@ -843,6 +844,7 @@ $$;
 
 -- Function to award loyalty points after order completion
 -- Drop and recreate the function to handle both points and draw entries
+-- Drop and recreate the function to handle points, draw entries, AND account activation
 DROP FUNCTION IF EXISTS award_loyalty_points() CASCADE;
 
 CREATE OR REPLACE FUNCTION award_loyalty_points()
@@ -860,19 +862,99 @@ DECLARE
     v_entry_count INTEGER := 0;
     v_entries_awarded INTEGER := 0;
     v_entry_id UUID;
+    -- Activation variables
+    v_current_status TEXT;
 BEGIN
-    -- Only award points when order is marked as completed and paid
-    IF NEW.status = 'completed' AND NEW.payment_status = 'completed' 
+    -- Only process when order is marked as completed and paid
+    IF NEW.status = 'completed' AND NEW.payment_status = 'paid' 
        AND (OLD.status != 'completed' OR OLD.payment_status != 'completed') THEN
 
-        -- Skip if this is a referral order (let the separate RPC handle it)
-        IF NEW.referred_by IS NOT NULL THEN
-            RETURN NEW;
+        -- ============================================
+        -- PART 1: ACTIVATE USER ACCOUNT (30 days)
+        -- ============================================
+        -- Any successful paid order activates the account for 30 days
+        -- This is critical for streak challenges, team eligibility, and referral completion
+        
+        SELECT status INTO v_current_status
+        FROM users
+        WHERE id = NEW.user_id;
+        
+        -- Set status to 'active' and record the activation expiry
+        UPDATE users
+        SET 
+            status = 'active',
+            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+                'last_activation_date', NOW()::TEXT,
+                'activation_expires_at', (NOW() + INTERVAL '30 days')::TEXT,
+                'activation_source', 'order_' || NEW.order_number,
+                'activation_order_id', NEW.id::TEXT
+            ),
+            updated_at = NOW()
+        WHERE id = NEW.user_id;
+        
+        -- Log the activation event
+        INSERT INTO loyalty_transactions (
+            user_id, 
+            order_id, 
+            points_change, 
+            points_balance, 
+            transaction_type, 
+            description
+        ) VALUES (
+            NEW.user_id,
+            NEW.id,
+            0,
+            COALESCE((SELECT points FROM loyalty_points WHERE user_id = NEW.user_id), 0),
+            'account_activation',
+            'Account activated for 30 days via order #' || NEW.order_number
+        );
+        
+        RAISE NOTICE 'User % account activated for 30 days (was: %)', NEW.user_id, v_current_status;
+        
+        -- ============================================
+        -- PART 2: PROCESS SIGNUP REFERRALS
+        -- ============================================
+        -- If user was referred and status just changed to active,
+        -- this will trigger the referral completion
+        
+        -- Check if user has pending signup referrals
+        IF EXISTS (
+            SELECT 1 FROM referrals
+            WHERE referred_user_id = NEW.user_id
+            AND status = 'joined'
+            AND conversion_type = 'signup'
+        ) THEN
+            -- Update pending signup referrals to completed
+            UPDATE referrals
+            SET 
+                status = 'completed',
+                completed_at = NOW(),
+                updated_at = NOW(),
+                reward_points = COALESCE(reward_points, 100)
+            WHERE referred_user_id = NEW.user_id
+            AND status = 'joined'
+            AND conversion_type = 'signup';
+            
+            -- Process each completed referral through the challenge system
+            PERFORM process_referral_challenge_completion(r.id)
+            FROM referrals r
+            WHERE r.referred_user_id = NEW.user_id
+            AND r.status = 'completed'
+            AND r.conversion_type = 'signup'
+            AND r.completed_at >= NOW() - INTERVAL '1 minute';
+            
+            RAISE NOTICE 'Signup referrals completed for user %', NEW.user_id;
         END IF;
         
         -- ============================================
-        -- PART 1: AWARD LOYALTY POINTS
+        -- PART 3: AWARD LOYALTY POINTS
         -- ============================================
+        
+        -- Award referral points if this is a referral order
+        -- This is same as sign up referral
+        IF NEW.referred_by IS NOT NULL THEN
+            PERFORM award_referral_points_on_order_complete(NEW.id);
+        END IF;
         
         -- Get user's current tier
         SELECT lt.* INTO user_tier
@@ -937,7 +1019,7 @@ BEGIN
         WHERE user_id = NEW.user_id AND tier != new_tier;
         
         -- ============================================
-        -- PART 2: AWARD DRAW ENTRIES
+        -- PART 4: AWARD DRAW ENTRIES
         -- ============================================
         
         -- Skip if draw entries already awarded
@@ -1023,6 +1105,23 @@ BEGIN
                 RAISE NOTICE 'No active draw found for order %', NEW.id;
             END IF;
         END IF;
+        
+        -- ============================================
+        -- PART 5: PROCESS PURCHASE CHALLENGES
+        -- ============================================
+        -- Check if this order qualifies for any purchase challenges
+        PERFORM process_purchase_challenge(NEW.id);
+        
+        -- ============================================
+        -- PART 6: PROCESS TEAM SPENDING
+        -- ============================================
+        -- If user is in a team, add spending to team total
+        PERFORM process_team_spending(
+            NEW.id,
+            NEW.user_id,
+            NEW.total_amount
+        );
+        
     END IF;
     
     RETURN NEW;
@@ -1035,6 +1134,52 @@ CREATE TRIGGER orders_award_points
     AFTER UPDATE ON orders
     FOR EACH ROW
     EXECUTE FUNCTION award_loyalty_points();
+
+
+-- Also create a scheduled function to deactivate expired accounts
+-- Run this via pg_cron or a scheduled edge function every hour
+CREATE OR REPLACE FUNCTION deactivate_expired_accounts()
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    -- Deactivate users whose 30-day activation has expired
+    -- But only if they haven't made another purchase that would extend it
+    WITH expired_users AS (
+        SELECT u.id
+        FROM users u
+        WHERE u.status = 'active'
+        AND (u.metadata->>'activation_expires_at')::TIMESTAMPTZ < NOW()
+        -- Don't deactivate if they have a more recent order
+        AND NOT EXISTS (
+            SELECT 1 FROM orders o
+            WHERE o.user_id = u.id
+            AND o.payment_status = 'paid'
+            AND o.status = 'completed'
+            AND o.updated_at > (u.metadata->>'activation_expires_at')::TIMESTAMPTZ - INTERVAL '30 days'
+        )
+    )
+    UPDATE users u
+    SET 
+        status = 'inactive',
+        metadata = COALESCE(u.metadata, '{}'::jsonb) || jsonb_build_object(
+            'deactivated_at', NOW()::TEXT,
+            'deactivation_reason', '30-day activation expired'
+        ),
+        updated_at = NOW()
+    FROM expired_users eu
+    WHERE u.id = eu.id;
+    
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    
+    RAISE NOTICE 'Deactivated % expired accounts', v_count;
+    
+    RETURN v_count;
+END;
+$$;
 
 -- Keep this function for admin cashbacks and direct redemptions
 CREATE OR REPLACE FUNCTION redeem_loyalty_points(

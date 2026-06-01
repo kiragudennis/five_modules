@@ -115,17 +115,16 @@ export async function POST(req: Request) {
         .eq("referral_code", referralCode.toUpperCase())
         .single();
 
-      if (!referrerError && referrerData) {
-        // Record the referral (pending status)
+      // In your signup endpoint, update the referral insertion:
+      if (referralCode && !referrerError && referrerData) {
         await supabaseAdmin.from("referrals").insert({
           referrer_id: referrerData.id,
           referred_email: email,
           referred_user_id: userId,
           referral_code: referralCode.toUpperCase(),
-          status: "joined", // They've joined, waiting for first purchase
-          reward_points: 100, // Default points
-          converted_at: new Date().toISOString(),
-          conversion_type: "account_creation",
+          status: "joined", // Waiting for activation
+          reward_points: 100,
+          conversion_type: "signup", // ✅ Changed from "account_creation" to "signup"
           metadata: {
             joined_at: new Date().toISOString(),
             signup_data: {

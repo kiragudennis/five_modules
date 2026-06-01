@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -130,7 +131,7 @@ export function TriviaHostControls({
     time_limit_seconds: 5,
     category: "",
     explanation: "",
-    question_type: "",
+    question_type: "multiple_choice",
     accepted_answers: [] as string[],
     case_sensitive: false,
   });
@@ -357,13 +358,23 @@ export function TriviaHostControls({
       };
 
       if (editingQuestion) {
-        await supabase
+        const { error } = await supabase
           .from("challenge_trivia_questions")
           .update(questionData)
           .eq("id", editingQuestion.id);
+        if (error) {
+          console.log("Error adding new question", error);
+          throw error;
+        }
         toast.success("Question updated!");
       } else {
-        await supabase.from("challenge_trivia_questions").insert(questionData);
+        const { error } = await supabase
+          .from("challenge_trivia_questions")
+          .insert(questionData);
+        if (error) {
+          console.log("Error adding new question", error);
+          throw error;
+        }
         toast.success("Question added!");
       }
 
@@ -386,7 +397,7 @@ export function TriviaHostControls({
       time_limit_seconds: 5,
       category: "",
       explanation: "",
-      question_type: "",
+      question_type: "multiple_choice",
       accepted_answers: [],
       case_sensitive: false,
     });
@@ -757,7 +768,7 @@ export function TriviaHostControls({
             <div className="space-y-2">
               {questions.map((q) => (
                 <Card key={q.id} className={cn(q.is_used && "opacity-50")}>
-                  <CardContent className="p-4">
+                  <CardContent>
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <p className="font-medium">{q.question}</p>
@@ -878,7 +889,7 @@ export function TriviaHostControls({
                 placeholder="Send a message to viewers..."
                 value={hostMessage}
                 onChange={(e) => setHostMessage(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && sendHostMessage()}
+                onKeyDown={(e) => e.key === "Enter" && sendHostMessage()}
               />
               <Button onClick={sendHostMessage}>
                 <Send className="h-4 w-4" />
@@ -908,6 +919,11 @@ export function TriviaHostControls({
             <DialogTitle>
               {editingQuestion ? "Edit Question" : "Add New Question"}
             </DialogTitle>
+            <DialogDescription>
+              {editingQuestion
+                ? "Modify the question details and save to update."
+                : "Fill in the details for your new trivia question."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

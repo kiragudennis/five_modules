@@ -68,33 +68,6 @@ CREATE TABLE IF NOT EXISTS challenge_trivia_round_questions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Trivia participant selection (from spinning wheel)
-CREATE TABLE IF NOT EXISTS challenge_trivia_selections (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    challenge_id UUID REFERENCES challenges(id) ON DELETE CASCADE,
-    round_id UUID REFERENCES challenge_trivia_rounds(id) ON DELETE CASCADE,
-    question_id UUID REFERENCES challenge_trivia_questions(id) ON DELETE CASCADE,
-    
-    -- Selected participant (from wheel spin)
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    selected_by_spin_id UUID REFERENCES spin_attempts(id),
-    
-    -- Answer tracking
-    selected_answer INTEGER CHECK (selected_answer >= 0 AND selected_answer <= 3),
-    is_correct BOOLEAN,
-    points_earned INTEGER DEFAULT 0,
-    
-    -- Time tracking
-    question_shown_at TIMESTAMPTZ,
-    answer_submitted_at TIMESTAMPTZ,
-    response_time_ms INTEGER, -- How fast they answered
-    
-    -- Status
-    status TEXT DEFAULT 'selected' CHECK (status IN ('selected', 'answering', 'answered', 'timeout', 'skipped')),
-    
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Trivia leaderboard (real-time)
 CREATE TABLE IF NOT EXISTS challenge_trivia_scores (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

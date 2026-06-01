@@ -21,7 +21,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -58,6 +60,7 @@ import {
   Zap,
   AlertCircle,
   Copy,
+  Brain,
 } from "lucide-react";
 import { toast } from "sonner";
 import { SpinGame, PrizeSegment } from "@/types/spinning_wheel";
@@ -142,6 +145,13 @@ const PRIZE_TYPES = [
     label: "Bundle",
     icon: <Gift className="h-4 w-4" />,
     placeholder: "select bundle",
+    unit: "",
+  },
+  {
+    value: "trivia_ticket",
+    label: "Trivia Ticket",
+    icon: <Zap className="h-4 w-4" />,
+    placeholder: "entry label",
     unit: "",
   },
 ];
@@ -253,7 +263,7 @@ export default function SpinningWheelAdmin() {
               New Game
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto scrollbar-hide">
             <DialogHeader>
               <DialogTitle>
                 {selectedGame ? "Edit Spin Game" : "Create New Spin Game"}
@@ -457,6 +467,9 @@ function GameCard({
                       <Truck className="h-3 w-3" />
                     )}
                     {prize.type === "bundle" && <Gift className="h-3 w-3" />}
+                    {prize.type === "trivia_ticket" && (
+                      <Brain className="h-3 w-3" />
+                    )}
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -628,6 +641,16 @@ function GameForm({
         },
         {
           id: "5",
+          label: "Trivia Entry",
+          type: "trivia_ticket",
+          value: "Trivia Challenge Entry",
+          color: "#FFD700",
+          probability: 5,
+          product_id: null,
+          bundle_id: null,
+        },
+        {
+          id: "6",
           label: "Try Again",
           type: "points",
           value: "0",
@@ -644,6 +667,7 @@ function GameForm({
       live_theme: "default",
       show_confetti: true,
       play_sounds: true,
+      linked_challenge_id: null,
     },
   );
 
@@ -691,6 +715,8 @@ function GameForm({
       } else if (prize.type === "bundle" && prize.bundle_id) {
         prize.label = `Bundle (${prize.bundle_id.slice(0, 8)}...)`;
         prize.value = prize.bundle_id;
+      } else if (prize.type === "trivia_ticket") {
+        prize.label = prize.value || "Trivia Entry";
       }
     }
 
@@ -716,6 +742,14 @@ function GameForm({
     return true;
   };
 
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+  };
+
+  const slug = formData.slug || generateSlug(formData.name);
   const handleSave = async () => {
     if (!validateProbabilities()) return;
 
@@ -724,7 +758,7 @@ function GameForm({
       // Clean up data before saving
       const saveData = {
         name: formData.name,
-        slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, "-"),
+        slug: slug,
         description: formData.description,
         game_type: formData.game_type,
         eligible_tiers: formData.eligible_tiers,
@@ -749,6 +783,7 @@ function GameForm({
         live_theme: formData.live_theme,
         show_confetti: formData.show_confetti,
         play_sounds: formData.play_sounds,
+        linked_challenge_id: formData.linked_challenge_id || null,
       };
       await onSave(saveData);
     } finally {
@@ -783,7 +818,11 @@ function GameForm({
             <Input
               value={formData.name}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData({
+                  ...formData,
+                  name: e.target.value,
+                  slug: generateSlug(e.target.value),
+                })
               }
               placeholder="e.g., Weekend Wonder Wheel"
             />
@@ -795,7 +834,7 @@ function GameForm({
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                  slug: e.target.value,
                 })
               }
               placeholder="weekend-wonder-wheel"
@@ -852,17 +891,20 @@ function GameForm({
                 })
               }
             >
-              <SelectTrigger>
-                <SelectValue placeholder="All tiers" />
+              <SelectTrigger className="w-full max-w-48">
+                <SelectValue placeholder="Select a tier" />
               </SelectTrigger>
+
               <SelectContent>
-                <SelectItem value="all tiers">All tiers</SelectItem>
-                <SelectItem value="bronze,silver,gold,platinum">
-                  All (Bronze+)
-                </SelectItem>
-                <SelectItem value="silver,gold,platinum">Silver+</SelectItem>
-                <SelectItem value="gold,platinum">Gold+</SelectItem>
-                <SelectItem value="platinum">Platinum only</SelectItem>
+                <SelectGroup>
+                  <SelectLabel>Tiers</SelectLabel>
+                  <SelectItem value="bronze,silver,gold,platinum">
+                    All (Bronze+)
+                  </SelectItem>
+                  <SelectItem value="silver,gold,platinum">Silver+</SelectItem>
+                  <SelectItem value="gold,platinum">Gold+</SelectItem>
+                  <SelectItem value="platinum">Platinum only</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -964,7 +1006,7 @@ function GameForm({
           </Button>
         </div>
 
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 scrollbar-hide">
           {formData.prize_config.map((prize: any, idx: number) => (
             <Card key={prize.id || idx} className="p-4">
               <div className="space-y-3">
@@ -1061,6 +1103,15 @@ function GameForm({
                           </Tooltip>
                         </TooltipProvider>
                       </div>
+                    ) : prize.type === "trivia_ticket" ? (
+                      <Input
+                        type="text"
+                        value={prize.value}
+                        onChange={(e) =>
+                          updatePrize(idx, "value", e.target.value)
+                        }
+                        placeholder="e.g., Trivia Challenge Entry"
+                      />
                     ) : (
                       <Input
                         type={prize.type === "points" ? "number" : "text"}
@@ -1173,6 +1224,52 @@ function GameForm({
               placeholder="0 = no requirement"
             />
           </div>
+        </div>
+
+        <div>
+          <div className="flex-1 align-items gap-2">
+            <div>
+              <Label>Linked Trivia Challenge (Optional)</Label>
+              <Input
+                value={formData.linked_challenge_id || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    linked_challenge_id: e.target.value || null,
+                  })
+                }
+                placeholder="None - not linked to trivia"
+                className="font-mono text-xs"
+              />
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 h-9 px-2"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        formData.linked_challenge_id || "",
+                      );
+                      toast.success("Challenge ID copied");
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy ID</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-1">
+            When linked, players who win a trivia_ticket prize will
+            automatically be added to this trivia challenge as participants with
+            a ticket number.
+          </p>
         </div>
 
         <div className="space-y-4">

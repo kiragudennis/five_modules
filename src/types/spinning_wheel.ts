@@ -34,7 +34,14 @@ export interface SpinGame {
 
 export interface PrizeSegment {
   label: string;
-  type: "points" | "discount" | "free_shipping" | "product" | "bundle";
+  type:
+    | "points"
+    | "discount"
+    | "free_shipping"
+    | "product"
+    | "bundle"
+    | "trivia_ticket"
+    | "challenge_entry";
   value: string | number;
   color: string;
   probability: number; // 0-100, sum should be 100
