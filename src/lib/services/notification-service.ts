@@ -1,4 +1,4 @@
-// src/lib/services/notification-service.ts
+// src/lib/services/notification-service.ts (UPDATED)
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export interface Notification {
@@ -6,18 +6,131 @@ export interface Notification {
   user_id: string;
   type:
     | "draw_win"
+    | "draw_runner_up"
     | "draw_reminder"
-    | "entry_confirmation"
-    | "promotion"
-    | "system"
+    | "draw_entry_confirmed"
+    | "draw_consolation"
+    | "draw_redraw"
+    | "loyalty_partial_redeem"
+    | "loyalty_points_earned"
+    | "loyalty_points_expiring"
+    | "loyalty_tier_upgrade"
+    | "order_confirmation"
+    | "order_shipped"
+    | "order_delivered"
+    | "payment_received"
+    | "payment_failed"
+    | "coupon_issued"
+    | "system_alert"
     | "rank_improved"
-    | "challenge_joined";
+    | "challenge_joined"
+    | "entry_confirmation"
+    | "promotion";
   title: string;
   message: string;
   metadata: any;
   is_read: boolean;
+  read_at?: string;
   created_at: string;
 }
+
+// ============================================
+// STANDALONE FUNCTIONS (for notification-bell.tsx)
+// ============================================
+
+/**
+ * Get unread notification count for a user
+ */
+export async function getUnreadNotificationCount(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("get_unread_notification_count", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Error getting unread count:", error);
+    return 0;
+  }
+  return data || 0;
+}
+
+/**
+ * Mark a single notification as read
+ */
+export async function markNotificationRead(
+  supabase: SupabaseClient,
+  notificationId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("mark_notification_read", {
+    p_notification_id: notificationId,
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Error marking notification as read:", error);
+    throw error;
+  }
+}
+
+/**
+ * Mark all notifications as read for a user
+ */
+export async function markAllNotificationsRead(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("mark_all_notifications_read", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Error marking all notifications as read:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get paginated notifications for a user
+ */
+export async function getUserNotifications(
+  supabase: SupabaseClient,
+  userId: string,
+  limit: number = 20,
+  offset: number = 0,
+  includeRead: boolean = true,
+): Promise<Notification[]> {
+  const { data, error } = await supabase.rpc("get_user_notifications", {
+    p_user_id: userId,
+    p_limit: limit,
+    p_offset: offset,
+    p_include_read: includeRead,
+  });
+
+  if (error) {
+    console.error("Error getting notifications:", error);
+    return [];
+  }
+
+  // Map snake_case DB columns to camelCase for frontend
+  return (data || []).map((n: any) => ({
+    id: n.id,
+    user_id: n.user_id || userId,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    metadata: n.metadata,
+    is_read: n.read,
+    read_at: n.read_at,
+    created_at: n.created_at,
+  }));
+}
+
+// ============================================
+// NOTIFICATION SERVICE CLASS (for other uses)
+// ============================================
 
 export class NotificationService {
   constructor(private supabase: SupabaseClient) {}
@@ -31,25 +144,24 @@ export class NotificationService {
     title: string,
     message: string,
     metadata?: any,
-  ): Promise<Notification> {
-    const { data, error } = await this.supabase
-      .from("user_notifications")
-      .insert({
-        user_id: userId,
-        type,
-        title,
-        message,
-        metadata: metadata || {},
-      })
-      .select()
-      .single();
+  ): Promise<Notification | null> {
+    const { data, error } = await this.supabase.rpc("create_notification", {
+      p_user_id: userId,
+      p_type: type,
+      p_title: title,
+      p_message: message,
+      p_metadata: metadata || {},
+    });
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error sending notification:", error);
+      return null;
+    }
     return data;
   }
 
   /**
-   * Send email via Resend (queued)
+   * Send email via email queue
    */
   async sendEmail(
     to: string,
@@ -58,7 +170,6 @@ export class NotificationService {
     text?: string,
     metadata?: any,
   ): Promise<void> {
-    // Queue email for sending
     const { error } = await this.supabase.from("email_queue").insert({
       to_email: to,
       subject,
@@ -158,7 +269,7 @@ export class NotificationService {
   ): Promise<void> {
     await this.sendInAppNotification(
       userId,
-      "entry_confirmation",
+      "draw_entry_confirmed",
       `Entry confirmed for ${drawName}!`,
       `You earned ${entryCount} ${entryCount === 1 ? "entry" : "entries"} via ${method}. Good luck!`,
       { drawName, entryCount, method },
@@ -187,69 +298,37 @@ export class NotificationService {
     );
   }
 
-  /**
-   * Get user's unread notifications
-   */
-  async getUnreadNotifications(userId: string): Promise<Notification[]> {
-    const { data, error } = await this.supabase
-      .from("user_notifications")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_read", false)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return data || [];
+  // Convenience methods that delegate to standalone functions
+  async getUnreadCount(userId: string): Promise<number> {
+    return getUnreadNotificationCount(this.supabase, userId);
   }
 
-  /**
-   * Get user's all notifications (paginated)
-   */
   async getUserNotifications(
     userId: string,
     limit: number = 20,
     offset: number = 0,
   ): Promise<{ notifications: Notification[]; total: number }> {
-    const [{ data, error }, { count }] = await Promise.all([
-      this.supabase
-        .from("user_notifications")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .range(offset, offset + limit - 1),
-      this.supabase
-        .from("user_notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId),
-    ]);
+    const notifications = await getUserNotifications(
+      this.supabase,
+      userId,
+      limit,
+      offset,
+      true,
+    );
 
-    if (error) throw error;
-    return { notifications: data || [], total: count || 0 };
-  }
-
-  /**
-   * Mark notification as read
-   */
-  async markAsRead(notificationId: string, userId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("user_notifications")
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq("id", notificationId)
+    const { count } = await this.supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
       .eq("user_id", userId);
 
-    if (error) throw error;
+    return { notifications, total: count || 0 };
   }
 
-  /**
-   * Mark all notifications as read
-   */
-  async markAllAsRead(userId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("user_notifications")
-      .update({ is_read: true, read_at: new Date().toISOString() })
-      .eq("user_id", userId)
-      .eq("is_read", false);
+  async markAsRead(notificationId: string, userId: string): Promise<void> {
+    return markNotificationRead(this.supabase, notificationId, userId);
+  }
 
-    if (error) throw error;
+  async markAllAsRead(userId: string): Promise<void> {
+    return markAllNotificationsRead(this.supabase, userId);
   }
 }

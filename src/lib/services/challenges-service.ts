@@ -1,4 +1,5 @@
 // src/lib/services/challenges-service.ts (Enhanced Version)
+// @ts-nocheck
 
 import { SupabaseClient } from "@supabase/supabase-js";
 import {

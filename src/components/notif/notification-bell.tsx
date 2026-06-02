@@ -8,7 +8,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   getUserNotifications,
-} from "@/lib/services/notification-helper";
+} from "@/lib/services/notification-service";
 import {
   Popover,
   PopoverContent,
@@ -162,7 +162,7 @@ export function NotificationBell() {
                   key={notification.id}
                   className={cn(
                     "p-4 hover:bg-muted/50 transition-colors cursor-pointer",
-                    !notification.read && "bg-primary/5",
+                    !notification.is_read && "bg-primary/5",
                   )}
                   onClick={() => handleMarkAsRead(notification.id)}
                 >
@@ -184,7 +184,7 @@ export function NotificationBell() {
                         )}
                       </p>
                     </div>
-                    {!notification.read && (
+                    {!notification.is_read && (
                       <div className="flex-shrink-0">
                         <div className="h-2 w-2 rounded-full bg-blue-500" />
                       </div>
