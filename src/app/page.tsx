@@ -56,6 +56,12 @@ import axios from "axios";
 import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { scrollableCategories } from "@/lib/constants";
+import spinAnimation from "@/assets/lottie/spin-1.json";
+import challengesAnimation from "@/assets/lottie/challenges.json";
+import drawsAnimation from "@/assets/lottie/draws.json";
+import bundlesAnimation from "@/assets/lottie/bundles.json";
+import dealsAnimation from "@/assets/lottie/deals.json";
+import { LottieIcon } from "@/components/ui/lottie-icon";
 
 // Banner slides
 const banners = [
@@ -86,8 +92,8 @@ const banners = [
 const gamifiedModules = [
   {
     id: "spin",
-    name: "Spin & Win",
-    icon: <Target className="w-6 h-6" />,
+    name: "Spin",
+    lottieAnimation: spinAnimation, // Add this
     href: "/spin",
     color: "from-purple-500 to-pink-500",
     gradient: "purple",
@@ -95,31 +101,31 @@ const gamifiedModules = [
   {
     id: "challenges",
     name: "Challenges",
-    icon: <Trophy className="w-6 h-6" />,
+    lottieAnimation: challengesAnimation, // Add this
     href: "/challenges",
     color: "from-orange-500 to-red-500",
     gradient: "orange",
   },
   {
     id: "draws",
-    name: "Lucky Draw",
-    icon: <Ticket className="w-6 h-6" />,
+    name: "Draw",
+    lottieAnimation: drawsAnimation, // Add this
     href: "/draws",
     color: "from-blue-500 to-cyan-500",
     gradient: "blue",
   },
   {
     id: "bundles",
-    name: "Mystery Bundles",
-    icon: <Gift className="w-6 h-6" />,
+    name: "Bundles",
+    lottieAnimation: bundlesAnimation, // Add this
     href: "/bundles",
     color: "from-green-500 to-emerald-500",
     gradient: "green",
   },
   {
     id: "deals",
-    name: "Flash Sales",
-    icon: <Zap className="w-6 h-6" />,
+    name: "Deals",
+    lottieAnimation: dealsAnimation, // Add this
     href: "/deals",
     color: "from-amber-500 to-yellow-500",
     gradient: "amber",
@@ -538,7 +544,7 @@ export default function HomePage() {
       {/* HORIZONTAL SCROLLABLE CATEGORIES */}
       {/* ============================================ */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-        <div className="container mx-auto px-4 py-3">
+        <div className="container mx-auto px-2 py-3">
           <div className="relative">
             <button
               onClick={() => scrollCategories("left")}
@@ -566,13 +572,13 @@ export default function HomePage() {
                   >
                     <div
                       className={cn(
-                        "w-12 h-12 rounded-full flex items-center justify-center text-2xl",
+                        "w-12 h-12 rounded-full flex justify-center items-center text-2xl pr-2",
                         category.color,
                       )}
                     >
                       {IconComponent && (
                         <span className="ml-2">
-                          <IconComponent className="w-4 h-4" />
+                          <IconComponent className="w-4 h-4 m" />
                         </span>
                       )}
                     </div>
@@ -596,8 +602,8 @@ export default function HomePage() {
       {/* ============================================ */}
       {/* LANDSCAPE SLIDESHOW BANNERS */}
       {/* ============================================ */}
-      <div className="container mx-auto px-4 py-4">
-        <div className="relative rounded-2xl overflow-hidden h-[240px] md:h-[300px] lg:h-[360px]">
+      <div className="py-4">
+        <div className="relative overflow-hidden h-[240px] md:h-[300px] lg:h-[360px]">
           {banners.map((banner, index) => (
             <div
               key={banner.id}
@@ -674,62 +680,44 @@ export default function HomePage() {
       {/* GAMIFIED EXPERIENCES + CATEGORY GRID (5x2) */}
       {/* ============================================ */}
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-5 gap-1 sm:gap-3">
           {gamifiedModules.map((module) => (
             <Link
               key={module.id}
               href={module.href}
               className={cn(
-                "group flex flex-col items-center gap-2 p-4 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg",
-                module.isCategory
-                  ? "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-amber-300"
-                  : cn(
-                      "bg-gradient-to-br text-white",
-                      module.gradient === "purple" &&
-                        "from-purple-500 to-pink-500",
-                      module.gradient === "orange" &&
-                        "from-orange-500 to-red-500",
-                      module.gradient === "blue" && "from-blue-500 to-cyan-500",
-                      module.gradient === "green" &&
-                        "from-green-500 to-emerald-500",
-                      module.gradient === "amber" &&
-                        "from-amber-500 to-yellow-500",
-                    ),
+                "group flex flex-col items-center gap-2 rounded-xl transition-all duration-300 hover:scale-105",
               )}
             >
-              <div
-                className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center",
-                  module.isCategory
-                    ? "bg-gray-100 dark:bg-gray-700 shadow-md"
-                    : "bg-white/20 backdrop-blur-sm",
-                )}
-              >
+              {/* Render Lottie for gamified modules, regular icons for categories */}
+              {module.lottieAnimation ? (
+                <LottieIcon
+                  animation={module.lottieAnimation}
+                  isCategory={module.isCategory}
+                />
+              ) : (
                 <div
-                  className={
+                  className={cn(
+                    "w-12 h-12 rounded-full flex items-center justify-center",
                     module.isCategory
-                      ? "text-gray-700 dark:text-gray-200"
-                      : "text-white"
-                  }
+                      ? "bg-gray-100 dark:bg-gray-700 shadow-md"
+                      : "",
+                  )}
                 >
-                  {module.icon}
+                  <div>{module.icon}</div>
                 </div>
-              </div>
+              )}
+
               <span
-                className={cn(
-                  "text-sm font-medium text-center",
-                  module.isCategory
-                    ? "text-gray-700 dark:text-gray-300"
-                    : "text-white",
-                )}
+                className={
+                  "text-sm font-medium text-center truncate max-w-full"
+                }
               >
                 {module.name}
               </span>
+
               {!module.isCategory && (
-                <Badge
-                  variant="secondary"
-                  className="text-[10px] bg-white/20 text-white border-0 mt-1"
-                >
+                <Badge variant="secondary" className="text-[5px] border-0 mt-1">
                   Play Now →
                 </Badge>
               )}

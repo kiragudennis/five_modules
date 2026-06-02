@@ -30,6 +30,22 @@ import {
   TrendingUp,
   RefreshCcw,
   Star,
+  Coins,
+  Share2,
+  ShoppingBag,
+  Ticket,
+  Trophy,
+  Target,
+  Webhook,
+  BarChart,
+  Shield,
+  Cpu,
+  Radio,
+  Tv,
+  Braces,
+  Layers,
+  FileSearch,
+  Phone,
 } from "lucide-react";
 
 export const scrollableCategories = [
@@ -286,6 +302,774 @@ export const scrollableCategories = [
 // Export both for backward compatibility during migration
 export const lightingCategories = scrollableCategories;
 
+interface ModuleDetail {
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  longDescription: string;
+  icon: any;
+  color: string;
+  gradient: string;
+  href: string;
+  retentionValue: string[];
+  mechanics: {
+    title: string;
+    description: string;
+  }[];
+  stats: { label: string; value: string }[];
+  benefits: string[];
+  useCases: string[];
+}
+
+export const modules: ModuleDetail[] = [
+  {
+    id: "spin",
+    name: "Spin to Win",
+    tagline: "Daily engagement through gamified rewards",
+    description:
+      "Interactive spinning wheel where customers win points, discounts, or products. Builds daily habit and repeat visits.",
+    longDescription:
+      "The Spin Wheel creates a daily touchpoint with your brand. Customers return each day for their free spins, earning points and prizes that keep them engaged with your store.",
+    icon: Target,
+    color: "from-purple-500 to-pink-500",
+    gradient: "purple",
+    href: "/spin",
+    retentionValue: [
+      "Creates daily visit habit",
+      "Points system encourages repeat purchases",
+      "Social sharing extends reach",
+      "VIP tiers unlock exclusive wheels",
+    ],
+    mechanics: [
+      {
+        title: "Free Spins",
+        description:
+          "Customers receive free spins daily, weekly, and lifetime. Configurable limits per user.",
+      },
+      {
+        title: "Paid Spins",
+        description:
+          "After free spins, customers can use loyalty points to spin more, keeping them engaged.",
+      },
+      {
+        title: "Prize Configuration",
+        description:
+          "Set prizes as points, discounts, free shipping, products, or bundles with custom probabilities.",
+      },
+      {
+        title: "Single Prize Mode",
+        description:
+          "Grand prize mode where the wheel locks after the top prize is won, creating urgency.",
+      },
+      {
+        title: "Multi-Game Support",
+        description:
+          "Run multiple wheels simultaneously (VIP, New Customer, Weekend Special) for different audiences.",
+      },
+    ],
+    stats: [
+      { label: "Avg. Daily Spins", value: "3-5 per user" },
+      { label: "Return Rate", value: "65% next day" },
+      { label: "Points Spent", value: "2,500+ monthly" },
+      { label: "Social Shares", value: "15% of spins" },
+    ],
+    benefits: [
+      "Increases daily active users",
+      "Reduces customer acquisition cost through shares",
+      "Points economy drives purchases",
+      "Creates excitement around your brand",
+    ],
+    useCases: [
+      "E-commerce daily engagement",
+      "Product launch promotions",
+      "Holiday campaigns",
+      "VIP member rewards",
+    ],
+  },
+  {
+    id: "challenges",
+    name: "Live Challenges & Trivia",
+    tagline: "Real-time competitions with host-led questions",
+    description:
+      "Host live trivia sessions where customers answer questions in real-time. Perfect for TikTok, Instagram, and YouTube Live.",
+    longDescription:
+      "Our unique Trivia Challenge mode lets you host live sessions where you ask questions and customers answer through the platform. Points awarded instantly creates addictive competitive energy.",
+    icon: Trophy,
+    color: "from-orange-500 to-red-500",
+    gradient: "orange",
+    href: "/challenges",
+    retentionValue: [
+      "Live events drive scheduled returns",
+      "Competition creates community",
+      "Leaderboard visibility motivates",
+      "Team challenges increase social sharing",
+    ],
+    mechanics: [
+      {
+        title: "Live Trivia Mode",
+        description:
+          "Host asks questions, customers answer via the platform. Real-time scoring and leaderboard updates.",
+      },
+      {
+        title: "Referral Challenges",
+        description:
+          "Compete to refer the most new customers. Automatic tracking and scoring.",
+      },
+      {
+        title: "Purchase Challenges",
+        description: "Compete based on spending amount during campaign period.",
+      },
+      {
+        title: "Streak Challenges",
+        description: "Consecutive daily visits or actions earn bonus points.",
+      },
+      {
+        title: "Team Challenges",
+        description:
+          "Customers form teams and compete together against other teams.",
+      },
+    ],
+    stats: [
+      { label: "Avg. Participation", value: "40% of users" },
+      { label: "Live Session Length", value: "15-30 minutes" },
+      { label: "Referral Rate", value: "3-5x normal" },
+      { label: "Points Awarded", value: "10K+ weekly" },
+    ],
+    benefits: [
+      "Builds community around your brand",
+      "Live events create scheduled engagement",
+      "Referrals drive customer acquisition",
+      "Competitive spirit increases activity",
+    ],
+    useCases: [
+      "Weekly live trivia nights",
+      "Product launch competitions",
+      "Seasonal leaderboards",
+      "Affiliate referral contests",
+    ],
+  },
+  {
+    id: "draws",
+    name: "Lucky Draws",
+    tagline: "Time-limited giveaways with multiple entry methods",
+    description:
+      "Create excitement with scheduled draws. Customers earn entries through purchases, referrals, and social shares.",
+    longDescription:
+      "Lucky Draws build anticipation before the draw date and excitement during the live winner reveal. Perfect for end-of-month promotions or special events.",
+    icon: Ticket,
+    color: "from-blue-500 to-cyan-500",
+    gradient: "blue",
+    href: "/draws",
+    retentionValue: [
+      "Builds anticipation before draw date",
+      "Multiple entry methods maximize engagement",
+      "Social shares extend reach",
+      "Winner announcements create social proof",
+    ],
+    mechanics: [
+      {
+        title: "Multiple Entry Methods",
+        description:
+          "Purchase, referral, social share, live stream email, and loyalty tier bonuses.",
+      },
+      {
+        title: "Entry Limits",
+        description:
+          "Configure per-user and global entry limits to ensure fairness.",
+      },
+      {
+        title: "Multi-Phase Draw Show",
+        description:
+          "Entry collection → Entries closed → Winner reveal with confetti and sound.",
+      },
+      {
+        title: "Winner Management",
+        description:
+          "Track claims, auto-redraw unclaimed prizes, distribute consolation points.",
+      },
+      {
+        title: "Concurrent Draws",
+        description:
+          "Run multiple draws simultaneously with different schedules and prizes.",
+      },
+    ],
+    stats: [
+      { label: "Entry Rate", value: "35% of visitors" },
+      { label: "Social Shares", value: "2-3 per entry" },
+      { label: "Winner Retention", value: "80% return" },
+      { label: "Avg. Entries", value: "500-5,000" },
+    ],
+    benefits: [
+      "Massive social media engagement",
+      "Purchase incentives during entry period",
+      "Referral acquisition",
+      "Email list growth via live stream entries",
+    ],
+    useCases: [
+      "Monthly grand prize draws",
+      "Flash draws during live streams",
+      "Holiday giveaways",
+      "Product launch promotions",
+    ],
+  },
+  {
+    id: "bundles",
+    name: "Mystery Bundles",
+    tagline: "Curated product bundles with surprise reveals",
+    description:
+      "Increase average order value with product bundles. Mystery mode creates unboxing content for social media.",
+    longDescription:
+      "Bundles increase AOV while clearing inventory. Mystery bundles generate viral unboxing content perfect for TikTok and Instagram.",
+    icon: Gift,
+    color: "from-green-500 to-emerald-500",
+    gradient: "green",
+    href: "/bundles",
+    retentionValue: [
+      "Increases average order value",
+      "Mystery element drives curiosity",
+      "Unboxing content goes viral",
+      "Stream exclusives reward live viewers",
+    ],
+    mechanics: [
+      {
+        title: "Curated Bundles",
+        description: "Admin handpicks products that work well together.",
+      },
+      {
+        title: "Build-Your-Own",
+        description: "Customers select products from eligible pool.",
+      },
+      {
+        title: "Tiered Bundles",
+        description: "Savings increase as customers add more items.",
+      },
+      {
+        title: "Mystery Bundles",
+        description:
+          "Contents hidden until revealed during live stream or after purchase.",
+      },
+      {
+        title: "Subscription Bundles",
+        description: "Recurring bundle delivery for predictable revenue.",
+      },
+    ],
+    stats: [
+      { label: "AOV Increase", value: "35-50%" },
+      { label: "Mystery Unboxings", value: "2M+ views" },
+      { label: "Subscription Retention", value: "85% after 3 months" },
+      { label: "Bundle Conversion", value: "25% of shoppers" },
+    ],
+    benefits: [
+      "Higher average order value",
+      "Inventory management",
+      "Viral social content",
+      "Predictable recurring revenue",
+    ],
+    useCases: [
+      "Seasonal gift bundles",
+      "Clearance inventory",
+      "Subscription boxes",
+      "Live stream exclusives",
+    ],
+  },
+  {
+    id: "deals",
+    name: "Flash Deals",
+    tagline: "Urgency-driven limited-time offers",
+    description:
+      "Create scarcity with countdown timers and real-time stock depletion. BOGO, free gifts, and mystery deals.",
+    longDescription:
+      "Flash Deals leverage scarcity psychology. Live countdowns, stock meters, and claim tickers create FOMO that drives immediate purchases.",
+    icon: Zap,
+    color: "from-amber-500 to-yellow-500",
+    gradient: "amber",
+    href: "/deals",
+    retentionValue: [
+      "Urgency drives immediate action",
+      "Daily deals create visit habit",
+      "Scarcity increases conversion",
+      "Social proof via claim ticker",
+    ],
+    mechanics: [
+      {
+        title: "Flash Sales",
+        description: "Scheduled or instant deals with countdown timer.",
+      },
+      {
+        title: "Quantity Limits",
+        description:
+          "Limited units available at deal price. Real-time stock depletion.",
+      },
+      {
+        title: "BOGO Offers",
+        description: "Buy one, get one free or discounted.",
+      },
+      {
+        title: "Free Gift with Purchase",
+        description: "Automatic gift when spending above threshold.",
+      },
+      {
+        title: "Mystery Deals",
+        description: "Product and price hidden until revealed live.",
+      },
+    ],
+    stats: [
+      { label: "Conversion Rate", value: "3-5x normal" },
+      { label: "Time to Sell Out", value: "2-4 hours" },
+      { label: "Email Capture", value: "40% of viewers" },
+      { label: "Share Rate", value: "25% of buyers" },
+    ],
+    benefits: [
+      "Immediate revenue spikes",
+      "Inventory clearance",
+      "Email list growth",
+      "Social media buzz",
+    ],
+    useCases: [
+      "Daily deal at specific time",
+      "Flash sale during live stream",
+      "Holiday promotions",
+      "Inventory clearance events",
+    ],
+  },
+];
+
+export const retentionMetrics = [
+  {
+    label: "Daily Active Users",
+    value: "+65%",
+    icon: Users,
+    color: "text-blue-500",
+  },
+  {
+    label: "Average Order Value",
+    value: "+40%",
+    icon: ShoppingBag,
+    color: "text-green-500",
+  },
+  {
+    label: "Customer Lifetime Value",
+    value: "+85%",
+    icon: TrendingUp,
+    color: "text-purple-500",
+  },
+  {
+    label: "Social Shares",
+    value: "+120%",
+    icon: Share2,
+    color: "text-pink-500",
+  },
+  {
+    label: "Referral Rate",
+    value: "+200%",
+    icon: Users,
+    color: "text-orange-500",
+  },
+  {
+    label: "Points Redemption",
+    value: "15,000+/mo",
+    icon: Coins,
+    color: "text-amber-500",
+  },
+];
+
+export const consultationPackages = [
+  {
+    name: "Discovery Call",
+    price: "KES 5,000",
+    duration: "60 minutes",
+    description:
+      "Strategic consultation to understand your business, audience, and recommend the right engagement architecture.",
+    features: [
+      "Business requirements & audience analysis",
+      "Module architecture recommendation",
+      "ROI projection based on your traffic data",
+      "Live demo of all 5 modules in action",
+      "Technical feasibility assessment",
+      "Q&A with lead architect",
+    ],
+    icon: Phone,
+    color: "from-blue-500 to-cyan-500",
+  },
+  {
+    name: "Full Audit",
+    price: "KES 50,000",
+    duration: "Full day",
+    description:
+      "Comprehensive audit of your existing e-commerce with detailed implementation blueprint.",
+    features: [
+      "Everything in Discovery Call",
+      "Existing tech stack deep-dive",
+      "Database schema & API analysis",
+      "Custom integration roadmap with timeline",
+      "Performance & scalability assessment",
+      "Security audit & recommendations",
+      "Team capability assessment",
+      "2-week post-audit support",
+    ],
+    icon: FileSearch,
+    color: "from-purple-500 to-pink-500",
+    recommended: true,
+  },
+  {
+    name: "Implementation Workshop",
+    price: "KES 250,000",
+    duration: "1 week",
+    description:
+      "Full implementation of all 5 modules with your team. Includes training and 3 months support.",
+    features: [
+      "Everything in Full Audit",
+      "Complete module deployment (all 5)",
+      "Custom branding & theming",
+      "Team training & knowledge transfer",
+      "Live broadcast setup (OBS integration)",
+      "30-day launch support",
+      "Performance optimization",
+      "Full documentation & handover",
+    ],
+    icon: Users,
+    color: "from-orange-500 to-red-500",
+  },
+];
+
+export const modulePricing = [
+  {
+    module: "Spin Wheel",
+    price: "KES 250,000",
+    setup: "3-5 days",
+    description:
+      "Real-time spinning wheel with live broadcast integration and dynamic prize pools.",
+    longDescription:
+      "Not just a wheel - it's a live engagement engine. Real-time probability calculations, dynamic prize pools, WebSocket-powered winner announcements, and OBS-ready displays. Supports multi-game segmentation (VIP, new customers, weekend specials) with automatic prize locking.",
+    icon: Target,
+    color: "from-purple-500 to-pink-500",
+    features: [
+      "Multi-game support (run 5+ wheels simultaneously)",
+      "Dynamic prize pools with probability weighting",
+      "Real-time winner ticker (WebSocket powered)",
+      "Live broadcast display with sound & confetti",
+      "Points integration (free spins + paid spins)",
+      "Single-prize mode with auto-lock",
+      "Grand prize winner announcements",
+      "VIP tier-based access control",
+      "Daily/weekly/lifetime spin limits",
+      "Admin live controls (force winner, broadcast)",
+    ],
+    whatMakesItEnterprise: [
+      "Zero-latency winner broadcasting",
+      "Automatic prize pool replenishment",
+      "Fraud detection & rate limiting",
+      "Real-time analytics dashboard",
+      "A/B testing support",
+    ],
+  },
+  {
+    module: "Challenges",
+    price: "KES 250,000",
+    setup: "5-7 days",
+    description:
+      "7 challenge types including live trivia where hosts ask questions in real-time.",
+    longDescription:
+      "Turn your live streams into competitions. Host asks questions, customers answer through the platform. Real-time leaderboards, team competitions, and automatic point distribution. Supports referral, purchase, share, streak, team, combo, and live trivia challenges.",
+    icon: Trophy,
+    color: "from-orange-500 to-red-500",
+    features: [
+      "7 challenge types (referral, purchase, share, streak, team, combo, live trivia)",
+      "Live trivia mode with host dashboard",
+      "Real-time leaderboard updates",
+      "Team challenges with join codes",
+      "Catch Them feature (track competitors)",
+      "Multi-phase display (countdown/active/final hour/ended)",
+      "Admin live controls (pause, extend, adjust scores)",
+      "Automatic point distribution",
+      "Social media integration",
+      "Customizable prize tiers",
+    ],
+    whatMakesItEnterprise: [
+      "Host-controlled question pacing",
+      "Real-time participant scoring",
+      "Suspicious activity flagging",
+      "Automated winner notifications",
+      "Cross-campaign analytics",
+    ],
+  },
+  {
+    module: "Lucky Draws",
+    price: "KES 250,000",
+    setup: "3-5 days",
+    description:
+      "Time-limited giveaways with live draw shows and automatic winner selection.",
+    longDescription:
+      "Build anticipation with entry periods, then host a live draw show. The system randomly selects winners with full transparency. Automatic winner notifications, claim tracking, and redraws for unclaimed prizes. Multiple entry methods (purchases, referrals, social shares, live stream).",
+    icon: Ticket,
+    color: "from-blue-500 to-cyan-500",
+    features: [
+      "Multiple entry methods (purchase, referral, social share, live stream, loyalty tier)",
+      "Live draw show with multi-phase display",
+      "Cryptographically fair winner selection",
+      "Winner management suite (claim tracking, auto-redraw)",
+      "Consolation points for non-winners",
+      "Concurrent draw support",
+      "Real-time entry ticker",
+      "Social proof notifications",
+      "Entry limit controls (per-user, global)",
+      "Email/SMS winner notifications",
+    ],
+    whatMakesItEnterprise: [
+      "Provably fair selection algorithm",
+      "Automated fraud detection",
+      "Compliance-ready audit logs",
+      "Automated tax document generation",
+      "Winner blacklist management",
+    ],
+  },
+  {
+    module: "Mystery Bundles",
+    price: "KES 250,000",
+    setup: "3-5 days",
+    description:
+      "Product bundles with mystery reveal mode for viral unboxing content.",
+    longDescription:
+      "Increase average order value by 40%+. Mystery bundles create unboxing content that goes viral on TikTok/Instagram. Live stream exclusives appear only during broadcasts. Subscription bundles provide predictable recurring revenue.",
+    icon: Gift,
+    color: "from-green-500 to-emerald-500",
+    features: [
+      "5 bundle types (curated, build-your-own, tiered, mystery, subscription)",
+      "Mystery reveal mode (hidden contents)",
+      "Live stream exclusives (appear only during broadcast)",
+      "Real-time stock depletion meter",
+      "Live claim ticker with customer names",
+      "Points bonus bundles",
+      "Subscription management (weekly/monthly)",
+      "VIP tier discounts",
+      "Limited-time bundle windows",
+      "Social sharing incentives",
+    ],
+    whatMakesItEnterprise: [
+      "Automated inventory sync",
+      "Dynamic bundle pricing engine",
+      "Subscription renewal automation",
+      "Unboxing content tracking",
+      "Stream-exclusive analytics",
+    ],
+  },
+  {
+    module: "Flash Deals",
+    price: "KES 250,000",
+    setup: "2-3 days",
+    description:
+      "Urgency-driven deals with live countdowns, stock meters, and real-time claim tickers.",
+    longDescription:
+      "Create FOMO with limited-time offers. Live countdown timers change color (green → yellow → red) as time runs out. Stock meters deplete in real-time. Claim tickers show customer names and locations. Admin can extend timer or add stock live during broadcast.",
+    icon: Zap,
+    color: "from-amber-500 to-yellow-500",
+    features: [
+      "6 deal types (discount, flash sale, daily deal, BOGO, free gift, mystery)",
+      "Live countdown with urgency states",
+      "Real-time stock depletion meter",
+      "Live claim ticker with customer locations",
+      "Admin live controls (extend timer, add stock)",
+      "Points early access",
+      "Points revive (missed deals)",
+      "Quantity-limited deals",
+      "Schedule management",
+      "Performance analytics",
+    ],
+    whatMakesItEnterprise: [
+      "Real-time inventory sync with POS",
+      "Dynamic discount optimization",
+      "A/B test deal types",
+      "Automated deal rotation",
+      "Email/SMS reminders",
+    ],
+  },
+  {
+    module: "Complete Bundle",
+    price: "KES 1,100,000",
+    setup: "2-3 weeks",
+    description: "All 5 modules + shared infrastructure + priority support.",
+    longDescription:
+      "The complete engagement ecosystem. Includes Points Economy Engine (shared across all modules), Live Display Infrastructure (WebSocket servers), and Admin Live Controls Dashboard. Everything you need to build a community around your brand.",
+    icon: Sparkles,
+    color: "from-purple-500 to-cyan-500",
+    highlight: true,
+    features: [
+      "All 5 modules (Spin, Challenges, Draws, Bundles, Deals)",
+      "Points Economy Engine (shared across modules)",
+      "Live Display Infrastructure (WebSocket/Redis)",
+      "Admin Live Controls Dashboard",
+      "Priority support (4-hour response)",
+      "Custom branding integration",
+      "Team training session",
+      "30-day launch support",
+      "Full documentation",
+      "Source code access",
+    ],
+    whatMakesItEnterprise: [
+      "99.9% uptime SLA",
+      "Dedicated support channel",
+      "Custom feature development (up to 40 hours)",
+      "Quarterly strategy calls",
+      "Performance monitoring dashboard",
+    ],
+  },
+];
+
+// Enterprise Features
+export const enterpriseFeatures = [
+  {
+    title: "Live Broadcast Ready",
+    description:
+      "Every module includes an OBS-friendly display URL. Hosts can project real-time action while the system handles stock, payments, and winner selection automatically.",
+    icon: Tv,
+  },
+  {
+    title: "WebSocket-Powered Real-time",
+    description:
+      "Zero-latency updates across all modules. Winner announcements, ticker feeds, and stock updates appear instantly on all connected displays.",
+    icon: Radio,
+  },
+  {
+    title: "Admin Live Controls",
+    description:
+      "During live streams, admins can trigger winners, extend timers, add stock, and send announcements - all without touching code.",
+    icon: Cpu,
+  },
+  {
+    title: "Points Economy Engine",
+    description:
+      "Shared points infrastructure across all modules. Points earned anywhere are usable everywhere. Real-time balance updates.",
+    icon: Coins,
+  },
+  {
+    title: "Fraud Prevention Suite",
+    description:
+      "Rate limiting, duplicate detection, suspicious pattern monitoring, and full audit trails for every transaction.",
+    icon: Shield,
+  },
+  {
+    title: "Analytics Dashboard",
+    description:
+      "Real-time engagement metrics, conversion tracking, and ROI analysis per module.",
+    icon: BarChart,
+  },
+];
+
+export const integrationPoints = [
+  {
+    title: "Automatic Checkout Integration",
+    description:
+      "Points redemption happens at checkout automatically. No manual coupon codes needed.",
+    icon: ShoppingBag,
+  },
+  {
+    title: "Live Stock Sync",
+    description:
+      "Real-time inventory updates. When a deal sells out, it's instantly reflected everywhere.",
+    icon: Package,
+  },
+  {
+    title: "Payment Gateway Agnostic",
+    description:
+      "Works with MPesa, Stripe, PayPal, or any processor. No changes to your payment flow.",
+    icon: CreditCard,
+  },
+  {
+    title: "Webhook Support",
+    description:
+      "Trigger external actions when events happen (new winner, deal claimed, etc.).",
+    icon: Webhook,
+  },
+  {
+    title: "REST API",
+    description:
+      "Full API access for custom integrations with your existing systems.",
+    icon: Braces,
+  },
+  {
+    title: "Multi-tenant Ready",
+    description: "Support for multiple stores/brands under one installation.",
+    icon: Layers,
+  },
+];
+
+export const fraudPrevention = [
+  "Rate limiting (per user/IP/second)",
+  "Duplicate entry detection",
+  "Suspicious pattern monitoring",
+  "Referral fraud detection",
+  "Bot detection & blocking",
+  "Admin override with audit trail",
+  "Winner verification workflow",
+  "Automated blacklist management",
+  "Geographic restrictions",
+  "Device fingerprinting (optional)",
+];
+
+export const whatYouGet = [
+  "Fully functional modules deployed on your infrastructure",
+  "Source code access (you own everything)",
+  "Database schemas and migrations",
+  "API documentation",
+  "OBS display URLs for each module",
+  "Admin dashboard with live controls",
+  "30-day launch support",
+  "Team training session",
+];
+
+export const faqs = [
+  {
+    question: "Why is this different from building a basic spin wheel plugin?",
+    answer:
+      "This isn't a plugin - it's an enterprise-grade engagement ecosystem. We're building real-time WebSocket infrastructure, shared points economy, live broadcast displays, fraud detection, and admin controls. Each module is production-ready with scalability built-in. Basic plugins cost KES 20,000 - 28,000. What we deliver is a community-building platform that drives measurable ROI.",
+  },
+  {
+    question: "What's the actual implementation process?",
+    answer:
+      "1) Discovery call (KES 5,000) to understand your needs. 2) We deploy to your infrastructure (Vercel/Supabase). 3) Each module is configured with your branding. 4) Live broadcast URLs are set up. 5) Your team is trained. 6) 30-day launch support. The KES 5,000 consultation fee is credited toward any module purchase.",
+  },
+  {
+    question: "Do I need an existing e-commerce store?",
+    answer:
+      "Either works. We can build from scratch OR integrate with your existing store (Shopify, WooCommerce, custom). For existing stores, we'll need API access or database integration. The modules connect to your checkout, product catalogue, and user database seamlessly.",
+  },
+  {
+    question: "What about ongoing costs?",
+    answer:
+      "You pay for your own infrastructure (Vercel + Supabase ~$50-200/month depending on traffic). Optional maintenance/support starts at KES 20,000/month which includes bug fixes, security updates, and feature tweaks. No hidden fees or per-user pricing.",
+  },
+  {
+    question: "How does the live broadcast work?",
+    answer:
+      "Each module generates a unique OBS-friendly URL. During TikTok/Instagram/YouTube Live, hosts add this as a Browser Source. The display shows real-time action: wheel spins, winner names, stock meters, claim tickers. The system handles all the heavy lifting - stock updates, payments, winner selection - automatically.",
+  },
+  {
+    question: "Is there fraud protection?",
+    answer:
+      "Multiple layers: rate limiting, duplicate detection, suspicious pattern monitoring, referral fraud detection, bot blocking, and full audit logs. Admin can override with audit trail. Winners go through verification workflow if needed.",
+  },
+  {
+    question: "How do modules share the points system?",
+    answer:
+      "Unified Points Economy Engine. Customers earn points from purchases, spins, challenges, and draws. Points are redeemed for spin payments, early access, deals, and checkout discounts. All modules read/write from the same points ledger with real-time balance updates.",
+  },
+  {
+    question: "What's the ROI timeline?",
+    answer:
+      "Clients typically see 40-60% increase in customer retention within 3 months, 25-35% increase in average order value within 2 months, and 150-250% increase in referral rates within 2 months. The complete bundle usually pays for itself within 6-9 months.",
+  },
+];
+
+export const successMetrics = [
+  { metric: "Customer Retention", increase: "40-60%", timeframe: "3 months" },
+  { metric: "Average Order Value", increase: "25-35%", timeframe: "2 months" },
+  { metric: "Repeat Purchase Rate", increase: "50-70%", timeframe: "3 months" },
+  { metric: "Social Shares", increase: "100-200%", timeframe: "1 month" },
+  { metric: "Referral Rate", increase: "150-250%", timeframe: "2 months" },
+  { metric: "Points Redemption", increase: "80-95%", timeframe: "1 month" },
+];
+
 export const BUNDLE_CONFIG = {
   mystery: {
     icon: Gift,
@@ -331,7 +1115,6 @@ export const BUNDLE_CONFIG = {
   },
 };
 
-// If you need to keep the icon components mapping separately
 export const categoryIcons = {
   electronics: "Smartphone",
   "phones-tablets": "Smartphone",
