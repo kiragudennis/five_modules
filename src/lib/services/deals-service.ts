@@ -214,7 +214,7 @@ export class DealsService {
       async () => {
         const status = await this.getDealStatus(dealId);
         callbacks.onStatusUpdate?.(status);
-        if (callbacks.onStockUpdate && status.stock_remaining !== undefined) {
+        if (callbacks.onStockUpdate && status.stock_remaining !== null) {
           callbacks.onStockUpdate(status.stock_remaining);
         }
       },
