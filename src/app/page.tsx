@@ -844,6 +844,151 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* ============================================ */}
+      {/* PURPOSE OF THIS APP */}
+      {/* ============================================ */}
+      <div className="container mx-auto px-2 py-12 border-t border-gray-200 dark:border-gray-800">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Purpose of This Project
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            The 5 Engagement Modules are a complete e-commerce engagement system
+            that transforms traditional online shopping into an interactive,
+            community-driven experience. We integrate five gamified modules
+            designed to increase customer retention, drive repeat purchases, and
+            build brand loyalty.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                🎡 Spin to Win
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Daily interactive spin wheel where customers earn loyalty
+                points, discounts, or free products. Creates daily engagement
+                and repeat visits.
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                🏆 Live Challenges
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Real-time competitions including live trivia, referral contests,
+                and team challenges. Host-led questions during live streams with
+                instant scoring.
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                🎫 Lucky Draws
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Time-limited giveaways with multiple entry methods (purchases,
+                referrals, social shares). Live winner selection with broadcast
+                displays.
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                🎁 Mystery Bundles
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Curated product bundles with surprise reveals. Increases average
+                order value and creates viral unboxing content for social media.
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                ⚡ Flash Deals
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Limited-time offers with live countdown timers, real-time stock
+                depletion meters, and claim tickers creating urgency.
+              </p>
+            </div>
+            <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 p-4 rounded-lg">
+              <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                💰 Unified Points Economy
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Earn loyalty points across all 5 modules. Redeem points for
+                discounts at checkout. Tier-based rewards (Bronze → Platinum).
+              </p>
+            </div>
+          </div>
+
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mt-8 mb-4">
+            User Roles & Responsibilities
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            This platform is designed for e-commerce businesses looking to
+            increase customer engagement and retention. Users of this system
+            include:
+          </p>
+          <ul className="list-disc list-inside space-y-2 text-gray-600 dark:text-gray-400 ml-4">
+            <li>
+              <strong>Customers:</strong> Engage with the 5 modules, earn
+              loyalty points, redeem rewards, and participate in live events.
+            </li>
+            <li>
+              <strong>Store Admins:</strong> Configure spin wheels, create
+              challenges, manage draws, set up bundles, and launch flash deals.
+            </li>
+            <li>
+              <strong>Live Stream Hosts:</strong> Use OBS-ready broadcast
+              displays during TikTok/Instagram/YouTube Live to engage audiences
+              in real-time.
+            </li>
+          </ul>
+
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mt-8 mb-4">
+            Data Collection & Privacy
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-2">
+            We collect minimal data solely to operate and improve our 5
+            engagement modules:
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-400 ml-4 mb-4">
+            <li>
+              Account information (email, Google sign-in) for authentication
+            </li>
+            <li>Transaction history to calculate loyalty points</li>
+            <li>
+              Engagement activity (spins, challenge participation, draw entries)
+              to improve module performance
+            </li>
+            <li>Device/browser information for optimization</li>
+          </ul>
+          <p className="text-gray-600 dark:text-gray-400">
+            <strong>
+              We do NOT use your data for marketing unless you explicitly
+              subscribe.
+            </strong>
+            No data is sold to third parties. For full details, see our{" "}
+            <Link href="/privacy" className="text-blue-600 hover:underline">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+
+          <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+              🔐 Google Sign-In Verification
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              This application uses Google OAuth for authentication. The data
+              accessed is limited to: email address, name, and profile picture.
+              This data is used solely for account creation and personalization
+              within the engagement modules. No data is shared with third
+              parties or used for marketing purposes.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

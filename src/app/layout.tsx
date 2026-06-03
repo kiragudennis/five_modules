@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Northwind Systems | Enterprise E-commerce + Engagement System",
+    default: "Northwind Systems - Enterprise Engagement Suite",
     template: "%s | Northwind Systems",
   },
   description:
