@@ -67,24 +67,27 @@ import { LottieIcon } from "@/components/ui/lottie-icon";
 const banners = [
   {
     id: 1,
-    title: "Flash Sale! Up to 70% OFF",
+    title: "Flash Sale! Up to 50% OFF",
     subtitle: "Limited time offer on electronics & appliances",
     cta: "Shop Now",
-    bgColor: "from-red-500 to-orange-500",
+    bgColor: "from-red-500/80 to-orange-500/80", // Add opacity directly
+    bgImage: "/images/flash-sale-banner.jpg",
   },
   {
     id: 2,
     title: "Free Delivery on Orders Over KES 5,000",
     subtitle: "Nairobi & Mombasa only",
     cta: "Shop Now",
-    bgColor: "from-blue-500 to-cyan-500",
+    bgColor: "from-blue-500/80 to-cyan-500/80",
+    bgImage: "/images/free-delivery-banner.jpg",
   },
   {
     id: 3,
     title: "New Arrivals",
     subtitle: "Check out the latest products",
     cta: "Explore",
-    bgColor: "from-purple-500 to-pink-500",
+    bgColor: "from-purple-500/80 to-pink-500/80",
+    bgImage: "/images/new-arrivals-banner.jpg",
   },
 ];
 
@@ -614,12 +617,21 @@ export default function HomePage() {
                   : "opacity-0 translate-x-full",
               )}
             >
+              {/* Background Image with Overlay */}
+              <div
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: `url(${banner.bgImage})` }}
+              />
+
+              {/* Gradient Overlay - blends with image */}
               <div
                 className={cn(
                   "absolute inset-0 bg-gradient-to-r",
                   banner.bgColor,
                 )}
               />
+
+              {/* Content */}
               <div className="absolute inset-0 flex items-center justify-between px-8 md:px-16 z-10">
                 <div className="text-white">
                   <h2 className="text-xl md:text-3xl lg:text-4xl font-bold mb-2">
@@ -634,11 +646,11 @@ export default function HomePage() {
                     className="rounded-full"
                     asChild
                   >
-                    <Link href="/products">{banner.cta}</Link>
+                    <Link href="/#products">{banner.cta}</Link>
                   </Button>
                 </div>
                 <div className="hidden md:block w-40 h-40 relative">
-                  <div className="w-full h-full bg-white/20 rounded-2xl flex items-center justify-center text-5xl">
+                  <div className="w-full h-full bg-white/20 rounded-2xl flex items-center justify-center text-5xl backdrop-blur-sm">
                     🛍️
                   </div>
                 </div>
@@ -729,7 +741,7 @@ export default function HomePage() {
       {/* ============================================ */}
       {/* PRODUCTS GRID */}
       {/* ============================================ */}
-      <div className="container mx-auto px-4 py-6">
+      <div id="products" className="container mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             {searchQuery

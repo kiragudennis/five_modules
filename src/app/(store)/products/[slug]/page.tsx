@@ -5,7 +5,7 @@ import { Product, Variaty } from "@/types/store";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL || "https://www.blessedtwoelectronics.com";
+  process.env.NEXT_PUBLIC_SITE_URL || "https://ns.yunobase.com";
 
 // --- Single, shared data fetch function ---
 async function fetchProductData(slug: string) {

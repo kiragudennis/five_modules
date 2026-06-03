@@ -169,7 +169,7 @@ export default function CartPage() {
             size="lg"
             className="bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600"
           >
-            <Link href="/products">
+            <Link href="/">
               <Bolt className="h-5 w-5 mr-2" />
               Continue Shopping
             </Link>

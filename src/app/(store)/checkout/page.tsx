@@ -833,16 +833,16 @@ export default function CheckoutPage() {
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <AlertDescription className="flex items-center justify-between flex-wrap gap-2">
               <span className="font-medium">
-                Need expert advice on your lighting setup?
+                Need expert advice on anything?
               </span>
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-2">
                   <Phone className="h-3 w-3" />
                   <a
-                    href="tel:+254727833691"
+                    href="tel:+254113062599"
                     className="font-bold hover:text-amber-700"
                   >
-                    0727 833 691
+                    0113 062 599
                   </a>
                 </span>
                 <span className="flex items-center gap-2">

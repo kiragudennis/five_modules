@@ -1,19 +1,24 @@
 // app/checkout/layout.tsx
 import { Metadata } from "next";
+
 export const metadata: Metadata = {
   title: {
-    default: "Checkout | Blessed Two Electricals",
+    default: "Checkout | Northwind Systems",
     template: "%s | Checkout",
   },
   description:
-    "Secure checkout process for Blessed Two Electricals lighting products. Multiple payment options including M-Pesa, credit cards, and Lipa Pole Pole financing.",
+    "Secure checkout process for Northwind Systems. Earn loyalty points on every purchase. Multiple payment options including M-Pesa, credit cards, and Lipa Pole Pole financing. Points can be redeemed for discounts.",
   keywords: [
-    "checkout lighting products",
-    "secure payment Nairobi",
-    "M-Pesa checkout",
-    "lighting purchase",
+    "secure checkout",
+    "loyalty points checkout",
+    "points redemption",
+    "M-Pesa payment",
+    "credit card payment",
     "order confirmation",
     "payment processing",
+    "earn points on purchase",
+    "redeem points discount",
+    "engagement platform checkout",
   ],
   robots: {
     index: false, // Don't index checkout pages
@@ -24,14 +29,20 @@ export const metadata: Metadata = {
       noimageindex: true,
     },
   },
-  authors: [{ name: "Blessed Two Electricals" }],
+  authors: [{ name: "Northwind Systems" }],
   openGraph: {
     type: "website",
     locale: "en_KE",
-    url: "https://www.blessedtwoelectricals.com/checkout",
-    title: "Checkout | Blessed Two Electricals",
+    url: "https://ns.yunobase.com/checkout",
+    title: "Checkout | Northwind Systems",
     description:
-      "Complete your lighting purchase securely with multiple payment options.",
+      "Complete your purchase securely and earn loyalty points redeemable for discounts across all 5 engagement modules.",
+    siteName: "Northwind Systems",
+  },
+  twitter: {
+    card: "summary",
+    title: "Checkout | Northwind Systems",
+    description: "Secure checkout. Earn points on every purchase.",
   },
   alternates: {
     canonical: "/checkout",
@@ -43,5 +54,7 @@ export default function CheckoutLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <main>{children}</main>;
+  return (
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-950">{children}</main>
+  );
 }
