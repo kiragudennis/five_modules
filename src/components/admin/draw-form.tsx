@@ -19,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { format } from "date-fns";
+import { DateTimeInput } from "../ui/date-input";
 
 export function DrawForm({ onSave, initialDraw, groups }: any) {
   const { supabase } = useAuth();
@@ -85,6 +87,26 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
     setLoading(true);
     try {
       const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      console.log(
+        "Start time:",
+        formData.entry_starts_at,
+        "End time:",
+        formData.entry_ends_at,
+        "Draw time:",
+        formData.draw_time,
+      );
+      // Validate required date fields
+      if (
+        !formData.entry_starts_at ||
+        !formData.entry_ends_at ||
+        !formData.draw_time
+      ) {
+        toast.error(
+          "Please fill in all date fields (Entries Open, Entries Close, and Draw Time)",
+        );
+        setLoading(false);
+        return;
+      }
       const { error } = await supabase
         .from("draws")
         .upsert({
@@ -107,6 +129,7 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
       onSave();
     } catch (error: any) {
       toast.error(error.message);
+      console.error("Error saving draw:", error);
     } finally {
       setLoading(false);
     }
@@ -137,20 +160,26 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
             </div>
             <div>
               <Label>Draw Group</Label>
-              <select
-                className="w-full border rounded-lg p-2"
+              <Select
                 value={formData.draw_group_id}
-                onChange={(e) =>
-                  setFormData({ ...formData, draw_group_id: e.target.value })
+                onValueChange={(value) =>
+                  setFormData({ ...formData, draw_group_id: value })
                 }
               >
-                <SelectItem value="">No Group</SelectItem>
-                {groups?.map((group: any) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </select>
+                <SelectTrigger className="w-full max-w-48">
+                  <SelectValue placeholder="Select draw group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Draw Group</SelectLabel>
+                    {groups?.map((group: any) => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div>
@@ -605,31 +634,66 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label>Entries Open</Label>
-              <Input
+              <input
                 type="datetime-local"
-                value={formData.entry_starts_at}
-                onChange={(e) =>
-                  setFormData({ ...formData, entry_starts_at: e.target.value })
+                value={
+                  formData.entry_starts_at
+                    ? format(
+                        new Date(formData.entry_starts_at),
+                        "yyyy-MM-dd'T'HH:mm",
+                      )
+                    : ""
                 }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) {
+                    // Convert to ISO string with timezone
+                    const date = new Date(value);
+                    setFormData({
+                      ...formData,
+                      entry_starts_at: date.toISOString(),
+                    });
+                  }
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
             <div>
               <Label>Entries Close</Label>
-              <Input
+              <input
                 type="datetime-local"
-                value={formData.entry_ends_at}
-                onChange={(e) =>
-                  setFormData({ ...formData, entry_ends_at: e.target.value })
+                value={
+                  formData.entry_ends_at
+                    ? format(
+                        new Date(formData.entry_ends_at),
+                        "yyyy-MM-dd'T'HH:mm",
+                      )
+                    : ""
                 }
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value) {
+                    const date = new Date(value);
+                    setFormData({
+                      ...formData,
+                      entry_ends_at: date.toISOString(),
+                    });
+                  } else {
+                    setFormData({
+                      ...formData,
+                      entry_ends_at: "",
+                    });
+                  }
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-pointer disabled:opacity-50"
               />
             </div>
             <div>
               <Label>Draw Time</Label>
-              <Input
-                type="datetime-local"
+              <DateTimeInput
                 value={formData.draw_time}
-                onChange={(e) =>
-                  setFormData({ ...formData, draw_time: e.target.value })
+                onChange={(value) =>
+                  setFormData({ ...formData, draw_time: value })
                 }
               />
             </div>

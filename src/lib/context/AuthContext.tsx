@@ -86,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           city: data.city,
           postal_code: data.postal_code,
           country: data.country,
+          referral_code: data.referral_code,
 
           business_name: data.business_name,
           business_type: data.business_type,

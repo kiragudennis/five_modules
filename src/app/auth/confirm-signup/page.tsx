@@ -33,7 +33,7 @@ export default function ConfirmSignupPage() {
 
       // If we already have a profile, redirect immediately
       if (profile?.role) {
-        const role = profile.role === "admin" ? "/admin" : "/products";
+        const role = profile.role === "admin" ? "/admin" : "/";
         processedRef.current = true;
         setIsLoading(false);
         router.push(role);
@@ -96,14 +96,14 @@ export default function ConfirmSignupPage() {
         setStatus("success");
         toast.dismiss();
         toast.success(
-          "Email confirmed successfully! Welcome to Blessed Two Electricals!",
+          "Email confirmed successfully! Welcome to Northwind Systems!",
         );
 
         // Small delay to ensure everything is processed
         await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Redirect
-        const role = profile?.role === "admin" ? "/admin" : "/products";
+        const role = profile?.role === "admin" ? "/admin" : "/";
         router.push(role);
       } catch (err: any) {
         console.error("Magic link confirmation error:", err);

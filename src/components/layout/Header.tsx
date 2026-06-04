@@ -78,7 +78,7 @@ export default function Header() {
                 {totalItems > 0 && (
                   <Badge
                     variant="destructive"
-                    className="absolute -top-2 -right-2 h-4 min-w-5 rounded-full px-1 tabular-nums text-xs"
+                    className="absolute -bottom-2 -right-2 h-4 min-w-5 rounded-full px-1 tabular-nums text-xs"
                   >
                     {totalItems}
                   </Badge>

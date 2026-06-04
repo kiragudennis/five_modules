@@ -500,6 +500,10 @@ export default function AdminMarketingPage() {
 
   useEffect(() => {
     if (profile?.role !== "admin") {
+      console.log(
+        "Unauthorized access to marketing dashboard. Redirecting to login.",
+        profile?.role,
+      );
       router.push("/login");
       return;
     }

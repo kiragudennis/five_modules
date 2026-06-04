@@ -25,6 +25,10 @@ initBotId({
       method: "GET",
     },
     {
+      path: "/api/auth/signup",
+      method: "POST",
+    },
+    {
       path: "/api/products/search",
       method: "GET",
     },

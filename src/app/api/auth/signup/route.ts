@@ -117,24 +117,31 @@ export async function POST(req: Request) {
 
       // In your signup endpoint, update the referral insertion:
       if (referralCode && !referrerError && referrerData) {
-        await supabaseAdmin.from("referrals").insert({
-          referrer_id: referrerData.id,
-          referred_email: email,
-          referred_user_id: userId,
-          referral_code: referralCode.toUpperCase(),
-          status: "joined", // Waiting for activation
-          reward_points: 100,
-          conversion_type: "signup", // ✅ Changed from "account_creation" to "signup"
-          metadata: {
-            joined_at: new Date().toISOString(),
-            signup_data: {
-              full_name: fullName,
-              phone: phone,
-              city: city,
-              is_business: !!businessName,
+        const { error: referralError } = await supabaseAdmin
+          .from("referrals")
+          .insert({
+            referrer_id: referrerData.id,
+            referred_email: email,
+            referred_user_id: userId,
+            referral_code: referralCode.toUpperCase(),
+            status: "joined", // Waiting for activation
+            reward_points: 100,
+            conversion_type: "signup", // ✅ Changed from "account_creation" to "signup"
+            metadata: {
+              joined_at: new Date().toISOString(),
+              signup_data: {
+                full_name: fullName,
+                phone: phone,
+                city: city,
+                is_business: !!businessName,
+              },
             },
-          },
-        });
+          });
+
+        if (referralError) {
+          console.error("Referral insertion error:", referralError);
+          // Not critical, so we won't throw an error here
+        }
       }
     }
 
@@ -204,9 +211,27 @@ async function sendVerificationEmail(email: string, name: string) {
         </head>
         <body style="font-family: 'Inter', Arial, sans-serif; background: #fefefe; padding: 40px; color: #333; max-width: 600px; margin: auto;">
           <div style="background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-            <div style="background: white; width: 80px; height: 80px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px;">
-              <div style="font-size: 40px; color: #2563eb;">🎡</div>
-            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td align="center" style="padding-bottom: 20px;">
+      <div style="background: #ffffff; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto;">
+        <table width="100%" height="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td align="center" valign="middle">
+              <img
+                src="${process.env.NEXT_PUBLIC_SITE_URL}/favicon-32x32.png"
+                alt="Northwind Systems"
+                style="width: 32px; height: 32px; border-radius: 8px; display: block;"
+                width="32"
+                height="32"
+              />
+            </td>
+          </tr>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
             <h1 style="color: white; font-size: 28px; font-weight: bold; margin: 0;">Welcome to Northwind Systems!</h1>
           </div>
           

@@ -1461,6 +1461,45 @@ ALTER TABLE challenge_tracking ENABLE ROW LEVEL SECURITY;
 ALTER TABLE challenge_live_ticker ENABLE ROW LEVEL SECURITY;
 purchases_count
 
+-- Challenge Action constriant;
+-- Drop the existing constraint
+ALTER TABLE challenge_actions DROP CONSTRAINT IF EXISTS challenge_actions_action_type_check;
+
+-- Add the updated constraint with all action types including trivia
+ALTER TABLE challenge_actions ADD CONSTRAINT challenge_actions_action_type_check 
+CHECK (action_type IN (
+    -- Referral
+    'referral_sent', 
+    'referral_completed',
+    
+    -- Purchase
+    'purchase_made',
+    
+    -- Social/Share
+    'share_posted', 
+    'social_hashtag',
+    
+    -- Streak
+    'streak_day_completed', 
+    'daily_login',
+    
+    -- Team
+    'team_joined',
+    
+    -- Trivia
+    'trivia_joined',        -- Participant joins trivia
+    'trivia_answer',        -- Participant answers a question
+    'trivia_timeout',       -- Participant runs out of time
+    'trivia_passed',        -- Question passed to next participant
+    
+    -- Bonus
+    'bonus_top_rank',       -- Bonus for top 3 position
+    'bonus_top_referrer',   -- Bonus for top referrer
+    
+    -- General
+    'challenge_joined'      -- Generic challenge join
+));
+
 -- Policies
 CREATE POLICY "Anyone can view active challenges" ON challenges
     FOR SELECT USING (status = 'active' AND starts_at <= NOW() AND ends_at >= NOW());

@@ -72,7 +72,7 @@ CREATE INDEX idx_trivia_selections_challenge_status ON challenge_trivia_selectio
 CREATE INDEX idx_trivia_selections_queue ON challenge_trivia_selections(challenge_id, queue_position);
 CREATE INDEX idx_participants_ticket ON challenge_participants(challenge_id, ticket_number);
 
--- Function to add participant from spin game
+-- Updated function with better error handling
 CREATE OR REPLACE FUNCTION add_trivia_participant_from_spin(
     p_challenge_id UUID,
     p_user_id UUID,
@@ -124,7 +124,7 @@ BEGIN
         p_challenge_id,
         p_user_id,
         v_ticket_number,
-        v_ticket_number, -- Initial queue = ticket number
+        v_ticket_number,
         0,
         TRUE,
         p_spin_attempt_id,
@@ -149,23 +149,28 @@ BEGIN
         0
     );
     
-    -- Record action
-    INSERT INTO challenge_actions (
-        challenge_id,
-        user_id,
-        action_type,
-        points_awarded,
-        action_metadata
-    ) VALUES (
-        p_challenge_id,
-        p_user_id,
-        'trivia_joined',
-        0,
-        jsonb_build_object(
-            'ticket_number', v_ticket_number,
-            'via_spin', TRUE
-        )
-    );
+    -- Record action (wrapped in exception block so it doesn't fail the whole function)
+    BEGIN
+        INSERT INTO challenge_actions (
+            challenge_id,
+            user_id,
+            action_type,
+            points_awarded,
+            action_metadata
+        ) VALUES (
+            p_challenge_id,
+            p_user_id,
+            'trivia_joined',
+            0,
+            jsonb_build_object(
+                'ticket_number', v_ticket_number,
+                'via_spin', TRUE
+            )
+        );
+    EXCEPTION WHEN OTHERS THEN
+        -- Log but don't fail - the participant was still added successfully
+        RAISE WARNING 'Could not record trivia_joined action: %', SQLERRM;
+    END;
     
     RETURN json_build_object(
         'success', true,
