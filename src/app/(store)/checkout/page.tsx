@@ -100,7 +100,7 @@ export default function CheckoutPage() {
   // If cart is empty, redirect to products
   useEffect(() => {
     if (cartItems.length === 0) {
-      router.push("/products");
+      router.push("/");
     }
   }, [cartItems]);
 

@@ -64,19 +64,6 @@ import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
-import { FaYoutube } from "react-icons/fa";
-
-// ─── Types ──────────────────────────────────────────────
-type SocialPlatform =
-  | "twitter"
-  | "x"
-  | "facebook"
-  | "linkedin"
-  | "whatsapp"
-  | "reddit"
-  | "instagram"
-  | "youtube"
-  | "tiktok";
 
 const CHALLENGE_ICONS: Record<
   string,
@@ -154,7 +141,7 @@ export default function ChallengeDetailPage() {
     score: number;
     pointsToNext: number;
   } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [joining, setJoining] = useState(false);
 
   // ─── Type-Specific Data (single object) ───────────────
@@ -180,12 +167,20 @@ export default function ChallengeDetailPage() {
   // ─── Data Loaders ─────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!challengeId) return;
+    setLoading(true);
+
     try {
-      const { data: ch } = await supabase
+      const { data: ch, error } = await supabase
         .from("challenges")
         .select("*")
         .eq("id", challengeId)
         .single();
+
+      if (error) {
+        console.error("Error fetching challenge:", error);
+        return;
+      }
+
       setChallenge(ch);
 
       const board = await challengesService.getLeaderboard(challengeId, 20);
@@ -441,7 +436,8 @@ export default function ChallengeDetailPage() {
   const td = typeData; // shorthand
 
   // ─── Loading / Not Found ──────────────────────────────
-  if (loading)
+  if (loading) {
+    console.log("Loading challenge details for ID:", challengeId);
     return (
       <div className="container mx-auto px-2 py-8">
         <div className="flex flex-col justify-center items-center h-64 space-y-4">
@@ -450,7 +446,11 @@ export default function ChallengeDetailPage() {
         </div>
       </div>
     );
-  if (!challenge)
+  }
+
+  if (!challenge) {
+    console.error("Challenge not found for ID:", challengeId);
+
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -460,6 +460,7 @@ export default function ChallengeDetailPage() {
         </Button>
       </div>
     );
+  }
 
   // ─── Render ───────────────────────────────────────────
   return (
@@ -1104,14 +1105,9 @@ export default function ChallengeDetailPage() {
                         <li>Top 3 win prizes!</li>
                       </InfoBox>
                       {challenge.scoring_config.spin_game_id && (
-                        <Button className="w-full" asChild>
-                          <Link
-                            href={`/spin/${challenge.scoring_config.spin_game_id}`}
-                          >
-                            <Brain className="h-4 w-4 mr-2" />
-                            Spin to participate
-                          </Link>
-                        </Button>
+                        <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                          🎫 You have a trivia ticket! Ready to play?
+                        </p>
                       )}
                       <Button className="w-full" asChild>
                         <Link href={`/challenges/${challengeId}/trivia`}>

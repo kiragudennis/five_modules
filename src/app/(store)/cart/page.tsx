@@ -631,9 +631,9 @@ export default function CartPage() {
                   variant="outline"
                   className="w-full justify-start"
                 >
-                  <a href="tel:0727833691">
+                  <a href="tel:0113062599">
                     <Phone className="h-4 w-4 mr-2" />
-                    Need Help? Call 0727 833 691
+                    Need Help? Call 0113 062 599
                   </a>
                 </Button>
               </div>
