@@ -50,8 +50,9 @@ CREATE TABLE IF NOT EXISTS loyalty_transactions (
     order_id uuid REFERENCES orders(id) ON DELETE SET NULL,
     points_change integer NOT NULL,
     current_points integer NOT NULL,
-    transaction_type text NOT NULL CHECK (transaction_type IN ('earned', 'redeemed', 'expired', 'adjusted', 'signup_bonus', 'refunded')),
+    transaction_type text NOT NULL CHECK (transaction_type IN ('earned', 'redeemed', 'expired', 'adjusted', 'signup_bonus', 'refunded', 'account_activation')),
     description text NOT NULL,
+    expires_at timestamptz,
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamptz DEFAULT now()
 );
@@ -72,9 +73,10 @@ CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_user_id ON loyalty_transacti
 CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_order_id ON loyalty_transactions(order_id);
 CREATE INDEX IF NOT EXISTS idx_loyalty_transactions_created_at ON loyalty_transactions(created_at DESC);
 
--- 6. Drop and recreate the function with proper error handling
-DROP FUNCTION IF EXISTS get_user_loyalty_summary(uuid);
+-- Drop all existing versions of the function
+DROP FUNCTION IF EXISTS get_user_loyalty_summary(uuid) CASCADE;
 
+-- Create a single, clean version
 CREATE OR REPLACE FUNCTION get_user_loyalty_summary(p_user_id uuid)
 RETURNS json
 LANGUAGE plpgsql
@@ -142,32 +144,26 @@ BEGIN
     available_points := FLOOR(COALESCE(loyalty_record.points, 0) / 100) * 100;
     
     -- Get recent transactions - FIXED VERSION
-    -- First, check if there are any transactions
-    IF EXISTS (SELECT 1 FROM loyalty_transactions WHERE user_id = p_user_id) THEN
-        -- Build JSON array manually to avoid nested aggregation issues
-        SELECT COALESCE(
-            json_agg(
-                json_build_object(
-                    'date', t.created_at,
-                    'type', t.transaction_type,
-                    'points', ABS(t.points_change),
-                    'description', t.description,
-                    'order_number', o.order_number
-                )
-            ),
-            '[]'::json
-        ) INTO recent_transactions
-        FROM (
-            SELECT *
-            FROM loyalty_transactions
-            WHERE user_id = p_user_id
-            ORDER BY created_at DESC
-            LIMIT 10
-        ) t
-        LEFT JOIN orders o ON t.order_id = o.id;
-    ELSE
-        recent_transactions := '[]'::json;
-    END IF;
+    SELECT COALESCE(
+        json_agg(
+            json_build_object(
+                'date', t.created_at,
+                'type', t.transaction_type,
+                'points', ABS(t.points_change),
+                'description', t.description,
+                'order_number', o.order_number
+            )
+        ),
+        '[]'::json
+    ) INTO recent_transactions
+    FROM (
+        SELECT *
+        FROM loyalty_transactions
+        WHERE user_id = p_user_id
+        ORDER BY created_at DESC
+        LIMIT 10
+    ) t
+    LEFT JOIN orders o ON t.order_id = o.id;
     
     -- Use points_earned and points_redeemed from loyalty_points table
     total_earned := COALESCE(loyalty_record.points_earned, 0);
@@ -204,8 +200,20 @@ BEGIN
     );
     
     RETURN result;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Return error information
+        RETURN json_build_object(
+            'success', false,
+            'message', SQLERRM,
+            'error_code', SQLSTATE
+        );
 END;
 $$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION get_user_loyalty_summary(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_user_loyalty_summary(uuid) TO anon;
 
 -- 7. Create a simple test function to verify tables exist
 CREATE OR REPLACE FUNCTION check_loyalty_tables_exist()
@@ -865,9 +873,18 @@ DECLARE
     -- Activation variables
     v_current_status TEXT;
 BEGIN
-    -- Only process when order is marked as completed and paid
-    IF NEW.status = 'completed' AND NEW.payment_status = 'paid' 
-       AND (OLD.status != 'completed' OR OLD.payment_status != 'completed') THEN
+
+    -- GUARD: Prevent infinite loop from our own UPDATE statements
+    IF pg_trigger_depth() > 1 THEN
+        RETURN NEW;
+    END IF;
+
+    -- Only process when order is marked as completed and paid/completed
+    IF NEW.status = 'processing' AND NEW.payment_status = 'completed' 
+       AND (OLD.status != 'completed' OR OLD.payment_status != 'refunded') THEN
+
+    -- IF NEW.status = 'completed' AND NEW.payment_status = 'paid' 
+    --    AND (OLD.status != 'completed' OR OLD.payment_status != 'completed') THEN
 
         -- ============================================
         -- PART 1: ACTIVATE USER ACCOUNT (30 days)
@@ -897,7 +914,7 @@ BEGIN
             user_id, 
             order_id, 
             points_change, 
-            points_balance, 
+            current_points,
             transaction_type, 
             description
         ) VALUES (
@@ -975,13 +992,13 @@ BEGIN
         points_to_award := FLOOR(NEW.total_amount * user_tier.points_per_shilling);
         
         -- Update loyalty points
-        INSERT INTO loyalty_points (user_id, points, points_earned, last_activity_at)
+        INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
         VALUES (NEW.user_id, points_to_award, points_to_award, NOW())
         ON CONFLICT (user_id) DO UPDATE
         SET 
             points = loyalty_points.points + EXCLUDED.points,
             points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
-            last_activity_at = EXCLUDED.last_activity_at,
+            last_updated = EXCLUDED.last_updated,
             updated_at = NOW()
         RETURNING points INTO current_points;
         
@@ -990,7 +1007,7 @@ BEGIN
             user_id, 
             order_id, 
             points_change, 
-            points_balance, 
+            current_points,
             transaction_type, 
             description,
             expires_at
@@ -1005,7 +1022,7 @@ BEGIN
         );
         
         -- Update order with points earned
-        NEW.loyalty_points_earned := points_to_award;
+        -- Done at the bottom of the draw entry section after awarding entries
         
         -- Check and update tier
         SELECT tier INTO new_tier
@@ -1019,92 +1036,99 @@ BEGIN
         WHERE user_id = NEW.user_id AND tier != new_tier;
         
         -- ============================================
-        -- PART 4: AWARD DRAW ENTRIES
-        -- ============================================
+-- PART 4: AWARD DRAW ENTRIES
+-- ============================================
+
+-- Skip if draw entries already awarded
+IF NEW.draw_entries_awarded > 0 THEN
+    RAISE NOTICE 'Draw entries already awarded for order %', NEW.id;
+ELSE
+    -- Find the best draw for this user
+    SELECT d.* INTO v_draw
+    FROM draws d
+    WHERE d.status = 'open'
+      AND d.entry_starts_at <= NOW()
+      AND d.entry_ends_at >= NOW()
+      AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
+    ORDER BY 
+        CASE WHEN EXISTS (
+            SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = NEW.user_id
+        ) THEN 1 ELSE 2 END,
+        d.entry_ends_at ASC
+    LIMIT 1;
+    
+    IF FOUND THEN
+        -- Calculate entries based on order amount
+        v_entry_count := FLOOR(
+            NEW.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric
+        );
         
-        -- Skip if draw entries already awarded
-        IF NEW.draw_entries_awarded > 0 THEN
-            RAISE NOTICE 'Draw entries already awarded for order %', NEW.id;
-        ELSE
-            -- Find the best draw for this user
-            SELECT d.* INTO v_draw
-            FROM draws d
-            WHERE d.status = 'open'
-              AND d.entry_starts_at <= NOW()
-              AND d.entry_ends_at >= NOW()
-              AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
-            ORDER BY 
-                CASE WHEN EXISTS (
-                    SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = NEW.user_id
-                ) THEN 1 ELSE 2 END,
-                d.entry_ends_at ASC
-            LIMIT 1;
+        -- Apply minimum purchase requirement
+        IF NEW.total_amount >= (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
+            -- Apply max entries per order
+            v_entry_count := LEAST(
+                v_entry_count,
+                (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+            );
             
-            IF FOUND THEN
-                -- Calculate entries based on order amount
-                v_entry_count := FLOOR(
-                    NEW.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric
-                );
+            IF v_entry_count > 0 THEN
+                -- Add entries to draw
+                INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
+                VALUES (v_draw.id, NEW.user_id, v_entry_count, 'purchase', NEW.id::text, jsonb_build_object(
+                    'order_id', NEW.id,
+                    'order_amount', NEW.total_amount,
+                    'order_number', NEW.order_number,
+                    'awarded_at', NOW()
+                ))
+                RETURNING id INTO v_entry_id;
                 
-                -- Apply minimum purchase requirement
-                IF NEW.total_amount >= (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
-                    -- Apply max entries per order
-                    v_entry_count := LEAST(
-                        v_entry_count,
-                        (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
-                    );
-                    
-                    IF v_entry_count > 0 THEN
-                        -- Add entries to draw
-                        INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
-                        VALUES (v_draw.id, NEW.user_id, v_entry_count, 'purchase', NEW.id::text, jsonb_build_object(
-                            'order_id', NEW.id,
-                            'order_amount', NEW.total_amount,
-                            'order_number', NEW.order_number,
-                            'awarded_at', NOW()
-                        ))
-                        RETURNING id INTO v_entry_id;
-                        
-                        -- Create individual tickets
-                        FOR i IN 1..v_entry_count LOOP
-                            INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
-                            VALUES (v_draw.id, NEW.user_id, v_entry_id, i);
-                        END LOOP;
-                        
-                        -- Add to live ticker
-                        INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
-                        SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
-                        FROM users u WHERE u.id = NEW.user_id;
-                        
-                        v_entries_awarded := v_entry_count;
-                        
-                        -- Update order with draw entry information
-                        UPDATE orders
-                        SET 
-                            draw_entries_awarded = v_entries_awarded,
-                            draw_id = v_draw.id,
-                            draw_entry_details = jsonb_build_object(
-                                'draw_name', v_draw.name,
-                                'draw_id', v_draw.id,
-                                'draw_time', v_draw.draw_time,
-                                'entries_awarded', v_entries_awarded,
-                                'calculation', jsonb_build_object(
-                                    'order_amount', NEW.total_amount,
-                                    'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
-                                    'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
-                                    'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
-                                ),
-                                'awarded_at', NOW()
-                            )
-                        WHERE id = NEW.id;
-                        
-                        RAISE NOTICE 'Awarded % draw entries for order % to draw %', v_entries_awarded, NEW.id, v_draw.name;
-                    END IF;
-                END IF;
-            ELSE
-                RAISE NOTICE 'No active draw found for order %', NEW.id;
+                -- Create individual tickets
+                FOR i IN 1..v_entry_count LOOP
+                    INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
+                    VALUES (v_draw.id, NEW.user_id, v_entry_id, i);
+                END LOOP;
+                
+                -- Add to live ticker
+                INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+                SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
+                FROM users u WHERE u.id = NEW.user_id;
+                
+                v_entries_awarded := v_entry_count;
+                
+                -- ============================================
+-- SINGLE ORDER UPDATE AT THE END
+-- ============================================
+UPDATE orders
+SET 
+    loyalty_points_earned = points_to_award,
+    draw_entries_awarded = CASE WHEN v_entries_awarded > 0 THEN v_entries_awarded ELSE 0 END,
+    draw_id = CASE WHEN v_entries_awarded > 0 THEN v_draw.id ELSE NULL END,
+    draw_entry_details = CASE WHEN v_entries_awarded > 0 THEN 
+        jsonb_build_object(
+            'draw_name', v_draw.name,
+            'draw_id', v_draw.id,
+            'draw_time', v_draw.draw_time,
+            'entries_awarded', v_entries_awarded,
+            'calculation', jsonb_build_object(
+                'order_amount', NEW.total_amount,
+                'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
+                'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
+                'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+            ),
+            'awarded_at', NOW()
+        )
+    ELSE NULL
+    END,
+    updated_at = NOW()
+WHERE id = NEW.id;
+
+RAISE NOTICE 'Order % fully processed: % points, % draw entries', NEW.id, points_to_award, v_entries_awarded;
             END IF;
         END IF;
+    ELSE
+        RAISE NOTICE 'No active draw found for order %', NEW.id;
+    END IF;
+END IF;
         
         -- ============================================
         -- PART 5: PROCESS PURCHASE CHALLENGES
@@ -1262,106 +1286,6 @@ BEGIN
         'remaining_points', loyalty_record.points,
         'transaction_id', transaction_id,
         'redemption_type', 'direct'
-    );
-    
-    RETURN result;
-END;
-$$;
-
--- Function to get user loyalty summary (CORRECTED VERSION)
-CREATE OR REPLACE FUNCTION get_user_loyalty_summary(p_user_id uuid)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    loyalty_record RECORD;
-    user_tier loyalty_tiers%ROWTYPE;
-    next_tier loyalty_tiers%ROWTYPE;
-    points_to_next_tier integer;
-    recent_transactions json;
-    result json;
-BEGIN
-    -- Get loyalty points
-    SELECT * INTO loyalty_record
-    FROM loyalty_points
-    WHERE user_id = p_user_id;
-    
-    IF NOT FOUND THEN
-        -- Create default record
-        INSERT INTO loyalty_points (user_id, tier)
-        VALUES (p_user_id, 'bronze')
-        RETURNING * INTO loyalty_record;
-    END IF;
-    
-    -- Get current tier details
-    SELECT * INTO user_tier
-    FROM loyalty_tiers
-    WHERE tier = loyalty_record.tier;
-    
-    -- Get next tier
-    SELECT * INTO next_tier
-    FROM loyalty_tiers
-    WHERE min_points > user_tier.min_points
-    ORDER BY min_points
-    LIMIT 1;
-    
-    -- Calculate points to next tier
-    IF next_tier.tier IS NOT NULL THEN
-        points_to_next_tier := GREATEST(next_tier.min_points - loyalty_record.points, 0);
-    ELSE
-        points_to_next_tier := 0;
-    END IF;
-    
-    -- Get recent transactions (CORRECTED - LIMIT moved outside json_agg)
-    SELECT COALESCE(json_agg(
-        json_build_object(
-            'date', created_at,
-            'type', transaction_type,
-            'points', points_change,
-            'description', description,
-            'order_number', (
-                SELECT order_number 
-                FROM orders 
-                WHERE id = loyalty_transactions.order_id
-            )
-        )
-    ), '[]'::json) INTO recent_transactions
-    FROM (
-        SELECT *
-        FROM loyalty_transactions
-        WHERE user_id = p_user_id
-        ORDER BY created_at DESC
-        LIMIT 10
-    ) AS recent_transactions;
-    
-    -- Build result
-    result := json_build_object(
-        'points', loyalty_record.points,
-        'availableForRedemption', FLOOR(loyalty_record.points / 100) * 100, -- Only multiples of 100
-        'redemptionRate', 0.1, -- 1 point = 0.10 KES
-        'maxDiscount', (FLOOR(loyalty_record.points / 100) * 100) / 10.0,
-        'tier', loyalty_record.tier,
-        'tierDetails', json_build_object(
-            'name', user_tier.tier,
-            'pointsPerShilling', user_tier.points_per_shilling,
-            'discountPercentage', user_tier.discount_percentage,
-            'freeShippingThreshold', user_tier.free_shipping_threshold,
-            'prioritySupport', user_tier.priority_support,
-            'birthdayBonusPoints', user_tier.birthday_bonus_points
-        ),
-        'nextTier', CASE WHEN next_tier.tier IS NOT NULL THEN
-            json_build_object(
-                'name', next_tier.tier,
-                'minPoints', next_tier.min_points,
-                'pointsNeeded', points_to_next_tier,
-                'discountPercentage', next_tier.discount_percentage
-            )
-        ELSE NULL END,
-        'recentTransactions', recent_transactions,
-        'pointsValue', (loyalty_record.points / 10.0), -- 1 point = 0.10 KES
-        'totalEarned', loyalty_record.points_earned,
-        'totalRedeemed', loyalty_record.points_redeemed
     );
     
     RETURN result;

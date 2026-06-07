@@ -139,6 +139,18 @@ export default function AdminDrawsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* Create Draw Button */}
+          <Button
+            variant="default"
+            onClick={() => {
+              setEditingDraw(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Draw
+          </Button>
+
           <Button variant="outline" onClick={handleRefresh} disabled={loading}>
             <RefreshCw
               className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
@@ -155,22 +167,17 @@ export default function AdminDrawsPage() {
               <LayoutGrid className="h-4 w-4" />
             )}
           </Button>
+
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => setEditingDraw(null)}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Draw
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingDraw ? "Edit Draw" : "Create New Draw"}
                 </DialogTitle>
                 <DialogDescription>
                   {editingDraw
-                    ? "Update the details of your draw and save to apply changes"
-                    : "Fill in the details of your new draw and save to create it"}
+                    ? "Update your draw details across all sections"
+                    : "Fill in the details across all sections to create your draw"}
                 </DialogDescription>
               </DialogHeader>
               <DrawForm
@@ -178,6 +185,10 @@ export default function AdminDrawsPage() {
                 groups={groups}
                 onSave={() => {
                   fetchData();
+                  setDialogOpen(false);
+                  setEditingDraw(null);
+                }}
+                onCancel={() => {
                   setDialogOpen(false);
                   setEditingDraw(null);
                 }}

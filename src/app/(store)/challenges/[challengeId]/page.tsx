@@ -59,11 +59,14 @@ import {
   UserCheck,
   Brain,
   Zap,
+  Ticket,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
+import { TriviaScore } from "@/types/challenges";
 
 const CHALLENGE_ICONS: Record<
   string,
@@ -143,6 +146,8 @@ export default function ChallengeDetailPage() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [joining, setJoining] = useState(false);
+  // Score and queue
+  const [myScore, setMyScore] = useState<TriviaScore | null>(null);
 
   // ─── Type-Specific Data (single object) ───────────────
   const [typeData, setTypeData] = useState<Record<string, any>>({});
@@ -183,8 +188,25 @@ export default function ChallengeDetailPage() {
 
       setChallenge(ch);
 
-      const board = await challengesService.getLeaderboard(challengeId, 20);
-      setLeaderboard(board);
+      if (ch.challenge_type === "trivia") {
+        const { data } = await supabase.rpc("get_trivia_leaderboard", {
+          p_challenge_id: challengeId,
+          p_limit: 20,
+        });
+        console.log("Trivia leaderboard data:", data);
+        setLeaderboard(data || []);
+      } else {
+        const board = await challengesService.getLeaderboard(challengeId, 20);
+        // Normalize the data structure
+        const normalizedBoard = (board || []).map((entry: any) => ({
+          ...entry,
+          user_id: entry.user_id,
+          full_name: entry.users?.full_name || entry.full_name || "Anonymous",
+          total_score: entry.current_score || 0,
+        }));
+        console.log("Regular leaderboard data:", normalizedBoard);
+        setLeaderboard(normalizedBoard);
+      }
 
       if (profile?.id) {
         const { data: part } = await supabase
@@ -200,6 +222,17 @@ export default function ChallengeDetailPage() {
           profile.id,
         );
         setUserRank(rank);
+
+        // Since user can only see thier own participant record, we need to fetch their score separately for trivia challenges
+        if (ch.challenge_type === "trivia" && part) {
+          const { data } = await supabase
+            .from("challenge_trivia_scores")
+            .select("*")
+            .eq("challenge_id", challengeId)
+            .eq("user_id", profile.id)
+            .maybeSingle();
+          if (data) setMyScore(data);
+        }
 
         if (ch?.challenge_type === "share") {
           const { data: user } = await supabase
@@ -467,7 +500,7 @@ export default function ChallengeDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       {/* Hero */}
       <div className={cn("bg-gradient-to-r text-white py-12", config.color)}>
-        <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="container mx-auto px-2 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Icon className="h-5 w-5" />
@@ -484,37 +517,90 @@ export default function ChallengeDetailPage() {
             <h1 className="text-3xl md:text-4xl font-bold">{challenge.name}</h1>
             <p className="opacity-90 mt-2 max-w-2xl">{challenge.description}</p>
           </div>
-          {!hasJoined && isActive && (
+          <div className="flex items-center gap-3">
+            {/* Live broadcast button */}
             <Button
               size="lg"
               className="bg-white text-purple-600 hover:bg-gray-100"
-              onClick={handleJoinChallenge}
-              disabled={joining}
+              asChild
             >
-              {joining ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Target className="h-4 w-4 mr-2" />
-              )}
-              Join Challenge
+              <Link href={`/challenges/live/${challengeId}`}>
+                <Video className="h-4 w-4 mr-2" />
+                Watch Live
+              </Link>
             </Button>
-          )}
+            {/* Join/Spin Button - Different for trivia */}
+            {!hasJoined && isActive && (
+              <div className="flex items-center gap-3">
+                {challenge.challenge_type === "trivia" &&
+                challenge.scoring_config?.spin_game_id ? (
+                  <Button
+                    size="lg"
+                    className="bg-white text-purple-600 hover:bg-gray-100"
+                    asChild
+                  >
+                    <Link
+                      href={`/spin/${challenge.scoring_config.spin_game_id}`}
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Spin to Join
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="bg-white text-purple-600 hover:bg-gray-100"
+                    onClick={handleJoinChallenge}
+                    disabled={joining}
+                  >
+                    {joining ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Target className="h-4 w-4 mr-2" />
+                    )}
+                    Join Challenge
+                  </Button>
+                )}
+              </div>
+            )}
+            {/* Show ticket info if already joined */}
+            {hasJoined &&
+              challenge.challenge_type === "trivia" &&
+              participant?.ticket_number && (
+                <div className="flex items-center gap-3">
+                  <Badge className="bg-white/20 text-white border-0 text-lg py-2 px-4">
+                    <Ticket className="h-4 w-4 mr-2" />
+                    Ticket #{participant.ticket_number}
+                  </Badge>
+                  <Button
+                    size="lg"
+                    className="bg-white/10 text-white hover:bg-white/20 border border-white/30"
+                    asChild
+                  >
+                    <Link href={`/challenges/${challengeId}/trivia`}>
+                      <Brain className="h-4 w-4 mr-2" />
+                      Go to Trivia
+                    </Link>
+                  </Button>
+                </div>
+              )}
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-2 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Progress Card */}
             {hasJoined && (
               <Card>
-                <CardContent className="p-6">
+                <CardContent>
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <Target className="h-5 w-5 text-purple-500" />
                     Your Progress
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-3 md:grid-cols-4 gap-2 sm:gap-4">
                     <StatBox
                       label="Total Points"
                       value={participant?.current_score || 0}
@@ -705,417 +791,626 @@ export default function ChallengeDetailPage() {
             )}
 
             {/* Actions Card */}
-            {hasJoined && isActive && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Take Action</h3>
+            {isActive && (
+              <Card className="overflow-hidden border-2 border-transparent hover:border-purple-500/20 transition-all duration-300">
+                <CardContent>
+                  <h3 className="font-semibold mb-6 flex items-center gap-2 text-lg">
+                    <Zap className="h-5 w-5 text-purple-500" />
+                    Take Action
+                  </h3>
 
-                  {/* ─── TYPE-SPECIFIC ACTIONS ─── */}
-
-                  {/* REFERRAL */}
-                  {challenge.challenge_type === "referral" && (
-                    <div className="space-y-4">
-                      <InfoBox
-                        icon={Users}
-                        color="text-blue-500"
-                        title="How to Earn"
-                      >
-                        <li>Share your referral link with friends</li>
-                        <li>
-                          {challenge.scoring_config?.referral_type === "signup"
-                            ? "Points when they become active"
-                            : challenge.scoring_config?.referral_type ===
-                                "first_purchase"
-                              ? "Points on first purchase"
-                              : "Points for signups & purchases"}
-                        </li>
-                        <li>
-                          {challenge.scoring_config?.points_per_referral || 100}{" "}
-                          pts per referral
-                        </li>
-                      </InfoBox>
-                      <div className="flex gap-2">
-                        <Input
-                          value={td.referralLink || ""}
-                          readOnly
-                          className="font-mono text-sm flex-1"
-                        />
-                        <Button variant="outline" onClick={copyReferralLink}>
-                          {copied ? (
-                            <Check className="h-4 w-4" />
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => shareReferral("facebook")}
-                        >
-                          <Facebook className="h-4 w-4 mr-1" />
-                          Facebook
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => shareReferral("twitter")}
-                        >
-                          <Twitter className="h-4 w-4 mr-1" />
-                          Twitter
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => shareReferral("whatsapp")}
-                        >
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          WhatsApp
-                        </Button>
-                      </div>
-                      {td.referralLeaderboard?.length > 0 && (
-                        <MiniLeaderboard
-                          title="Top Referrers"
-                          entries={td.referralLeaderboard.slice(0, 5)}
-                          valueKey="total_referrals"
-                          valueSuffix=" refs"
-                          currentUserId={profile?.id}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  {/* PURCHASE */}
-                  {challenge.challenge_type === "purchase" && (
-                    <div className="space-y-4">
-                      {td.targetProduct && (
-                        <div className="p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
-                          <h4 className="font-semibold mb-2">
-                            <ShoppingBag className="h-4 w-4 text-green-500 inline mr-1" />
-                            Target Product
-                          </h4>
-                          <div className="flex items-center gap-3">
-                            {td.targetProduct.image_url && (
-                              <img
-                                src={td.targetProduct.image_url}
-                                alt=""
-                                className="w-16 h-16 rounded-lg object-cover"
-                              />
-                            )}
-                            <div>
-                              <p className="font-medium">
-                                {td.targetProduct.name}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                KSH {td.targetProduct.price?.toLocaleString()}
-                              </p>
-                              <Badge variant="outline" className="mt-1 text-xs">
-                                {challenge.scoring_config?.points_per_unit ||
-                                  10}{" "}
-                                pts/unit
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      <Button className="w-full" size="lg" asChild>
-                        <Link
-                          href={`/?product=${challenge.scoring_config?.product_id}`}
-                        >
-                          <ShoppingBag className="h-4 w-4 mr-2" />
-                          Buy Now & Earn Points
-                        </Link>
-                      </Button>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[1, 3, 5].map((qty) => (
-                          <Button
-                            key={qty}
-                            variant="outline"
-                            size="sm"
-                            className="relative"
-                            asChild
-                          >
-                            <Link
-                              href={`/?product=${challenge.scoring_config?.product_id}&qty=${qty}`}
-                            >
-                              <div className="text-center">
-                                <p className="font-bold">{qty}x</p>
-                                <p className="text-xs">
-                                  +
-                                  {(challenge.scoring_config?.points_per_unit ||
-                                    10) * qty}{" "}
-                                  pts
-                                </p>
-                              </div>
-                            </Link>
-                          </Button>
-                        ))}
-                      </div>
-                      {td.purchaseLeaderboard?.length > 0 && (
-                        <MiniLeaderboard
-                          title="Top Buyers"
-                          entries={td.purchaseLeaderboard.slice(0, 3)}
-                          valueKey="total_units"
-                          valueSuffix=" units"
-                          currentUserId={profile?.id}
-                        />
-                      )}
-                    </div>
-                  )}
-
-                  {/* STREAK */}
-                  {challenge.challenge_type === "streak" && (
-                    <Button
-                      className="w-full"
-                      onClick={async () => {
-                        if (!profile) {
-                          router.push("/login");
-                          return;
-                        }
-                        try {
-                          const r = await challengesService.recordAction(
-                            challengeId,
-                            profile.id,
-                            "daily_login",
-                            undefined,
-                            { date: new Date().toISOString() },
-                          );
-                          toast.success(`+${r.pointsAwarded} pts!`);
-                          loadData();
-                        } catch (e: any) {
-                          toast.error(e.message);
-                        }
-                      }}
-                    >
-                      <Flame className="h-4 w-4 mr-2" />
-                      Daily Login
-                    </Button>
-                  )}
-
-                  {/* SOCIAL */}
-                  {challenge.challenge_type === "social" && (
-                    <div className="space-y-4">
-                      <InfoBox
-                        icon={Heart}
-                        color="text-pink-500"
-                        title="How to Participate"
-                      >
-                        <li>
-                          1. Create a post on social media with the hashtag
-                        </li>
-                        <li>2. Submit the post URL below for verification</li>
-                        <li>3. Wait for admin approval to earn points</li>
-                      </InfoBox>
-                      <div>
-                        <Label>Target Hashtag</Label>
-                        <p className="text-lg font-bold text-purple-600 mt-1">
-                          #
-                          {challenge.scoring_config?.target_hashtag ||
-                            "Challenge"}
-                        </p>
-                      </div>
-                      <div>
-                        <Label>Platform</Label>
-                        <Select
-                          value={socialForm.platform}
-                          onValueChange={(v) =>
-                            setSocialForm((p) => ({ ...p, platform: v }))
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[
-                              "facebook",
-                              "twitter",
-                              "instagram",
-                              "tiktok",
-                              "linkedin",
-                              "youtube",
-                            ].map((p) => (
-                              <SelectItem key={p} value={p}>
-                                <div className="flex items-center gap-2">
-                                  {React.createElement(getSocialIcon(p), {
-                                    className: "h-4 w-4",
-                                  })}
-                                  {p}
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Post URL *</Label>
-                        <Input
-                          placeholder="https://..."
-                          value={socialForm.postUrl}
-                          onChange={(e) =>
-                            setSocialForm((p) => ({
-                              ...p,
-                              postUrl: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <div>
-                        <Label>Caption</Label>
-                        <Textarea
-                          placeholder="What did you write?"
-                          value={socialForm.caption}
-                          onChange={(e) =>
-                            setSocialForm((p) => ({
-                              ...p,
-                              caption: e.target.value,
-                            }))
-                          }
-                          rows={2}
-                        />
-                      </div>
-                      <div>
-                        <Label>Screenshot URL</Label>
-                        <Input
-                          placeholder="https://..."
-                          value={socialForm.screenshot}
-                          onChange={(e) =>
-                            setSocialForm((p) => ({
-                              ...p,
-                              screenshot: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                      <Button
-                        className="w-full"
-                        onClick={handleSocialSubmission}
-                        disabled={!socialForm.postUrl || submittingSocial}
-                      >
-                        {submittingSocial ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Send className="h-4 w-4 mr-2" />
-                        )}
-                        Submit for Review
-                      </Button>
-                      {td.socialSubmissions?.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="font-semibold">Your Submissions</h4>
-                          {td.socialSubmissions.map((sub: any) => (
+                  {/* TRIVIA - Always show if active */}
+                  {challenge.challenge_type === "trivia" && (
+                    <div className="space-y-5">
+                      {/* How It Works - Collapsible/Always visible */}
+                      <div className="p-5 rounded-xl bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border border-yellow-500/20">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                          <Brain className="h-5 w-5" />
+                          How Trivia Works
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            {
+                              icon: Ticket,
+                              text: "Spin & Win a Ticket",
+                              color: "text-blue-500",
+                            },
+                            {
+                              icon: Users,
+                              text: "Join the Queue",
+                              color: "text-green-500",
+                            },
+                            {
+                              icon: Brain,
+                              text: "Answer Questions",
+                              color: "text-purple-500",
+                            },
+                            {
+                              icon: Trophy,
+                              text: "Win Prizes!",
+                              color: "text-yellow-500",
+                            },
+                          ].map((step, i) => (
                             <div
-                              key={sub.id}
-                              className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                              key={i}
+                              className="flex items-center gap-2 p-2 rounded-lg bg-white/5"
                             >
-                              <div className="flex items-center gap-2">
-                                {React.createElement(
-                                  getSocialIcon(sub.platform),
-                                  { className: "h-4 w-4" },
+                              <step.icon
+                                className={cn(
+                                  "h-4 w-4 flex-shrink-0",
+                                  step.color,
                                 )}
-                                <div>
-                                  <p className="text-sm font-medium truncate max-w-[200px]">
-                                    {sub.post_url}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(
-                                      new Date(sub.created_at),
-                                      { addSuffix: true },
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {sub.status === "approved" && (
-                                  <Badge className="bg-green-100 text-green-700">
-                                    +
-                                    {(sub.points_awarded || 0) +
-                                      (sub.bonus_points || 0)}{" "}
-                                    pts
-                                  </Badge>
-                                )}
-                                <Badge
-                                  variant={
-                                    sub.status === "approved"
-                                      ? "default"
-                                      : sub.status === "rejected"
-                                        ? "destructive"
-                                        : "secondary"
-                                  }
-                                >
-                                  {sub.status}
-                                </Badge>
-                              </div>
+                              />
+                              <span className="text-sm text-muted-foreground">
+                                {step.text}
+                              </span>
                             </div>
                           ))}
                         </div>
+                      </div>
+
+                      {/* State: Not joined - Show Spin button */}
+                      {!hasJoined && (
+                        <div className="space-y-3">
+                          <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                                <Zap className="h-5 w-5 text-purple-500" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-purple-700 dark:text-purple-400">
+                                  Ready to test your knowledge?
+                                </p>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Spin the wheel for a chance to win a trivia
+                                  ticket and compete for amazing prizes!
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {challenge.scoring_config?.spin_game_id ? (
+                            <Button
+                              size="lg"
+                              className="w-full h-14 text-lg bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 hover:scale-[1.02]"
+                              asChild
+                            >
+                              <Link
+                                href={`/spin/${challenge.scoring_config.spin_game_id}`}
+                              >
+                                <Zap className="h-5 w-5 mr-2 animate-pulse" />
+                                Spin to Win a Ticket
+                                <ArrowRight className="h-5 w-5 ml-2" />
+                              </Link>
+                            </Button>
+                          ) : (
+                            <Button
+                              size="lg"
+                              className="w-full h-14 text-lg"
+                              onClick={handleJoinChallenge}
+                              disabled={joining}
+                            >
+                              {joining ? (
+                                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                              ) : (
+                                <Ticket className="h-5 w-5 mr-2" />
+                              )}
+                              Join Trivia Queue
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* State: Joined with ticket */}
+                      {hasJoined && (
+                        <div className="space-y-4">
+                          {/* Ticket Card */}
+                          <div className="relative overflow-hidden rounded-xl p-[2px]">
+                            <div className="relative rounded-[10px] p-5">
+                              {/* Decorative elements */}
+                              <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                              <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-500/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+
+                              <div className="relative">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                      Your Trivia Ticket
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Ticket className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                                      <span className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
+                                        #{participant.ticket_number}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-xs text-muted-foreground">
+                                      Queue Position
+                                    </p>
+                                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                                      #
+                                      {participant.queue_position ||
+                                        participant.ticket_number}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Score display if they have points */}
+                                {participant.current_score > 0 && (
+                                  <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10">
+                                    <Trophy className="h-4 w-4 text-yellow-600" />
+                                    <span className="text-sm text-muted-foreground">
+                                      Current Score:
+                                    </span>
+                                    <span className="font-bold text-yellow-600">
+                                      {participant.current_score} pts
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Status indicator */}
+                                <div className="flex items-center gap-2 mt-3">
+                                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                  <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                                    Active & Ready
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Perforated edge effect */}
+                              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between px-1">
+                                <div className="w-3 h-3 rounded-full bg-slate-100 dark:bg-slate-900 -translate-x-1/2" />
+                                <div className="w-3 h-3 rounded-full bg-slate-100 dark:bg-slate-900 translate-x-1/2" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick Stats */}
+                          {myScore && (
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="p-3 rounded-lg bg-green-500/10 text-center">
+                                <p className="text-lg font-bold text-green-600">
+                                  {myScore.correct_answers}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Correct
+                                </p>
+                              </div>
+                              <div className="p-3 rounded-lg bg-blue-500/10 text-center">
+                                <p className="text-lg font-bold text-blue-600">
+                                  {myScore.accuracy}%
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Accuracy
+                                </p>
+                              </div>
+                              <div className="p-3 rounded-lg bg-purple-500/10 text-center">
+                                <p className="text-lg font-bold text-purple-600">
+                                  {myScore.current_streak}🔥
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Streak
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Go to Trivia Button */}
+                          <Button
+                            size="lg"
+                            className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-[1.02]"
+                            asChild
+                          >
+                            <Link href={`/challenges/${challengeId}/trivia`}>
+                              <Brain className="h-5 w-5 mr-2" />
+                              Enter Trivia Arena
+                              <ArrowRight className="h-5 w-5 ml-2" />
+                            </Link>
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}
 
-                  {/* TEAM */}
-                  {challenge.challenge_type === "team" && (
-                    <div className="space-y-3">
-                      {!participant?.team_id ? (
-                        <>
-                          <Button className="w-full" asChild>
-                            <Link
-                              href={`/challenges/${challengeId}/teams/discover`}
+                  {/* Only show these sections if user has joined */}
+                  {hasJoined && challenge.challenge_type !== "trivia" && (
+                    <>
+                      {challenge.challenge_type === "referral" && (
+                        <div className="space-y-4">
+                          <InfoBox
+                            icon={Users}
+                            color="text-blue-500"
+                            title="How to Earn"
+                          >
+                            <li>Share your referral link with friends</li>
+                            <li>
+                              {challenge.scoring_config?.referral_type ===
+                              "signup"
+                                ? "Points when they become active"
+                                : challenge.scoring_config?.referral_type ===
+                                    "first_purchase"
+                                  ? "Points on first purchase"
+                                  : "Points for signups & purchases"}
+                            </li>
+                            <li>
+                              {challenge.scoring_config?.points_per_referral ||
+                                100}{" "}
+                              pts per referral
+                            </li>
+                          </InfoBox>
+                          <div className="flex gap-2">
+                            <Input
+                              value={td.referralLink || ""}
+                              readOnly
+                              className="font-mono text-sm flex-1"
+                            />
+                            <Button
+                              variant="outline"
+                              onClick={copyReferralLink}
                             >
-                              <UsersRound className="h-4 w-4 mr-2" />
-                              Find or Create a Team
-                            </Link>
-                          </Button>
-                          <p className="text-sm text-muted-foreground text-center">
-                            Team up with {challenge.min_team_size || 2}-
-                            {challenge.max_team_size || 5} others!
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <Button className="w-full" asChild>
-                            <Link
-                              href={`/challenges/${challengeId}/teams/manage`}
+                              {copied ? (
+                                <Check className="h-4 w-4" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => shareReferral("facebook")}
                             >
-                              <UsersRound className="h-4 w-4 mr-2" />
-                              Manage Your Team
-                            </Link>
-                          </Button>
-                          <Button className="w-full" variant="outline" asChild>
-                            <Link href="/">
+                              <Facebook className="h-4 w-4 mr-1" />
+                              Facebook
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => shareReferral("twitter")}
+                            >
+                              <Twitter className="h-4 w-4 mr-1" />
+                              Twitter
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => shareReferral("whatsapp")}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-1" />
+                              WhatsApp
+                            </Button>
+                          </div>
+                          {td.referralLeaderboard?.length > 0 && (
+                            <MiniLeaderboard
+                              title="Top Referrers"
+                              entries={td.referralLeaderboard.slice(0, 5)}
+                              valueKey="total_referrals"
+                              valueSuffix=" refs"
+                              currentUserId={profile?.id}
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      {/* PURCHASE */}
+                      {challenge.challenge_type === "purchase" && (
+                        <div className="space-y-4">
+                          {td.targetProduct && (
+                            <div className="p-4 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20">
+                              <h4 className="font-semibold mb-2">
+                                <ShoppingBag className="h-4 w-4 text-green-500 inline mr-1" />
+                                Target Product
+                              </h4>
+                              <div className="flex items-center gap-3">
+                                {td.targetProduct.image_url && (
+                                  <img
+                                    src={td.targetProduct.image_url}
+                                    alt=""
+                                    className="w-16 h-16 rounded-lg object-cover"
+                                  />
+                                )}
+                                <div>
+                                  <p className="font-medium">
+                                    {td.targetProduct.name}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    KSH{" "}
+                                    {td.targetProduct.price?.toLocaleString()}
+                                  </p>
+                                  <Badge
+                                    variant="outline"
+                                    className="mt-1 text-xs"
+                                  >
+                                    {challenge.scoring_config
+                                      ?.points_per_unit || 10}{" "}
+                                    pts/unit
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          <Button className="w-full" size="lg" asChild>
+                            <Link
+                              href={`/?product=${challenge.scoring_config?.product_id}`}
+                            >
                               <ShoppingBag className="h-4 w-4 mr-2" />
-                              Shop to Help Your Team
+                              Buy Now & Earn Points
                             </Link>
                           </Button>
-                        </>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[1, 3, 5].map((qty) => (
+                              <Button
+                                key={qty}
+                                variant="outline"
+                                size="sm"
+                                className="relative"
+                                asChild
+                              >
+                                <Link
+                                  href={`/?product=${challenge.scoring_config?.product_id}&qty=${qty}`}
+                                >
+                                  <div className="text-center">
+                                    <p className="font-bold">{qty}x</p>
+                                    <p className="text-xs">
+                                      +
+                                      {(challenge.scoring_config
+                                        ?.points_per_unit || 10) * qty}{" "}
+                                      pts
+                                    </p>
+                                  </div>
+                                </Link>
+                              </Button>
+                            ))}
+                          </div>
+                          {td.purchaseLeaderboard?.length > 0 && (
+                            <MiniLeaderboard
+                              title="Top Buyers"
+                              entries={td.purchaseLeaderboard.slice(0, 3)}
+                              valueKey="total_units"
+                              valueSuffix=" units"
+                              currentUserId={profile?.id}
+                            />
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* TRIVIA */}
-                  {challenge.challenge_type === "trivia" && (
-                    <div className="space-y-3">
-                      <InfoBox
-                        icon={Brain}
-                        color="text-yellow-500"
-                        title="How It Works"
-                      >
-                        <li>Get a ticket via Spin & Win</li>
-                        <li>Host calls participants in order</li>
-                        <li>Answer correctly to earn points</li>
-                        <li>Top 3 win prizes!</li>
-                      </InfoBox>
-                      {challenge.scoring_config.spin_game_id && (
-                        <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
-                          🎫 You have a trivia ticket! Ready to play?
-                        </p>
+                      {/* STREAK */}
+                      {challenge.challenge_type === "streak" && (
+                        <Button
+                          className="w-full"
+                          onClick={async () => {
+                            if (!profile) {
+                              router.push("/login");
+                              return;
+                            }
+                            try {
+                              const r = await challengesService.recordAction(
+                                challengeId,
+                                profile.id,
+                                "daily_login",
+                                undefined,
+                                { date: new Date().toISOString() },
+                              );
+                              toast.success(`+${r.pointsAwarded} pts!`);
+                              loadData();
+                            } catch (e: any) {
+                              toast.error(e.message);
+                            }
+                          }}
+                        >
+                          <Flame className="h-4 w-4 mr-2" />
+                          Daily Login
+                        </Button>
                       )}
-                      <Button className="w-full" asChild>
-                        <Link href={`/challenges/${challengeId}/trivia`}>
-                          <Brain className="h-4 w-4 mr-2" />
-                          Go to Trivia
-                        </Link>
-                      </Button>
-                    </div>
+
+                      {/* SOCIAL */}
+                      {challenge.challenge_type === "social" && (
+                        <div className="space-y-4">
+                          <InfoBox
+                            icon={Heart}
+                            color="text-pink-500"
+                            title="How to Participate"
+                          >
+                            <li>
+                              1. Create a post on social media with the hashtag
+                            </li>
+                            <li>
+                              2. Submit the post URL below for verification
+                            </li>
+                            <li>3. Wait for admin approval to earn points</li>
+                          </InfoBox>
+                          <div>
+                            <Label>Target Hashtag</Label>
+                            <p className="text-lg font-bold text-purple-600 mt-1">
+                              #
+                              {challenge.scoring_config?.target_hashtag ||
+                                "Challenge"}
+                            </p>
+                          </div>
+                          <div>
+                            <Label>Platform</Label>
+                            <Select
+                              value={socialForm.platform}
+                              onValueChange={(v) =>
+                                setSocialForm((p) => ({ ...p, platform: v }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[
+                                  "facebook",
+                                  "twitter",
+                                  "instagram",
+                                  "tiktok",
+                                  "linkedin",
+                                  "youtube",
+                                ].map((p) => (
+                                  <SelectItem key={p} value={p}>
+                                    <div className="flex items-center gap-2">
+                                      {React.createElement(getSocialIcon(p), {
+                                        className: "h-4 w-4",
+                                      })}
+                                      {p}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label>Post URL *</Label>
+                            <Input
+                              placeholder="https://..."
+                              value={socialForm.postUrl}
+                              onChange={(e) =>
+                                setSocialForm((p) => ({
+                                  ...p,
+                                  postUrl: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label>Caption</Label>
+                            <Textarea
+                              placeholder="What did you write?"
+                              value={socialForm.caption}
+                              onChange={(e) =>
+                                setSocialForm((p) => ({
+                                  ...p,
+                                  caption: e.target.value,
+                                }))
+                              }
+                              rows={2}
+                            />
+                          </div>
+                          <div>
+                            <Label>Screenshot URL</Label>
+                            <Input
+                              placeholder="https://..."
+                              value={socialForm.screenshot}
+                              onChange={(e) =>
+                                setSocialForm((p) => ({
+                                  ...p,
+                                  screenshot: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
+                          <Button
+                            className="w-full"
+                            onClick={handleSocialSubmission}
+                            disabled={!socialForm.postUrl || submittingSocial}
+                          >
+                            {submittingSocial ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Send className="h-4 w-4 mr-2" />
+                            )}
+                            Submit for Review
+                          </Button>
+                          {td.socialSubmissions?.length > 0 && (
+                            <div className="space-y-2">
+                              <h4 className="font-semibold">
+                                Your Submissions
+                              </h4>
+                              {td.socialSubmissions.map((sub: any) => (
+                                <div
+                                  key={sub.id}
+                                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {React.createElement(
+                                      getSocialIcon(sub.platform),
+                                      { className: "h-4 w-4" },
+                                    )}
+                                    <div>
+                                      <p className="text-sm font-medium truncate max-w-[200px]">
+                                        {sub.post_url}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {formatDistanceToNow(
+                                          new Date(sub.created_at),
+                                          { addSuffix: true },
+                                        )}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {sub.status === "approved" && (
+                                      <Badge className="bg-green-100 text-green-700">
+                                        +
+                                        {(sub.points_awarded || 0) +
+                                          (sub.bonus_points || 0)}{" "}
+                                        pts
+                                      </Badge>
+                                    )}
+                                    <Badge
+                                      variant={
+                                        sub.status === "approved"
+                                          ? "default"
+                                          : sub.status === "rejected"
+                                            ? "destructive"
+                                            : "secondary"
+                                      }
+                                    >
+                                      {sub.status}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* TEAM */}
+                      {challenge.challenge_type === "team" && (
+                        <div className="space-y-3">
+                          {!participant?.team_id ? (
+                            <>
+                              <Button className="w-full" asChild>
+                                <Link
+                                  href={`/challenges/${challengeId}/teams/discover`}
+                                >
+                                  <UsersRound className="h-4 w-4 mr-2" />
+                                  Find or Create a Team
+                                </Link>
+                              </Button>
+                              <p className="text-sm text-muted-foreground text-center">
+                                Team up with {challenge.min_team_size || 2}-
+                                {challenge.max_team_size || 5} others!
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <Button className="w-full" asChild>
+                                <Link
+                                  href={`/challenges/${challengeId}/teams/manage`}
+                                >
+                                  <UsersRound className="h-4 w-4 mr-2" />
+                                  Manage Your Team
+                                </Link>
+                              </Button>
+                              <Button
+                                className="w-full"
+                                variant="outline"
+                                asChild
+                              >
+                                <Link href="/">
+                                  <ShoppingBag className="h-4 w-4 mr-2" />
+                                  Shop to Help Your Team
+                                </Link>
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -1124,48 +1419,352 @@ export default function ChallengeDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <Trophy className="h-5 w-5 text-yellow-500" />
-                    Leaderboard
-                  </h3>
+            {/* Trivia Leaderboard - Special UX */}
+            {challenge.challenge_type === "trivia" && leaderboard.length > 0 ? (
+              <Card className="overflow-hidden border-2 border-yellow-500/20">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 px-6 py-4 border-b border-yellow-500/20">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                      <Trophy className="h-5 w-5" />
+                      Trivia Rankings
+                    </h3>
+                    <Badge className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-0">
+                      {leaderboard.length} players
+                    </Badge>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {leaderboard.slice(0, 5).map((entry, idx) => (
-                    <div
-                      key={entry.id}
-                      className={cn(
-                        "flex items-center justify-between p-2 rounded-lg",
-                        entry.user_id === profile?.id && "bg-primary/10",
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 text-center font-bold">
-                          {idx === 0 ? (
-                            <Crown className="h-4 w-4 text-yellow-500" />
-                          ) : idx === 1 ? (
-                            <Award className="h-4 w-4 text-gray-400" />
-                          ) : idx === 2 ? (
-                            <Award className="h-4 w-4 text-amber-600" />
-                          ) : (
-                            `#${idx + 1}`
+
+                <CardContent className="p-0">
+                  {/* Top 3 Podium */}
+                  {leaderboard.length >= 3 && (
+                    <div className="px-6 pt-6 pb-4">
+                      <div className="flex items-end justify-center gap-3 h-32">
+                        {/* 2nd Place */}
+                        {leaderboard[1] && (
+                          <div className="flex flex-col items-center flex-1">
+                            <div className="relative mb-2">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center ring-4 ring-gray-200 dark:ring-gray-700">
+                                <span className="text-xl font-bold text-white">
+                                  {leaderboard[1].full_name?.charAt(0) || "?"}
+                                </span>
+                              </div>
+                              <Award className="h-6 w-6 text-gray-400 absolute -bottom-1 -right-1" />
+                            </div>
+                            <div className="w-full bg-gradient-to-t from-gray-300 to-gray-200 dark:from-gray-600 dark:to-gray-500 rounded-t-lg h-20 flex flex-col items-center justify-center relative">
+                              <p className="text-2xl font-bold text-white">2</p>
+                              <p className="text-xs text-white/80 truncate max-w-[80px] text-center">
+                                {leaderboard[1].full_name?.split(" ")[0]}
+                              </p>
+                              <p className="text-xs font-bold text-white mt-1">
+                                {leaderboard[1].total_score} pts
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 1st Place */}
+                        {leaderboard[0] && (
+                          <div className="flex flex-col items-center flex-1 -mt-4">
+                            <div className="relative mb-2">
+                              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center ring-4 ring-yellow-300 dark:ring-yellow-700 animate-pulse">
+                                <span className="text-2xl font-bold text-white">
+                                  {leaderboard[0].full_name?.charAt(0) || "?"}
+                                </span>
+                              </div>
+                              <Crown className="h-7 w-7 text-yellow-500 absolute -top-3 -right-3" />
+                            </div>
+                            <div className="w-full bg-gradient-to-t from-yellow-400 to-yellow-300 dark:from-yellow-600 dark:to-yellow-500 rounded-t-lg h-28 flex flex-col items-center justify-center relative shadow-lg shadow-yellow-500/30">
+                              <p className="text-3xl font-bold text-white">1</p>
+                              <p className="text-sm font-semibold text-white truncate max-w-[80px] text-center">
+                                {leaderboard[0].full_name?.split(" ")[0]}
+                              </p>
+                              <p className="text-sm font-bold text-white mt-1">
+                                {leaderboard[0].total_score} pts
+                              </p>
+                              {leaderboard[0].current_streak > 0 && (
+                                <Badge className="absolute -bottom-2 bg-orange-500 text-white border-0 text-xs">
+                                  🔥 {leaderboard[0].current_streak}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3rd Place */}
+                        {leaderboard[2] && (
+                          <div className="flex flex-col items-center flex-1">
+                            <div className="relative mb-2">
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center ring-4 ring-amber-200 dark:ring-amber-800">
+                                <span className="text-xl font-bold text-white">
+                                  {leaderboard[2].full_name?.charAt(0) || "?"}
+                                </span>
+                              </div>
+                              <Award className="h-6 w-6 text-amber-600 absolute -bottom-1 -right-1" />
+                            </div>
+                            <div className="w-full bg-gradient-to-t from-amber-500 to-amber-400 dark:from-amber-700 dark:to-amber-600 rounded-t-lg h-16 flex flex-col items-center justify-center relative">
+                              <p className="text-2xl font-bold text-white">3</p>
+                              <p className="text-xs text-white/80 truncate max-w-[80px] text-center">
+                                {leaderboard[2].full_name?.split(" ")[0]}
+                              </p>
+                              <p className="text-xs font-bold text-white mt-1">
+                                {leaderboard[2].total_score} pts
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rankings List (4th place onwards) */}
+                  <div className="px-6 pb-6 space-y-1">
+                    {leaderboard.slice(3).map((entry, idx) => {
+                      const isMe = entry.user_id === profile?.id;
+                      const rank = idx + 4;
+
+                      return (
+                        <div
+                          key={entry.user_id}
+                          className={cn(
+                            "flex items-center gap-3 p-2.5 rounded-lg transition-all duration-200 hover:bg-muted/50",
+                            isMe &&
+                              "bg-purple-500/10 border border-purple-500/20",
                           )}
-                        </span>
-                        <span className="text-sm truncate max-w-[120px]">
-                          {entry.users?.full_name || "Anonymous"}
+                        >
+                          {/* Rank */}
+                          <span
+                            className={cn(
+                              "w-8 text-center text-sm font-bold",
+                              rank <= 10
+                                ? "text-yellow-600 dark:text-yellow-400"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            #{rank}
+                          </span>
+
+                          {/* Avatar + Name */}
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div
+                              className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0",
+                                isMe
+                                  ? "bg-purple-500/20 text-purple-600 dark:text-purple-400"
+                                  : "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {entry.full_name?.charAt(0) || "?"}
+                            </div>
+                            <div className="min-w-0">
+                              <p
+                                className={cn(
+                                  "text-sm font-medium truncate",
+                                  isMe &&
+                                    "text-purple-600 dark:text-purple-400 font-bold",
+                                )}
+                              >
+                                {entry.full_name || "Anonymous"}
+                                {isMe && (
+                                  <span className="text-xs ml-1">(You)</span>
+                                )}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>
+                                  {entry.correct_answers}/
+                                  {entry.questions_answered} correct
+                                </span>
+                                {entry.current_streak > 0 && (
+                                  <span className="text-orange-500">
+                                    🔥 {entry.current_streak}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Score & Stats */}
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-sm">
+                              {entry.total_score} pts
+                            </p>
+                            {entry.accuracy > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {entry.accuracy}%
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Show top 3 again in list format if preferred, or just the list */}
+                    {leaderboard.length <= 3 && leaderboard.length > 0 && (
+                      <div className="space-y-1 pt-4">
+                        {leaderboard.map((entry, idx) => {
+                          const isMe = entry.user_id === profile?.id;
+
+                          return (
+                            <div
+                              key={entry.user_id}
+                              className={cn(
+                                "flex items-center gap-3 p-2.5 rounded-lg transition-all duration-200",
+                                idx === 0 &&
+                                  "bg-yellow-500/10 border border-yellow-500/20",
+                                isMe &&
+                                  "bg-purple-500/10 border border-purple-500/20",
+                              )}
+                            >
+                              <span className="w-8 text-center">
+                                {idx === 0
+                                  ? "🥇"
+                                  : idx === 1
+                                    ? "🥈"
+                                    : idx === 2
+                                      ? "🥉"
+                                      : `#${idx + 1}`}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={cn(
+                                    "text-sm font-medium truncate",
+                                    isMe &&
+                                      "text-purple-600 dark:text-purple-400",
+                                  )}
+                                >
+                                  {entry.full_name} {isMe && "(You)"}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>
+                                    {entry.correct_answers}/
+                                    {entry.questions_answered}
+                                  </span>
+                                  {entry.fastest_response_ms && (
+                                    <span>
+                                      ⚡{" "}
+                                      {(
+                                        entry.fastest_response_ms / 1000
+                                      ).toFixed(1)}
+                                      s
+                                    </span>
+                                  )}
+                                  {entry.current_streak > 0 && (
+                                    <span>🔥 {entry.current_streak}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold">{entry.total_score}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {entry.accuracy}%
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stats Footer */}
+                  {leaderboard.length > 0 && (
+                    <div className="px-6 py-3 bg-muted/30 border-t">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Avg Accuracy
+                          </p>
+                          <p className="text-sm font-bold text-green-600">
+                            {Math.round(
+                              leaderboard.reduce(
+                                (sum, e) => sum + (e.accuracy || 0),
+                                0,
+                              ) / leaderboard.length,
+                            )}
+                            %
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Fastest
+                          </p>
+                          <p className="text-sm font-bold text-blue-600">
+                            {leaderboard.some((e) => e.fastest_response_ms)
+                              ? (
+                                  Math.min(
+                                    ...leaderboard
+                                      .filter((e) => e.fastest_response_ms)
+                                      .map((e) => e.fastest_response_ms),
+                                  ) / 1000
+                                ).toFixed(1) + "s"
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Best Streak
+                          </p>
+                          <p className="text-sm font-bold text-orange-600">
+                            🔥{" "}
+                            {Math.max(
+                              ...leaderboard.map((e) => e.best_streak || 0),
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              // Regular Leaderboard for non-trivia challenges
+              <Card>
+                <CardContent>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-yellow-500" />
+                      Leaderboard
+                    </h3>
+                  </div>
+                  <div className="space-y-2">
+                    {leaderboard.slice(0, 5).map((entry, idx) => (
+                      <div
+                        key={entry.id || entry.user_id}
+                        className={cn(
+                          "flex items-center justify-between p-2 rounded-lg",
+                          entry.user_id === profile?.id && "bg-primary/10",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 text-center font-bold">
+                            {idx === 0 ? (
+                              <Crown className="h-4 w-4 text-yellow-500" />
+                            ) : idx === 1 ? (
+                              <Award className="h-4 w-4 text-gray-400" />
+                            ) : idx === 2 ? (
+                              <Award className="h-4 w-4 text-amber-600" />
+                            ) : (
+                              `#${idx + 1}`
+                            )}
+                          </span>
+                          <span className="text-sm truncate max-w-[120px]">
+                            {entry.users?.full_name ||
+                              entry.full_name ||
+                              "Anonymous"}
+                          </span>
+                        </div>
+                        <span className="font-bold">
+                          {entry.current_score || entry.total_score}
                         </span>
                       </div>
-                      <span className="font-bold">{entry.current_score}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
-              <CardContent className="p-6">
+              <CardContent>
                 <h3 className="font-semibold mb-4 flex items-center gap-2">
                   <Gift className="h-5 w-5" />
                   Prize Tiers

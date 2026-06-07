@@ -50,6 +50,15 @@ interface Participant {
   current_streak: number;
   users?: { full_name: string; avatar_url: string };
   team_name?: string;
+
+  // Trivia-specific extras
+  correct_answers?: number;
+  questions_answered?: number;
+  accuracy?: number;
+  fastest_response_ms?: number;
+  best_streak?: number;
+  full_name?: string; // for team challenges where user info is not joined in participant query
+  total_score?: number; // for trivia to show total score instead of current score (if different)
 }
 
 interface TickerEntry {
@@ -171,6 +180,55 @@ export default function ChallengeLivePage() {
   }, [challengeId, supabase]);
 
   const loadLeaderboard = useCallback(async () => {
+    // Check if challenge is trivia type
+    if (challenge?.challenge_type === "trivia") {
+      // Trivia leaderboard is loaded via loadTypeData, but we can also load it here
+      const { data } = await supabase.rpc("get_trivia_leaderboard", {
+        p_challenge_id: challengeId,
+        p_limit: 50,
+      });
+      if (!data?.length) return;
+
+      // Normalize trivia data to match participant structure
+      const normalized = data.map((entry: any) => ({
+        id: entry.user_id,
+        user_id: entry.user_id,
+        current_score: entry.total_score,
+        current_rank: entry.current_rank,
+        current_streak: entry.current_streak || 0,
+        users: {
+          full_name: entry.full_name,
+          avatar_url: null,
+        },
+        // Trivia-specific extras
+        correct_answers: entry.correct_answers,
+        questions_answered: entry.questions_answered,
+        accuracy: entry.accuracy,
+        fastest_response_ms: entry.fastest_response_ms,
+        best_streak: entry.best_streak,
+      }));
+
+      console.log("Normalized Trivia Leaderboard:", normalized);
+
+      const changes = new Map<string, "up" | "down" | "flat">();
+      const newRanks = new Map<string, number>();
+      normalized.forEach((p: any, i: number) => {
+        const rank = i + 1;
+        newRanks.set(p.user_id, rank);
+        const prev = previousRanks.get(p.user_id);
+        changes.set(
+          p.user_id,
+          prev ? (rank < prev ? "up" : rank > prev ? "down" : "flat") : "flat",
+        );
+      });
+
+      setLeaderboard(normalized);
+      setRankChanges(changes);
+      setPreviousRanks(newRanks);
+      setTotalParticipants(normalized.length);
+      return;
+    }
+
     const participants = await challengesService.current.getLeaderboard(
       challengeId,
       50,
@@ -630,7 +688,11 @@ export default function ChallengeLivePage() {
 
       {/* Phase Banner */}
       <div
-        className={cn("border-b py-3 px-6", phaseConfig.bg, phaseConfig.border)}
+        className={cn(
+          "border-b py-3 px-2 sm:px-6",
+          phaseConfig.bg,
+          phaseConfig.border,
+        )}
       >
         <div className="container mx-auto flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
@@ -680,7 +742,7 @@ export default function ChallengeLivePage() {
         </div>
       )}
 
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-2 sm:px-6 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left: Leaderboard */}
           <div className="lg:col-span-2 space-y-6">
@@ -768,7 +830,7 @@ export default function ChallengeLivePage() {
             {challenge.challenge_type === "streak" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <Card className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/30">
-                  <CardContent className="p-6 text-center">
+                  <CardContent className="text-center">
                     <Flame className="h-6 w-6 text-orange-400 mx-auto mb-2" />
                     <p className="text-4xl font-bold text-orange-400">
                       {Math.max(
@@ -781,7 +843,7 @@ export default function ChallengeLivePage() {
                   </CardContent>
                 </Card>
                 <Card className="bg-black/50 backdrop-blur border-white/10">
-                  <CardContent className="p-6 space-y-3">
+                  <CardContent className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-purple-300">Active Streakers</span>
                       <span className="text-white font-bold">
@@ -809,13 +871,12 @@ export default function ChallengeLivePage() {
                 </Card>
               </div>
             )}
-
             {/* Scoreboard */}
             <Card className="bg-black/50 backdrop-blur border-white/10">
               <CardContent className="p-0">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-white/10">
+                    <tr className="">
                       <th className="text-left p-4 text-sm font-medium text-purple-300">
                         Rank
                       </th>
@@ -831,65 +892,202 @@ export default function ChallengeLivePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rest.map((p, idx) => {
-                      const rank = idx + 4;
-                      const change = rankChanges.get(p.user_id);
-                      return (
-                        <tr
-                          key={p.id}
-                          className="border-b border-white/5 hover:bg-white/5"
-                        >
-                          <td className="p-4 font-mono font-bold text-white">
-                            #{rank}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
-                                <Users className="h-4 w-4 text-purple-400" />
-                              </div>
-                              <span className="text-white font-medium">
-                                {p.users?.full_name || "Anonymous"}
+                    {/* Show ALL participants including top 3 if total is small */}
+                    {leaderboard.length <= 3 ? (
+                      // When 3 or fewer participants, show everyone in the table (no podium needed or show podium + table)
+                      leaderboard.map((p, idx) => {
+                        const rank = idx + 1;
+                        const change = rankChanges.get(p.user_id);
+                        return (
+                          <tr
+                            key={p.id || p.user_id}
+                            className={cn(
+                              "border-b border-white/5 hover:bg-white/5",
+                              rank === 1 && "bg-yellow-500/5",
+                              rank === 2 && "bg-gray-500/5",
+                              rank === 3 && "bg-amber-500/5",
+                            )}
+                          >
+                            <td className="p-4 font-mono font-bold">
+                              <span
+                                className={cn(
+                                  rank === 1
+                                    ? "text-yellow-400"
+                                    : rank === 2
+                                      ? "text-gray-300"
+                                      : rank === 3
+                                        ? "text-amber-400"
+                                        : "text-white",
+                                )}
+                              >
+                                {rank === 1
+                                  ? "🥇"
+                                  : rank === 2
+                                    ? "🥈"
+                                    : rank === 3
+                                      ? "🥉"
+                                      : `#${rank}`}
                               </span>
-                              {p.team_name && (
-                                <Badge variant="outline" className="text-xs">
-                                  {p.team_name}
-                                </Badge>
-                              )}
-                              {challenge.challenge_type === "streak" &&
-                                p.current_streak > 0 && (
-                                  <Badge className="ml-2 bg-orange-500/20 text-orange-400">
-                                    <Flame className="h-3 w-3 mr-1" />
-                                    {p.current_streak}d
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center",
+                                    rank === 1
+                                      ? "bg-yellow-500/20"
+                                      : rank === 2
+                                        ? "bg-gray-500/20"
+                                        : rank === 3
+                                          ? "bg-amber-500/20"
+                                          : "bg-purple-500/20",
+                                  )}
+                                >
+                                  <Users
+                                    className={cn(
+                                      "h-4 w-4",
+                                      rank === 1
+                                        ? "text-yellow-400"
+                                        : rank === 2
+                                          ? "text-gray-300"
+                                          : rank === 3
+                                            ? "text-amber-400"
+                                            : "text-purple-400",
+                                    )}
+                                  />
+                                </div>
+                                <span className="text-white font-medium">
+                                  {p.users?.full_name ||
+                                    p.full_name ||
+                                    "Anonymous"}
+                                </span>
+                                {p.team_name && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {p.team_name}
                                   </Badge>
                                 )}
-                            </div>
-                          </td>
-                          <td className="p-4 text-right font-bold text-white">
-                            {p.current_score.toLocaleString()}
-                          </td>
-                          <td className="p-4 text-center">
-                            {change === "up" ? (
-                              <div className="inline-flex items-center gap-1 text-green-500">
-                                <ArrowUp className="h-4 w-4" />
+                                {challenge.challenge_type === "streak" &&
+                                  p.current_streak > 0 && (
+                                    <Badge className="ml-2 bg-orange-500/20 text-orange-400">
+                                      <Flame className="h-3 w-3 mr-1" />
+                                      {p.current_streak}d
+                                    </Badge>
+                                  )}
+                                {/* Trivia-specific stats */}
+                                {challenge.challenge_type === "trivia" && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {p.correct_answers}/{p.questions_answered} •{" "}
+                                    {p.accuracy}%
+                                  </span>
+                                )}
                               </div>
-                            ) : change === "down" ? (
-                              <div className="inline-flex items-center gap-1 text-red-500">
-                                <ArrowDown className="h-4 w-4" />
-                              </div>
-                            ) : (
-                              <div className="text-gray-500">—</div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {rest.length === 0 && (
+                            </td>
+                            <td className="p-4 text-right font-bold text-white">
+                              {(
+                                p.current_score ||
+                                p.total_score ||
+                                0
+                              ).toLocaleString()}
+                            </td>
+                            <td className="p-4 text-center">
+                              {change === "up" ? (
+                                <div className="inline-flex items-center gap-1 text-green-500">
+                                  <ArrowUp className="h-4 w-4" />
+                                </div>
+                              ) : change === "down" ? (
+                                <div className="inline-flex items-center gap-1 text-red-500">
+                                  <ArrowDown className="h-4 w-4" />
+                                </div>
+                              ) : (
+                                <div className="text-gray-500">—</div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      // More than 3: show rest (4th place onwards)
+                      <>
+                        {rest.map((p, idx) => {
+                          const rank = idx + 4;
+                          const change = rankChanges.get(p.user_id);
+                          return (
+                            <tr
+                              key={p.id || p.user_id}
+                              className="border-b border-white/5 hover:bg-white/5"
+                            >
+                              <td className="p-4 font-mono font-bold text-white">
+                                #{rank}
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                                    <Users className="h-4 w-4 text-purple-400" />
+                                  </div>
+                                  <span className="text-white font-medium">
+                                    {p.users?.full_name ||
+                                      p.full_name ||
+                                      "Anonymous"}
+                                  </span>
+                                  {p.team_name && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {p.team_name}
+                                    </Badge>
+                                  )}
+                                  {challenge.challenge_type === "streak" &&
+                                    p.current_streak > 0 && (
+                                      <Badge className="ml-2 bg-orange-500/20 text-orange-400">
+                                        <Flame className="h-3 w-3 mr-1" />
+                                        {p.current_streak}d
+                                      </Badge>
+                                    )}
+                                  {/* Trivia-specific stats */}
+                                  {challenge.challenge_type === "trivia" && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {p.correct_answers}/{p.questions_answered}{" "}
+                                      • {p.accuracy}%
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-4 text-right font-bold text-white">
+                                {(
+                                  p.current_score ||
+                                  p.total_score ||
+                                  0
+                                ).toLocaleString()}
+                              </td>
+                              <td className="p-4 text-center">
+                                {change === "up" ? (
+                                  <div className="inline-flex items-center gap-1 text-green-500">
+                                    <ArrowUp className="h-4 w-4" />
+                                  </div>
+                                ) : change === "down" ? (
+                                  <div className="inline-flex items-center gap-1 text-red-500">
+                                    <ArrowDown className="h-4 w-4" />
+                                  </div>
+                                ) : (
+                                  <div className="text-gray-500">—</div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {/* Only show "Waiting" when truly empty */}
+                    {leaderboard.length === 0 && (
                       <tr>
                         <td
                           colSpan={4}
                           className="p-8 text-center text-purple-300"
                         >
-                          Waiting for participants...
+                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p>Waiting for participants to join...</p>
                         </td>
                       </tr>
                     )}
@@ -903,7 +1101,7 @@ export default function ChallengeLivePage() {
           <div className="space-y-6">
             {/* Live Ticker */}
             <Card className="bg-black/50 backdrop-blur border-white/10 h-[400px] flex flex-col">
-              <div className="p-4 border-b border-white/10">
+              <div className="px-4 ">
                 <h3 className="text-white font-semibold flex items-center gap-2">
                   <Zap className="h-4 w-4 text-yellow-400" />
                   Live Activity Feed
@@ -953,7 +1151,7 @@ export default function ChallengeLivePage() {
 
             {/* Prize Tiers */}
             <Card className="bg-black/50 backdrop-blur border-white/10">
-              <div className="p-4">
+              <div className="px-4 ">
                 <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
                   <Trophy className="h-4 w-4 text-yellow-400" />
                   Prize Tiers
@@ -996,7 +1194,7 @@ export default function ChallengeLivePage() {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30">
-                    <CardContent className="p-3 text-center">
+                    <CardContent className="text-center">
                       <ShoppingBag className="h-4 w-4 text-green-400 mx-auto mb-1" />
                       <p className="text-lg font-bold text-white">
                         {td.totalUnitsSold || 0}
@@ -1005,7 +1203,7 @@ export default function ChallengeLivePage() {
                     </CardContent>
                   </Card>
                   <Card className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-500/30">
-                    <CardContent className="p-3 text-center">
+                    <CardContent className="text-center">
                       <Users className="h-4 w-4 text-blue-400 mx-auto mb-1" />
                       <p className="text-lg font-bold text-white">
                         {td.purchaseParticipants || 0}
@@ -1014,7 +1212,7 @@ export default function ChallengeLivePage() {
                     </CardContent>
                   </Card>
                   <Card className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/30">
-                    <CardContent className="p-3 text-center">
+                    <CardContent className="text-center">
                       <TrendingUp className="h-4 w-4 text-purple-400 mx-auto mb-1" />
                       <p className="text-lg font-bold text-white">
                         KSH {td.totalRevenue?.toLocaleString() || 0}
@@ -1024,7 +1222,7 @@ export default function ChallengeLivePage() {
                   </Card>
                 </div>
                 <Card className="bg-black/50 backdrop-blur border-white/10">
-                  <div className="p-4 border-b border-white/10">
+                  <div className="">
                     <h3 className="text-white font-semibold">Top Buyers</h3>
                   </div>
                   <div className="space-y-1 p-2">
@@ -1052,7 +1250,7 @@ export default function ChallengeLivePage() {
             {challenge.challenge_type === "team" && (
               <>
                 <Card className="bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-500/30">
-                  <CardContent className="p-4 text-center space-y-2">
+                  <CardContent className="text-center space-y-2">
                     <Users className="h-8 w-8 text-purple-400 mx-auto" />
                     <p className="text-white font-bold">
                       {td.totalTeams || 0} Teams
@@ -1064,7 +1262,7 @@ export default function ChallengeLivePage() {
                   </CardContent>
                 </Card>
                 <Card className="bg-black/50 backdrop-blur border-white/10">
-                  <div className="p-4 border-b border-white/10">
+                  <div className="">
                     <h3 className="text-white font-semibold">Team Rankings</h3>
                   </div>
                   <div className="space-y-1 p-2">
@@ -1091,7 +1289,7 @@ export default function ChallengeLivePage() {
               <>
                 <div className="grid grid-cols-3 gap-3">
                   <Card className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border-blue-500/30">
-                    <CardContent className="p-3 text-center">
+                    <CardContent className="text-center">
                       <Users className="h-4 w-4 text-blue-400 mx-auto mb-1" />
                       <p className="text-lg font-bold text-white">
                         {td.referralTotalConversions || 0}
@@ -1100,7 +1298,7 @@ export default function ChallengeLivePage() {
                     </CardContent>
                   </Card>
                   <Card className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-green-500/30">
-                    <CardContent className="p-3 text-center">
+                    <CardContent className="text-center">
                       <UserCheck className="h-4 w-4 text-green-400 mx-auto mb-1" />
                       <p className="text-lg font-bold text-white">
                         {td.referralSignups || 0}
@@ -1109,7 +1307,7 @@ export default function ChallengeLivePage() {
                     </CardContent>
                   </Card>
                   <Card className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border-purple-500/30">
-                    <CardContent className="p-3 text-center">
+                    <CardContent className="text-center">
                       <ShoppingBag className="h-4 w-4 text-purple-400 mx-auto mb-1" />
                       <p className="text-lg font-bold text-white">
                         {td.referralPurchases || 0}
@@ -1119,7 +1317,7 @@ export default function ChallengeLivePage() {
                   </Card>
                 </div>
                 <Card className="bg-black/50 backdrop-blur border-white/10">
-                  <div className="p-4 border-b border-white/10">
+                  <div className="">
                     <h3 className="text-white font-semibold">Top Referrers</h3>
                   </div>
                   <div className="space-y-1 p-2">
@@ -1148,7 +1346,7 @@ export default function ChallengeLivePage() {
               <>
                 {td.triviaCurrentQuestion ? (
                   <Card className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
-                    <CardContent className="p-4 text-center space-y-3">
+                    <CardContent className="text-center space-y-3">
                       <Badge className="bg-yellow-500/20 text-yellow-300">
                         {td.triviaCurrentQuestion.difficulty?.toUpperCase()} •{" "}
                         {td.triviaCurrentQuestion.points_value} PTS
@@ -1225,7 +1423,7 @@ export default function ChallengeLivePage() {
                   </Card>
                 ) : (
                   <Card className="bg-black/50 backdrop-blur border-white/10">
-                    <CardContent className="p-8 text-center">
+                    <CardContent className="text-center">
                       <Brain className="h-12 w-12 text-yellow-500 mx-auto mb-2 animate-pulse" />
                       <p className="text-white font-bold">
                         Waiting for next question...
@@ -1236,7 +1434,7 @@ export default function ChallengeLivePage() {
 
                 {/* Contestant Queue */}
                 <Card className="bg-black/50 backdrop-blur border-white/10">
-                  <div className="p-4 border-b border-white/10">
+                  <div className="px-4 ">
                     <h3 className="text-white font-semibold">
                       Contestants ({(td.participantQueue || []).length})
                     </h3>
@@ -1266,7 +1464,7 @@ export default function ChallengeLivePage() {
 
                 {/* Trivia Leaderboard */}
                 <Card className="bg-black/50 backdrop-blur border-white/10">
-                  <div className="p-4 border-b border-white/10">
+                  <div className="px-4 ">
                     <h3 className="text-white font-semibold">
                       Trivia Standings
                     </h3>

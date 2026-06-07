@@ -42,10 +42,12 @@ export function useStreakTracker() {
   const streakInterval = useRef<NodeJS.Timeout | null>(null);
   const sessionStart = useRef<number>(Date.now());
   const lastHeartbeat = useRef<number>(Date.now());
+  const isMounted = useRef(true);
+  const hasCheckedToday = useRef(false);
 
-  // Send heartbeat to server (lightweight - only stores session time)
+  // Send heartbeat to server - STABLE reference
   const sendHeartbeat = useCallback(async () => {
-    if (!profile?.id || !supabase) return;
+    if (!profile?.id || !supabase || !isMounted.current) return;
 
     const now = Date.now();
     const durationSinceLastHeartbeat = Math.floor(
@@ -56,7 +58,6 @@ export function useStreakTracker() {
     try {
       const sessionSeconds = Math.floor((now - sessionStart.current) / 1000);
 
-      // Use RPC instead of supabase.sql
       await supabase.rpc("update_user_activity", {
         p_user_id: profile.id,
         p_duration_seconds: durationSinceLastHeartbeat,
@@ -65,7 +66,6 @@ export function useStreakTracker() {
 
       lastHeartbeat.current = now;
 
-      // Also track in localStorage as backup
       const currentTotal = getStorageNumber(TOTAL_SITE_SECONDS_KEY);
       setStorageNumber(
         TOTAL_SITE_SECONDS_KEY,
@@ -75,17 +75,20 @@ export function useStreakTracker() {
     } catch (error) {
       console.error("Heartbeat error:", error);
     }
-  }, [profile?.id, supabase]);
+  }, [profile?.id, supabase]); // Dependencies are stable
 
-  // Check and update streaks via RPC
+  // Check and update streaks - STABLE reference
   const checkStreakChallenges = useCallback(async () => {
-    if (!profile?.id || !supabase) return;
+    if (!profile?.id || !supabase || !isMounted.current) return;
 
+    // Prevent multiple checks on same day
     const today = new Date().toDateString();
-    const lastChecked = getCookie(STREAK_CHECKED_KEY);
+    if (hasCheckedToday.current) return;
 
-    // Only check once per day
+    const lastChecked = getCookie(STREAK_CHECKED_KEY);
     if (lastChecked === today) return;
+
+    hasCheckedToday.current = true;
     setCookie(STREAK_CHECKED_KEY, today, 1);
 
     try {
@@ -95,6 +98,7 @@ export function useStreakTracker() {
 
       if (error) {
         console.error("Streak check error:", error);
+        hasCheckedToday.current = false; // Reset on error
         return;
       }
 
@@ -103,12 +107,15 @@ export function useStreakTracker() {
       }
     } catch (error) {
       console.error("Streak check error:", error);
+      hasCheckedToday.current = false;
     }
-  }, [profile?.id, supabase]);
+  }, [profile?.id, supabase]); // Dependencies are stable
 
-  // Initialize tracking
+  // Initialize tracking - runs only once
   useEffect(() => {
     if (!profile?.id) return;
+
+    isMounted.current = true;
 
     // Restore or set session start
     const savedStart = localStorage.getItem(SESSION_START_KEY);
@@ -120,66 +127,88 @@ export function useStreakTracker() {
     }
 
     lastHeartbeat.current = Date.now();
+    hasCheckedToday.current = false;
 
     // Send heartbeat every 60 seconds
-    heartbeatInterval.current = setInterval(sendHeartbeat, 60000);
+    heartbeatInterval.current = setInterval(() => {
+      sendHeartbeat();
+    }, 60000);
 
-    // Check streaks on mount and every 30 minutes
+    // Check streaks on mount and every 30 minutes (but only once per day)
     checkStreakChallenges();
     streakInterval.current = setInterval(() => {
-      setCookie(STREAK_CHECKED_KEY, "", -1); // Clear to allow re-check
-      checkStreakChallenges();
+      // Reset daily check flag to allow re-check on new day
+      const lastChecked = getCookie(STREAK_CHECKED_KEY);
+      const today = new Date().toDateString();
+      if (lastChecked !== today) {
+        hasCheckedToday.current = false;
+        checkStreakChallenges();
+      }
     }, 1800000);
 
     // Handle visibility change
     const handleVisibilityChange = () => {
       if (document.hidden) {
         sendHeartbeat();
-        if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
+        if (heartbeatInterval.current) {
+          clearInterval(heartbeatInterval.current);
+          heartbeatInterval.current = null;
+        }
       } else {
         lastHeartbeat.current = Date.now();
-        heartbeatInterval.current = setInterval(sendHeartbeat, 60000);
-        setCookie(STREAK_CHECKED_KEY, "", -1);
-        checkStreakChallenges();
+        if (!heartbeatInterval.current) {
+          heartbeatInterval.current = setInterval(() => {
+            sendHeartbeat();
+          }, 60000);
+        }
+        // Check streak on visibility change, but only if not checked today
+        const lastChecked = getCookie(STREAK_CHECKED_KEY);
+        const today = new Date().toDateString();
+        if (lastChecked !== today) {
+          hasCheckedToday.current = false;
+          checkStreakChallenges();
+        }
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // Cleanup
     return () => {
-      try {
-        // Save session end
+      isMounted.current = false;
+
+      if (heartbeatInterval.current) {
+        clearInterval(heartbeatInterval.current);
+        heartbeatInterval.current = null;
+      }
+      if (streakInterval.current) {
+        clearInterval(streakInterval.current);
+        streakInterval.current = null;
+      }
+
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      // Final heartbeat on unmount
+      if (profile?.id && supabase) {
         const sessionDuration = Math.floor(
           (Date.now() - sessionStart.current) / 1000,
         );
-        if (profile?.id && supabase) {
-          supabase
-            .rpc("update_user_activity", {
-              p_user_id: profile.id,
-              p_duration_seconds: 0,
-              p_session_seconds: sessionDuration,
-            })
-            .throwOnError();
-        }
-
-        // Store session duration locally
-        const currentTotal = getStorageNumber(TOTAL_SITE_SECONDS_KEY);
-        setStorageNumber(
-          TOTAL_SITE_SECONDS_KEY,
-          currentTotal + sessionDuration,
-        );
-
-        if (heartbeatInterval.current) clearInterval(heartbeatInterval.current);
-        if (streakInterval.current) clearInterval(streakInterval.current);
-        document.removeEventListener(
-          "visibilitychange",
-          handleVisibilityChange,
-        );
-      } catch (error) {
-        console.log("Error updating user activity:", error);
+        supabase
+          .rpc("update_user_activity", {
+            p_user_id: profile.id,
+            p_duration_seconds: 0,
+            p_session_seconds: sessionDuration,
+          })
+          .then(() => {
+            const currentTotal = getStorageNumber(TOTAL_SITE_SECONDS_KEY);
+            setStorageNumber(
+              TOTAL_SITE_SECONDS_KEY,
+              currentTotal + sessionDuration,
+            );
+          });
       }
     };
-  }, [profile?.id, sendHeartbeat, checkStreakChallenges, supabase]);
+  }, [profile?.id, sendHeartbeat, checkStreakChallenges, supabase]); // Dependencies are stable now
 
   return { checkStreakChallenges, sendHeartbeat };
 }

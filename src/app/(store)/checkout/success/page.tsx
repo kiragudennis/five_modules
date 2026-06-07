@@ -29,6 +29,11 @@ import {
   Layers,
   Tag,
   Ticket,
+  Info,
+  Star,
+  Users,
+  Flame,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -772,8 +777,77 @@ export default function SuccessPage({
 
                   <Separator />
 
-                  {/* Points & Draw Entries Section - NEW */}
+                  {/* Rewards & Benefits Section */}
                   <div className="space-y-4">
+                    {/* Account Activation Card - NEW */}
+                    {isOrderPaid && (
+                      <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-green-700 dark:text-green-400">
+                              Account Activated! ✅
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                              Your account is now active for the next 30 days
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Clock className="h-4 w-4 text-green-600" />
+                            <span className="text-muted-foreground">
+                              Active until:
+                            </span>
+                            <span className="font-medium">
+                              {format(
+                                new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                                "PPP",
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-sm">
+                            <Zap className="h-4 w-4 text-green-600" />
+                            <span className="text-muted-foreground">
+                              What this unlocks:
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded bg-green-500/5">
+                              <Flame className="h-3 w-3 text-orange-500 flex-shrink-0" />
+                              <span>Streak challenges & daily rewards</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded bg-green-500/5">
+                              <Users className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                              <span>Team challenges & collaborations</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded bg-green-500/5">
+                              <Gift className="h-3 w-3 text-purple-500 flex-shrink-0" />
+                              <span>Exclusive draws & giveaways</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground p-2 rounded bg-green-500/5">
+                              <Star className="h-3 w-3 text-yellow-500 flex-shrink-0" />
+                              <span>VIP loyalty rewards</span>
+                            </div>
+                          </div>
+
+                          {orderDetails.referred_by && (
+                            <div className="mt-2 pt-2 border-t border-green-500/30">
+                              <p className="text-xs text-green-600 dark:text-green-400">
+                                🎉 Your referrer earned bonus rewards from your
+                                activation!
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Points Earned Card */}
                     {isOrderPaid && orderDetails.loyalty_points_earned > 0 && (
                       <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -782,9 +856,16 @@ export default function SuccessPage({
                             <Coins className="h-5 w-5 text-yellow-600" />
                           </div>
                           <div>
-                            <h3 className="font-semibold">Points Earned! 🎉</h3>
+                            <h3 className="font-semibold">
+                              Loyalty Points Earned! 🎉
+                            </h3>
                             <p className="text-sm text-muted-foreground">
-                              You've earned loyalty points from this order
+                              Earned from your{" "}
+                              {formatCurrency(
+                                orderDetails.total_amount,
+                                orderDetails.currency,
+                              )}{" "}
+                              purchase
                             </p>
                           </div>
                         </div>
@@ -796,7 +877,11 @@ export default function SuccessPage({
                               {orderDetails.loyalty_points_earned?.toLocaleString()}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Loyalty Points
+                              Points •{" "}
+                              {Math.floor(
+                                orderDetails.loyalty_points_earned / 100,
+                              )}{" "}
+                              KSH value
                             </p>
                           </div>
                           <Button
@@ -813,16 +898,34 @@ export default function SuccessPage({
                           </Button>
                         </div>
 
-                        <div className="mt-3 pt-2 border-t border-yellow-500/30 text-xs text-muted-foreground">
-                          <p>
-                            💡 Use your points to get discounts on future
-                            purchases!
-                          </p>
+                        {/* Points calculation breakdown */}
+                        <div className="mt-3 pt-2 border-t border-yellow-500/30">
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div className="flex justify-between">
+                              <span>Order amount:</span>
+                              <span>
+                                {formatCurrency(
+                                  orderDetails.total_amount,
+                                  orderDetails.currency,
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Points rate:</span>
+                              <span>1 point per KSH spent</span>
+                            </div>
+                            <div className="flex justify-between text-yellow-600 font-medium">
+                              <span>Points earned:</span>
+                              <span>
+                                {orderDetails.loyalty_points_earned?.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
 
-                    {/* Draw Entries Awarded Card */}
+                    {/* Draw Entries Card */}
                     {isOrderPaid && orderDetails.draw_entries_awarded > 0 && (
                       <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-lg p-4">
                         <div className="flex items-center gap-3 mb-3">
@@ -831,10 +934,12 @@ export default function SuccessPage({
                           </div>
                           <div>
                             <h3 className="font-semibold">
-                              Draw Entries Earned! 🎟️
+                              {orderDetails.draw_entry_details?.draw_name
+                                ? `Entered: ${orderDetails.draw_entry_details.draw_name}`
+                                : "Draw Entries Earned! 🎟️"}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              You've been entered into our lucky draw
+                              You've been entered into the lucky draw
                             </p>
                           </div>
                         </div>
@@ -846,7 +951,15 @@ export default function SuccessPage({
                               {orderDetails.draw_entries_awarded?.toLocaleString()}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Draw Entries
+                              Entries • Draw on{" "}
+                              {orderDetails.draw_entry_details?.draw_time
+                                ? format(
+                                    new Date(
+                                      orderDetails.draw_entry_details.draw_time,
+                                    ),
+                                    "PPP 'at' h:mm a",
+                                  )
+                                : "upcoming date"}
                             </p>
                           </div>
                           {orderDetails.draw_id && (
@@ -863,13 +976,15 @@ export default function SuccessPage({
                           )}
                         </div>
 
-                        {orderDetails.draw_entry_details && (
+                        {orderDetails.draw_entry_details?.calculation && (
                           <div className="mt-3 pt-2 border-t border-purple-500/30">
+                            <p className="text-xs font-medium mb-1">
+                              📊 Entry calculation:
+                            </p>
                             <div className="text-xs text-muted-foreground space-y-1">
-                              <p>📊 Entry calculation:</p>
                               <div className="flex justify-between">
                                 <span>Order Amount:</span>
-                                <span className="font-medium">
+                                <span>
                                   {formatCurrency(
                                     orderDetails.total_amount,
                                     orderDetails.currency,
@@ -878,10 +993,10 @@ export default function SuccessPage({
                               </div>
                               <div className="flex justify-between">
                                 <span>Entries per KSH:</span>
-                                <span className="font-medium">
+                                <span>
                                   {
-                                    orderDetails.draw_entry_details?.calculation
-                                      ?.entries_per_ksh
+                                    orderDetails.draw_entry_details.calculation
+                                      .entries_per_ksh
                                   }
                                 </span>
                               </div>
@@ -895,14 +1010,34 @@ export default function SuccessPage({
                       </div>
                     )}
 
-                    {/* Pending Points/Entries Message */}
+                    {/* Draw Entry - No active draw but points awarded */}
+                    {isOrderPaid &&
+                      orderDetails.loyalty_points_earned > 0 &&
+                      !orderDetails.draw_entries_awarded && (
+                        <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-lg p-4">
+                          <div className="flex items-center gap-3">
+                            <Info className="h-5 w-5 text-blue-600" />
+                            <div>
+                              <p className="text-sm font-medium">
+                                No active draws at the moment
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Your points have been awarded. Check back later
+                                for new draws!
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Pending Payment - Show what they'll earn */}
                     {!isOrderPaid && (
                       <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-4">
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-3 mb-3">
                           <Clock className="h-5 w-5 text-amber-600" />
                           <div>
                             <h3 className="font-semibold">
-                              Complete Payment to Earn Rewards!
+                              Complete Payment to Unlock Rewards!
                             </h3>
                             <p className="text-sm text-muted-foreground">
                               Once payment is confirmed, you'll receive:
@@ -910,19 +1045,28 @@ export default function SuccessPage({
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 mt-3">
-                          <div className="text-center p-2 rounded-lg bg-white/50 dark:bg-black/20">
-                            <Coins className="h-5 w-5 text-yellow-500 mx-auto mb-1" />
-                            <p className="text-lg font-bold text-yellow-600">
-                              ~{Math.floor(orderDetails.total_amount * 0.01)}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                            <CheckCircle className="h-6 w-6 text-green-500 mx-auto mb-1" />
+                            <p className="text-sm font-bold text-green-600">
+                              30 Days
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Points
+                              Account Active
                             </p>
                           </div>
-                          <div className="text-center p-2 rounded-lg bg-white/50 dark:bg-black/20">
-                            <Ticket className="h-5 w-5 text-purple-500 mx-auto mb-1" />
-                            <p className="text-lg font-bold text-purple-600">
+                          <div className="text-center p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                            <Coins className="h-6 w-6 text-yellow-500 mx-auto mb-1" />
+                            <p className="text-sm font-bold text-yellow-600">
+                              ~{Math.floor(orderDetails.total_amount * 1)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Loyalty Points
+                            </p>
+                          </div>
+                          <div className="text-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                            <Ticket className="h-6 w-6 text-purple-500 mx-auto mb-1" />
+                            <p className="text-sm font-bold text-purple-600">
                               ~{Math.floor(orderDetails.total_amount * 0.05)}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -931,9 +1075,62 @@ export default function SuccessPage({
                           </div>
                         </div>
 
-                        <p className="text-xs text-amber-600 text-center mt-2">
-                          ⚠️ Complete your payment to claim these rewards!
+                        <p className="text-xs text-amber-600 dark:text-amber-400 text-center mt-3 flex items-center justify-center gap-1">
+                          <AlertCircle className="h-3 w-3" />
+                          Complete your payment to claim these rewards!
                         </p>
+                      </div>
+                    )}
+
+                    {/* Total Rewards Summary - when paid */}
+                    {isOrderPaid && (
+                      <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/30 rounded-lg p-4">
+                        <h3 className="font-semibold mb-2 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-indigo-600" />
+                          Rewards Summary
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Account Status:
+                            </span>
+                            <span className="text-green-600 font-medium flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" /> Active (30
+                              days)
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Loyalty Points:
+                            </span>
+                            <span className="text-yellow-600 font-medium">
+                              +
+                              {orderDetails.loyalty_points_earned?.toLocaleString() ||
+                                0}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">
+                              Draw Entries:
+                            </span>
+                            <span className="text-purple-600 font-medium">
+                              {orderDetails.draw_entries_awarded > 0
+                                ? `+${orderDetails.draw_entries_awarded?.toLocaleString()} entries`
+                                : "No active draw"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t border-indigo-500/30">
+                            <span className="text-muted-foreground">
+                              Order Total:
+                            </span>
+                            <span className="font-bold">
+                              {formatCurrency(
+                                orderDetails.total_amount,
+                                orderDetails.currency,
+                              )}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1700,17 +1897,17 @@ export default function SuccessPage({
                 <div>
                   <p className="text-sm font-medium mb-1">Order Questions</p>
                   <p className="text-sm text-muted-foreground">
-                    Email: info@blessedtwoelectricals.com
+                    Email: info@noreply.yunobase.com
                   </p>
                 </div>
                 <div>
                   <p className="text-sm font-medium mb-1">Payment Issues</p>
                   <p className="text-sm text-muted-foreground">
-                    Phone: +254 727 833 691
+                    Phone: +254 113 062 599
                   </p>
                 </div>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/contact">Contact Support</Link>
+                  <Link href="/about">About Us</Link>
                 </Button>
               </div>
             </CardContent>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,8 +21,9 @@ import {
 } from "../ui/select";
 import { format } from "date-fns";
 import { DateTimeInput } from "../ui/date-input";
+import { cn } from "@/lib/utils";
 
-export function DrawForm({ onSave, initialDraw, groups }: any) {
+export function DrawForm({ onSave, onCancel, initialDraw, groups }: any) {
   const { supabase } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
@@ -65,13 +66,13 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
       },
       max_entries_per_user: "",
       max_entries_total: "",
-      entry_starts_at: new Date().toISOString().slice(0, 16),
-      entry_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 16),
-      draw_time: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 3600000)
-        .toISOString()
-        .slice(0, 16),
+      entry_starts_at: new Date().toISOString(),
+      entry_ends_at: new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      draw_time: new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000 + 3600000,
+      ).toISOString(),
       status: "draft",
       theme_color: "#8B5CF6",
       show_entry_ticker: true,
@@ -83,30 +84,96 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
     };
   });
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    try {
-      const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      console.log(
-        "Start time:",
-        formData.entry_starts_at,
-        "End time:",
-        formData.entry_ends_at,
-        "Draw time:",
-        formData.draw_time,
-      );
-      // Validate required date fields
+  const tabs = [
+    { id: "basic", label: "Basic Info", icon: "📝" },
+    { id: "prize", label: "Prize", icon: "🎁" },
+    { id: "entries", label: "Entry Methods", icon: "🎟️" },
+    { id: "calculation", label: "Entry Rules", icon: "🧮" },
+    { id: "schedule", label: "Schedule", icon: "📅" },
+    { id: "advanced", label: "Advanced", icon: "⚙️" },
+  ];
+
+  const currentTabIndex = tabs.findIndex((t) => t.id === activeTab);
+  const nextTab = () => {
+    if (currentTabIndex < tabs.length - 1) {
+      setActiveTab(tabs[currentTabIndex + 1].id);
+    }
+  };
+  const prevTab = () => {
+    if (currentTabIndex > 0) {
+      setActiveTab(tabs[currentTabIndex - 1].id);
+    }
+  };
+
+  const validateCurrentTab = () => {
+    if (activeTab === "basic") {
+      if (!formData.name.trim()) {
+        toast.error("Draw name is required");
+        return false;
+      }
+    }
+    if (activeTab === "prize") {
+      if (!formData.prize_name.trim()) {
+        toast.error("Prize name is required");
+        return false;
+      }
+    }
+    if (activeTab === "schedule") {
       if (
         !formData.entry_starts_at ||
         !formData.entry_ends_at ||
         !formData.draw_time
       ) {
-        toast.error(
-          "Please fill in all date fields (Entries Open, Entries Close, and Draw Time)",
-        );
-        setLoading(false);
-        return;
+        toast.error("All date fields are required");
+        return false;
       }
+      const now = new Date();
+      const entryStarts = new Date(formData.entry_starts_at);
+      const entryEnds = new Date(formData.entry_ends_at);
+      const drawTime = new Date(formData.draw_time);
+
+      if (entryStarts < now) {
+        toast.error("Entry start date cannot be in the past");
+        return false;
+      }
+      if (entryEnds <= entryStarts) {
+        toast.error("Entry end date must be after start date");
+        return false;
+      }
+      if (drawTime <= entryEnds) {
+        toast.error("Draw time must be after entry end date");
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    // Validate all tabs before submit
+    if (!formData.name.trim()) {
+      toast.error("Draw name is required");
+      setActiveTab("basic");
+      return;
+    }
+    if (!formData.prize_name.trim()) {
+      toast.error("Prize name is required");
+      setActiveTab("prize");
+      return;
+    }
+    if (
+      !formData.entry_starts_at ||
+      !formData.entry_ends_at ||
+      !formData.draw_time
+    ) {
+      toast.error("All date fields are required");
+      setActiveTab("schedule");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
       const { error } = await supabase
         .from("draws")
         .upsert({
@@ -125,7 +192,9 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
         .select();
 
       if (error) throw error;
-      toast.success("Draw saved successfully");
+      toast.success(
+        `Draw ${initialDraw ? "updated" : "created"} successfully! 🎉`,
+      );
       onSave();
     } catch (error: any) {
       toast.error(error.message);
@@ -136,320 +205,327 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
   };
 
   return (
-    <div className="space-y-6 py-4">
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="basic">Basic</TabsTrigger>
-          <TabsTrigger value="prize">Prize</TabsTrigger>
-          <TabsTrigger value="entries">Entries</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="schedule">Schedule</TabsTrigger>
-          <TabsTrigger value="advanced">Advanced</TabsTrigger>
-        </TabsList>
+    <div className="space-y-6">
+      {/* Progress Indicator */}
+      <div className="flex items-center justify-between gap-1">
+        {tabs.map((tab, idx) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              "flex-1 text-center py-2 px-1 rounded-lg transition-all text-xs font-medium",
+              activeTab === tab.id
+                ? "bg-primary text-primary-foreground shadow-md"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            <span className="hidden sm:inline">{tab.icon} </span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsContent value="basic" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <Label>Draw Name *</Label>
               <Input
+                placeholder="e.g., Christmas Mega Giveaway"
                 value={formData.name}
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
+                className="mt-1"
               />
             </div>
-            <div>
-              <Label>Draw Group</Label>
-              <Select
-                value={formData.draw_group_id}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, draw_group_id: value })
-                }
-              >
-                <SelectTrigger className="w-full max-w-48">
-                  <SelectValue placeholder="Select draw group" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Draw Group</SelectLabel>
-                    {groups?.map((group: any) => (
-                      <SelectItem key={group.id} value={group.id}>
-                        {group.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              rows={3}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(e) => setFormData({ ...formData, status: e })}
-              >
-                <SelectTrigger className="w-full max-w-48">
-                  <SelectValue placeholder="Select draw status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Status</SelectLabel>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="open">Open</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Draw Group</Label>
+                <Select
+                  value={formData.draw_group_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, draw_group_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Available Groups</SelectLabel>{" "}
+                      {groups?.map((group: any) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(e) => setFormData({ ...formData, status: e })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">📝 Draft</SelectItem>
+                    <SelectItem value="open">🎯 Open</SelectItem>
+                    <SelectItem value="closed">🔒 Closed</SelectItem>
+                    <SelectItem value="completed">✅ Completed</SelectItem>
+                    <SelectItem value="cancelled">❌ Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div>
-              <Label>Theme Color</Label>
-              <Input
-                type="color"
-                value={formData.theme_color}
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Describe your draw..."
+                value={formData.description}
                 onChange={(e) =>
-                  setFormData({ ...formData, theme_color: e.target.value })
+                  setFormData({ ...formData, description: e.target.value })
                 }
-                className="w-20 h-10"
+                rows={3}
               />
             </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.show_entry_ticker}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, show_entry_ticker: checked })
-                }
-              />
-              <Label>Show Entry Ticker</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Theme Color</Label>
+                <Input
+                  type="color"
+                  value={formData.theme_color}
+                  onChange={(e) =>
+                    setFormData({ ...formData, theme_color: e.target.value })
+                  }
+                  className="w-full h-10"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.show_leaderboard}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, show_leaderboard: checked })
-                }
-              />
-              <Label>Show Leaderboard</Label>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={formData.show_entry_ticker}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, show_entry_ticker: checked })
+                  }
+                />
+                <Label>Show Entry Ticker</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={formData.show_leaderboard}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, show_leaderboard: checked })
+                  }
+                />
+                <Label>Show Leaderboard</Label>
+              </div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="prize" className="space-y-4 mt-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
               <Label>Prize Name *</Label>
               <Input
+                placeholder="e.g., iPhone 15 Pro Max"
                 value={formData.prize_name}
                 onChange={(e) =>
                   setFormData({ ...formData, prize_name: e.target.value })
                 }
               />
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Prize Value (KES)</Label>
+                <Input
+                  type="number"
+                  placeholder="150000"
+                  value={formData.prize_value}
+                  onChange={(e) =>
+                    setFormData({ ...formData, prize_value: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Prize Image URL</Label>
+                <Input
+                  placeholder="https://..."
+                  value={formData.prize_image_url}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      prize_image_url: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
             <div>
-              <Label>Prize Value (KES)</Label>
-              <Input
-                type="number"
-                value={formData.prize_value}
+              <Label>Prize Description</Label>
+              <Textarea
+                placeholder="Describe the prize..."
+                value={formData.prize_description}
                 onChange={(e) =>
-                  setFormData({ ...formData, prize_value: e.target.value })
+                  setFormData({
+                    ...formData,
+                    prize_description: e.target.value,
+                  })
                 }
+                rows={2}
               />
             </div>
-          </div>
-          <div>
-            <Label>Prize Description</Label>
-            <Input
-              value={formData.prize_description}
-              onChange={(e) =>
-                setFormData({ ...formData, prize_description: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <Label>Prize Image URL</Label>
-            <Input
-              value={formData.prize_image_url}
-              onChange={(e) =>
-                setFormData({ ...formData, prize_image_url: e.target.value })
-              }
-              placeholder="https://..."
-            />
           </div>
         </TabsContent>
 
         <TabsContent value="entries" className="space-y-4 mt-4">
           <div className="space-y-4">
             <h3 className="font-semibold">Entry Methods</h3>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!formData.entry_config.purchase}
-                onCheckedChange={(checked) => {
-                  const newConfig = { ...formData.entry_config };
-                  if (checked)
-                    newConfig.purchase = {
-                      min_amount: 1000,
-                      entries_per_ksh: 1,
-                    };
-                  else delete newConfig.purchase;
-                  setFormData({ ...formData, entry_config: newConfig });
-                }}
-              />
-              <Label>Purchase-based entries</Label>
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                {
+                  key: "purchase",
+                  label: "Purchase-based entries",
+                  desc: "Earn entries when customers buy products",
+                },
+                {
+                  key: "referral",
+                  label: "Referral-based entries",
+                  desc: "Earn entries when referrals sign up",
+                },
+                {
+                  key: "social_share",
+                  label: "Social share entries",
+                  desc: "Earn entries for sharing on social media",
+                },
+                {
+                  key: "live_stream",
+                  label: "Live stream entries",
+                  desc: "Earn entries from live stream engagement",
+                },
+                {
+                  key: "loyalty_tier",
+                  label: "Loyalty tier bonus",
+                  desc: "Bonus entries based on loyalty tier",
+                },
+              ].map((method) => (
+                <div
+                  key={method.key}
+                  className="flex items-center justify-between p-3 rounded-lg border"
+                >
+                  <div>
+                    <Label className="font-medium">{method.label}</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {method.desc}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!!formData.entry_config[method.key]}
+                    onCheckedChange={(checked) => {
+                      const newConfig = { ...formData.entry_config };
+                      if (checked) {
+                        const defaults: any = {
+                          purchase: { min_amount: 1000, entries_per_ksh: 1 },
+                          referral: {
+                            entries_per_referral: 5,
+                            bonus_for_first_referral: 5,
+                          },
+                          social_share: {
+                            entries_per_share: 2,
+                            max_entries_per_day: 10,
+                          },
+                          live_stream: { entries_per_email: 1 },
+                          loyalty_tier: {
+                            bronze: 1,
+                            silver: 2,
+                            gold: 5,
+                            platinum: 10,
+                          },
+                        };
+                        newConfig[method.key] = defaults[method.key];
+                      } else {
+                        delete newConfig[method.key];
+                      }
+                      setFormData({ ...formData, entry_config: newConfig });
+                    }}
+                  />
+                </div>
+              ))}
             </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!formData.entry_config.referral}
-                onCheckedChange={(checked) => {
-                  const newConfig = { ...formData.entry_config };
-                  if (checked)
-                    newConfig.referral = {
-                      entries_per_referral: 5,
-                      bonus_for_first_referral: 5,
-                    };
-                  else delete newConfig.referral;
-                  setFormData({ ...formData, entry_config: newConfig });
-                }}
-              />
-              <Label>Referral-based entries</Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!formData.entry_config.social_share}
-                onCheckedChange={(checked) => {
-                  const newConfig = { ...formData.entry_config };
-                  if (checked)
-                    newConfig.social_share = {
-                      entries_per_share: 2,
-                      max_entries_per_day: 10,
-                    };
-                  else delete newConfig.social_share;
-                  setFormData({ ...formData, entry_config: newConfig });
-                }}
-              />
-              <Label>Social share entries</Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!formData.entry_config.live_stream}
-                onCheckedChange={(checked) => {
-                  const newConfig = { ...formData.entry_config };
-                  if (checked) newConfig.live_stream = { entries_per_email: 1 };
-                  else delete newConfig.live_stream;
-                  setFormData({ ...formData, entry_config: newConfig });
-                }}
-              />
-              <Label>Live stream entries</Label>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!formData.entry_config.loyalty_tier}
-                onCheckedChange={(checked) => {
-                  const newConfig = { ...formData.entry_config };
-                  if (checked)
-                    newConfig.loyalty_tier = {
-                      bronze: 1,
-                      silver: 2,
-                      gold: 5,
-                      platinum: 10,
-                    };
-                  else delete newConfig.loyalty_tier;
-                  setFormData({ ...formData, entry_config: newConfig });
-                }}
-              />
-              <Label>Loyalty tier bonus entries</Label>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-            <div>
-              <Label>Max Entries Per User</Label>
-              <Input
-                type="number"
-                value={formData.max_entries_per_user}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_entries_per_user: e.target.value,
-                  })
-                }
-                placeholder="Unlimited"
-              />
-            </div>
-            <div>
-              <Label>Max Total Entries</Label>
-              <Input
-                type="number"
-                value={formData.max_entries_total}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_entries_total: e.target.value,
-                  })
-                }
-                placeholder="Unlimited"
-              />
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <div>
+                <Label>Max Entries Per User</Label>
+                <Input
+                  type="number"
+                  value={formData.max_entries_per_user}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      max_entries_per_user: e.target.value,
+                    })
+                  }
+                  placeholder="Unlimited"
+                />
+              </div>
+              <div>
+                <Label>Max Total Entries</Label>
+                <Input
+                  type="number"
+                  value={formData.max_entries_total}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      max_entries_total: e.target.value,
+                    })
+                  }
+                  placeholder="Unlimited"
+                />
+              </div>
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-4 mt-4">
-          {/* Entry Calculation Settings */}
+        <TabsContent value="calculation" className="space-y-4 mt-4">
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold border-b pb-2">
-              Entry Calculation Rules
-            </h3>
-
-            {/* Purchase Entries */}
-            <div className="space-y-3 p-4 border rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-semibold">
-                    Purchase-based Entries
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Award entries when customers make purchases
-                  </p>
-                </div>
+            {/* Purchase Calculation */}
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="font-semibold">Purchase Entry Rules</Label>
                 <Switch
                   checked={
                     formData.entry_calculation?.purchase?.enabled ?? true
                   }
                   onCheckedChange={(checked) => {
-                    setFormData({
-                      ...formData,
+                    setFormData((prev: any) => ({
+                      ...prev,
                       entry_calculation: {
-                        ...formData.entry_calculation,
+                        ...prev.entry_calculation,
                         purchase: {
-                          ...formData.entry_calculation?.purchase,
+                          ...prev.entry_calculation?.purchase,
                           enabled: checked,
+                          entries_per_ksh:
+                            prev.entry_calculation?.purchase?.entries_per_ksh ??
+                            0.05,
+                          min_purchase:
+                            prev.entry_calculation?.purchase?.min_purchase ??
+                            1000,
+                          max_entries_per_order:
+                            prev.entry_calculation?.purchase
+                              ?.max_entries_per_order ?? 5000,
                         },
                       },
-                    });
+                    }));
                   }}
                 />
               </div>
-
               {formData.entry_calculation?.purchase?.enabled && (
-                <div className="grid grid-cols-3 gap-4 ml-6">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label>Entries per KSH</Label>
                     <Input
@@ -459,20 +535,21 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
                         formData.entry_calculation?.purchase?.entries_per_ksh ??
                         0.05
                       }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
                           entry_calculation: {
-                            ...formData.entry_calculation,
+                            ...prev.entry_calculation,
                             purchase: {
-                              ...formData.entry_calculation?.purchase,
-                              entries_per_ksh: parseFloat(e.target.value),
+                              ...prev.entry_calculation?.purchase,
+                              entries_per_ksh: isNaN(value) ? 0 : value,
                             },
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground mt-1">
                       e.g., 0.05 = 50 entries per KSH 1000
                     </p>
                   </div>
@@ -484,144 +561,213 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
                         formData.entry_calculation?.purchase?.min_purchase ??
                         1000
                       }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
                           entry_calculation: {
-                            ...formData.entry_calculation,
+                            ...prev.entry_calculation,
                             purchase: {
-                              ...formData.entry_calculation?.purchase,
-                              min_purchase: parseFloat(e.target.value),
+                              ...prev.entry_calculation?.purchase,
+                              min_purchase: isNaN(value) ? 0 : value,
                             },
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
                   </div>
                   <div>
-                    <Label>Max Entries per Order</Label>
+                    <Label>Max per Order</Label>
                     <Input
                       type="number"
                       value={
                         formData.entry_calculation?.purchase
                           ?.max_entries_per_order ?? 5000
                       }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
                           entry_calculation: {
-                            ...formData.entry_calculation,
+                            ...prev.entry_calculation,
                             purchase: {
-                              ...formData.entry_calculation?.purchase,
-                              max_entries_per_order: parseInt(e.target.value),
+                              ...prev.entry_calculation?.purchase,
+                              max_entries_per_order: isNaN(value) ? 0 : value,
                             },
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Referral Entries */}
-            <div className="space-y-3 p-4 border rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="font-semibold">
-                    Referral-based Entries
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Award entries when referrals convert
-                  </p>
-                </div>
+            {/* Referral Calculation */}
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="font-semibold">Referral Entry Rules</Label>
                 <Switch
                   checked={
                     formData.entry_calculation?.referral?.enabled ?? true
                   }
                   onCheckedChange={(checked) => {
-                    setFormData({
-                      ...formData,
+                    setFormData((prev: any) => ({
+                      ...prev,
                       entry_calculation: {
-                        ...formData.entry_calculation,
+                        ...prev.entry_calculation,
                         referral: {
-                          ...formData.entry_calculation?.referral,
+                          ...prev.entry_calculation?.referral,
                           enabled: checked,
+                          entries_per_referral:
+                            prev.entry_calculation?.referral
+                              ?.entries_per_referral ?? 100,
+                          bonus_for_first_referral:
+                            prev.entry_calculation?.referral
+                              ?.bonus_for_first_referral ?? 50,
+                          entries_per_purchase:
+                            prev.entry_calculation?.referral
+                              ?.entries_per_purchase ?? 200,
                         },
                       },
-                    });
+                    }));
                   }}
                 />
               </div>
-
               {formData.entry_calculation?.referral?.enabled && (
-                <div className="grid grid-cols-2 gap-4 ml-6">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Entries per Referral (Signup)</Label>
+                    <Label>Entries per Signup</Label>
                     <Input
                       type="number"
                       value={
                         formData.entry_calculation?.referral
                           ?.entries_per_referral ?? 100
                       }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
                           entry_calculation: {
-                            ...formData.entry_calculation,
+                            ...prev.entry_calculation,
                             referral: {
-                              ...formData.entry_calculation?.referral,
-                              entries_per_referral: parseInt(e.target.value),
+                              ...prev.entry_calculation?.referral,
+                              entries_per_referral: isNaN(value) ? 0 : value,
                             },
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Points awarded when a referred user signs up
+                    </p>
                   </div>
                   <div>
-                    <Label>Bonus for First Referral</Label>
+                    <Label>First Referral Bonus</Label>
                     <Input
                       type="number"
                       value={
                         formData.entry_calculation?.referral
                           ?.bonus_for_first_referral ?? 50
                       }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
                           entry_calculation: {
-                            ...formData.entry_calculation,
+                            ...prev.entry_calculation,
                             referral: {
-                              ...formData.entry_calculation?.referral,
-                              bonus_for_first_referral: parseInt(
-                                e.target.value,
-                              ),
+                              ...prev.entry_calculation?.referral,
+                              bonus_for_first_referral: isNaN(value)
+                                ? 0
+                                : value,
                             },
                           },
-                        })
-                      }
+                        }));
+                      }}
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Extra points for the first successful referral
+                    </p>
                   </div>
                   <div>
-                    <Label>Entries per Referral (Purchase)</Label>
+                    <Label>Entries per Purchase</Label>
                     <Input
                       type="number"
                       value={
                         formData.entry_calculation?.referral
                           ?.entries_per_purchase ?? 200
                       }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
                           entry_calculation: {
-                            ...formData.entry_calculation,
+                            ...prev.entry_calculation,
                             referral: {
-                              ...formData.entry_calculation?.referral,
-                              entries_per_purchase: parseInt(e.target.value),
+                              ...prev.entry_calculation?.referral,
+                              entries_per_purchase: isNaN(value) ? 0 : value,
                             },
                           },
-                        })
+                        }));
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Points when a referred user makes a purchase
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Social Share Calculation (add if needed) */}
+            <div className="p-4 border rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <Label className="font-semibold">Social Share Rules</Label>
+                <Switch
+                  checked={
+                    formData.entry_calculation?.social_share?.enabled ?? true
+                  }
+                  onCheckedChange={(checked) => {
+                    setFormData((prev: any) => ({
+                      ...prev,
+                      entry_calculation: {
+                        ...prev.entry_calculation,
+                        social_share: {
+                          ...prev.entry_calculation?.social_share,
+                          enabled: checked,
+                          entries_per_share:
+                            prev.entry_calculation?.social_share
+                              ?.entries_per_share ?? 10,
+                        },
+                      },
+                    }));
+                  }}
+                />
+              </div>
+              {formData.entry_calculation?.social_share?.enabled && (
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <Label>Entries per Share</Label>
+                    <Input
+                      type="number"
+                      value={
+                        formData.entry_calculation?.social_share
+                          ?.entries_per_share ?? 10
                       }
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value);
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          entry_calculation: {
+                            ...prev.entry_calculation,
+                            social_share: {
+                              ...prev.entry_calculation?.social_share,
+                              entries_per_share: isNaN(value) ? 0 : value,
+                            },
+                          },
+                        }));
+                      }}
                     />
                   </div>
                 </div>
@@ -631,134 +777,115 @@ export function DrawForm({ onSave, initialDraw, groups }: any) {
         </TabsContent>
 
         <TabsContent value="schedule" className="space-y-4 mt-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label>Entries Open</Label>
-              <input
-                type="datetime-local"
-                value={
-                  formData.entry_starts_at
-                    ? format(
-                        new Date(formData.entry_starts_at),
-                        "yyyy-MM-dd'T'HH:mm",
-                      )
-                    : ""
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value) {
-                    // Convert to ISO string with timezone
-                    const date = new Date(value);
-                    setFormData({
-                      ...formData,
-                      entry_starts_at: date.toISOString(),
-                    });
-                  }
-                }}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <Label>Entries Close</Label>
-              <input
-                type="datetime-local"
-                value={
-                  formData.entry_ends_at
-                    ? format(
-                        new Date(formData.entry_ends_at),
-                        "yyyy-MM-dd'T'HH:mm",
-                      )
-                    : ""
-                }
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value) {
-                    const date = new Date(value);
-                    setFormData({
-                      ...formData,
-                      entry_ends_at: date.toISOString(),
-                    });
-                  } else {
-                    setFormData({
-                      ...formData,
-                      entry_ends_at: "",
-                    });
-                  }
-                }}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-pointer disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <Label>Draw Time</Label>
-              <DateTimeInput
-                value={formData.draw_time}
-                onChange={(value) =>
-                  setFormData({ ...formData, draw_time: value })
-                }
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-4">
+            <DateTimeInput
+              label="Entries Open Date"
+              value={formData.entry_starts_at}
+              onChange={(value) =>
+                setFormData({ ...formData, entry_starts_at: value })
+              }
+            />
+            <DateTimeInput
+              label="Entries Close Date"
+              value={formData.entry_ends_at}
+              onChange={(value) =>
+                setFormData({ ...formData, entry_ends_at: value })
+              }
+            />
+            <DateTimeInput
+              label="Draw Date & Time"
+              value={formData.draw_time}
+              onChange={(value) =>
+                setFormData({ ...formData, draw_time: value })
+              }
+            />
           </div>
         </TabsContent>
 
         <TabsContent value="advanced" className="space-y-4 mt-4">
-          <div>
-            <Label>Consolation Points</Label>
-            <Input
-              type="number"
-              value={formData.consolation_points_amount}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  consolation_points_amount: parseInt(e.target.value),
-                })
-              }
-            />
-            <p className="text-xs text-muted-foreground">
-              Points awarded to all non-winners
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <div>
-              <Label>Auto Redraw Days</Label>
+              <Label>Consolation Points</Label>
               <Input
                 type="number"
-                value={formData.auto_redraw_days}
+                value={formData.consolation_points_amount}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    auto_redraw_days: parseInt(e.target.value),
+                    consolation_points_amount: parseInt(e.target.value),
                   })
                 }
               />
               <p className="text-xs text-muted-foreground">
-                Days after which unclaimed prizes are redrawn
+                Points awarded to all non-winners
               </p>
             </div>
-            <div>
-              <Label>Max Redraws</Label>
-              <Input
-                type="number"
-                value={formData.max_redraws}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_redraws: parseInt(e.target.value),
-                  })
-                }
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Auto Redraw Days</Label>
+                <Input
+                  type="number"
+                  value={formData.auto_redraw_days}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      auto_redraw_days: parseInt(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <Label>Max Redraws</Label>
+                <Input
+                  type="number"
+                  value={formData.max_redraws}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      max_redraws: parseInt(e.target.value),
+                    })
+                  }
+                />
+              </div>
             </div>
           </div>
         </TabsContent>
       </Tabs>
 
-      <div className="flex justify-end gap-2 pt-4 border-t">
-        <Button variant="outline" onClick={() => onSave()}>
-          Cancel
-        </Button>
-        <Button onClick={handleSubmit} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-          {initialDraw ? "Update" : "Create"} Draw
-        </Button>
+      {/* Navigation Buttons */}
+      <div className="flex justify-between gap-2 pt-4 border-t">
+        <div>
+          {currentTabIndex > 0 && (
+            <Button variant="outline" onClick={prevTab} type="button">
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onCancel} type="button">
+            <X className="h-4 w-4 mr-1" />
+            Cancel
+          </Button>
+          {currentTabIndex < tabs.length - 1 ? (
+            <Button
+              onClick={() => validateCurrentTab() && nextTab()}
+              type="button"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} disabled={loading}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {initialDraw ? "Update" : "Create"} Draw
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

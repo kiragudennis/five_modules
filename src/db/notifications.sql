@@ -53,6 +53,8 @@ ALTER TABLE notifications ADD CONSTRAINT valid_notification_type CHECK (type IN 
     'draw_entry_confirmed',  -- Entry confirmation
     'draw_consolation',      -- Consolation points awarded
     'draw_redraw'           -- Draw was redrawn due to unclaimed prize
+     -- New challenge type
+    'challenge_joined'      -- User joined a challenge
 ));
 
 -- Update the create_notification function to include new types
@@ -89,7 +91,8 @@ BEGIN
         'draw_reminder',
         'draw_entry_confirmed',
         'draw_consolation',
-        'draw_redraw'
+        'draw_redraw',
+        'challenge_joined'
     ) THEN
         RAISE EXCEPTION 'Invalid notification type: %', p_type;
     END IF;

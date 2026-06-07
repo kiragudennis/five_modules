@@ -294,7 +294,7 @@ export default function DrawDetailPage() {
     }
     setEntering(true);
     try {
-      router.push(`/shop?draw=${drawId}&entry=purchase`);
+      router.push(`/?draw=${drawId}&entry=purchase`);
     } catch (error: any) {
       toast.error(error.message);
     } finally {

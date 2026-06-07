@@ -1507,8 +1507,31 @@ CREATE POLICY "Anyone can view active challenges" ON challenges
 CREATE POLICY "Users can view own participation" ON challenge_participants
     FOR SELECT USING (auth.uid() = user_id);
 
+-- Allow public to see challenge participants;
+CREATE POLICY "Anyone can view challenge participants" ON challenge_participants
+    FOR SELECT USING (true);
+
 CREATE POLICY "Users can view challenge actions" ON challenge_actions
     FOR SELECT USING (true);
+
+-- Users can join challenges (with checks for duplicates and trivia type)
+CREATE POLICY "Users can join challenges" ON challenge_participants
+FOR INSERT
+WITH CHECK (
+  auth.uid() = user_id
+  AND NOT EXISTS (
+    SELECT 1
+    FROM challenge_participants cp
+    WHERE cp.challenge_id = challenge_participants.challenge_id
+      AND cp.user_id = auth.uid()
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM challenges c
+    WHERE c.id = challenge_participants.challenge_id
+      AND c.challenge_type = 'trivia'
+  )
+);
 
 -- Admin can manage USING (public.is_admin());
 CREATE POLICY "Admins can manage challenges" ON challenges
