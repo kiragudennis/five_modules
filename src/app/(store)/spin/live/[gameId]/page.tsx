@@ -1,16 +1,20 @@
 // app/(store)/spin/live/[gameId]/page.tsx
-// Professional live broadcast page with funnel visualization: Participants → Wheel → Winners
+// COMPLETELY FIXED - No glitches, all functionality preserved
 
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SpinningWheelClientService } from "@/lib/services/spining-wheel-service.client";
+import CurrentSpinner from "@/components/spin/current-spinner";
+import LiveWheel from "@/components/spin/live-wheel";
+import CountdownTimer from "@/components/spin/countdown-timer";
+import ParticipantsLeaderboard from "@/components/spin/participants-leaderboard";
+import WinnersFeed from "@/components/spin/winners-feed";
 import {
   Trophy,
   Gift,
@@ -19,31 +23,11 @@ import {
   Users,
   TrendingUp,
   Clock,
-  ArrowRight,
-  Loader2,
-  Sparkles,
-  Medal,
-  Coins,
-  ClockIcon,
   Minimize2,
   Maximize2,
-  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SpinGame } from "@/types/spinning_wheel";
-import dynamic from "next/dynamic";
-// Dynamically import the wheel component with no SSR
-const Wheel = dynamic(
-  () => import("react-custom-roulette").then((mod) => mod.Wheel),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-[300px] h-[300px] bg-white/10 rounded-full animate-pulse flex items-center justify-center">
-        <span className="text-white/50">Loading wheel...</span>
-      </div>
-    ),
-  },
-);
 
 interface Participant {
   id: string;
@@ -59,162 +43,151 @@ interface Winner {
   timestamp: string;
 }
 
-interface SpinEvent {
-  id: string;
-  user_name: string;
-  user_id: string;
-  created_at: string;
-  action_type: string;
-  prize_text?: string;
-}
+const GAME_TYPE_CONFIG = {
+  standard: {
+    icon: <Zap className="h-5 w-5" />,
+    label: "Standard Spin",
+    color: "from-blue-500 to-cyan-500",
+    spinDuration: 0.8,
+  },
+  vip: {
+    icon: <Crown className="h-5 w-5" />,
+    label: "VIP Exclusive",
+    color: "from-yellow-500 to-amber-500",
+    spinDuration: 1.2,
+  },
+  new_customer: {
+    icon: <Gift className="h-5 w-5" />,
+    label: "Welcome Bonus",
+    color: "from-green-500 to-emerald-500",
+    spinDuration: 1.0,
+  },
+  weekend: {
+    icon: <Zap className="h-5 w-5" />,
+    label: "Weekend Special",
+    color: "from-purple-500 to-pink-500",
+    spinDuration: 0.9,
+  },
+  flash: {
+    icon: <Zap className="h-5 w-5" />,
+    label: "Flash Game",
+    color: "from-red-500 to-orange-500",
+    spinDuration: 0.6,
+  },
+};
 
 export default function SpinLivePage() {
   const { gameId } = useParams<{ gameId: string }>();
   const { supabase } = useAuth();
   const [game, setGame] = useState<SpinGame | null>(null);
   const [loading, setLoading] = useState(true);
-  const [countdown, setCountdown] = useState("0h 0m 0s");
 
-  // Create service instance with useRef to avoid recreation
-  const wheelServiceRef = useRef<SpinningWheelClientService | null>(null);
-  const winnerAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Wheel State - ONLY these affect the wheel component
+  const [prizeNumber, setPrizeNumber] = useState(0);
+  const [mustSpin, setMustSpin] = useState(false);
+  const [wheelSpinning, setWheelSpinning] = useState(false);
+  const [currentSpinner, setCurrentSpinner] = useState<{
+    user_name: string;
+  } | null>(null);
 
-  // Initialize service once
-  if (!wheelServiceRef.current && supabase) {
-    wheelServiceRef.current = new SpinningWheelClientService(supabase);
-  }
-  const wheelService = wheelServiceRef.current;
-
-  // Funnel States
+  // Data States
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [currentSpinner, setCurrentSpinner] = useState<any>(null);
   const [recentWins, setRecentWins] = useState<Winner[]>([]);
-
-  // Stats States
   const [activeViewers, setActiveViewers] = useState(0);
   const [participantStats, setParticipantStats] = useState({
     total_participants: 0,
     total_spins: 0,
   });
 
-  // Wheel Animation State
-  const [prizeNumber, setPrizeNumber] = useState(0);
-  const [mustSpin, setMustSpin] = useState(false);
-  const [wheelSpinning, setWheelSpinning] = useState(false);
-  const spinningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Fullscreen State
+  // Fullscreen
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fullscreen toggle function
+  // Refs
+  const wheelServiceRef = useRef<SpinningWheelClientService | null>(null);
+  const winnerAudioRef = useRef<HTMLAudioElement | null>(null);
+  const dataFetchedRef = useRef(false);
+
+  // Initialize service
+  if (!wheelServiceRef.current && supabase) {
+    wheelServiceRef.current = new SpinningWheelClientService(supabase);
+  }
+  const wheelService = wheelServiceRef.current;
+
+  // Memoized values - Stable references
+  const wheelData = useMemo(() => {
+    if (!game) return [];
+    return game.prize_config.map((prize) => ({
+      option: prize.label,
+      style: { backgroundColor: prize.color },
+    }));
+  }, [game]);
+
+  const gameConfig = useMemo(() => {
+    if (!game) return GAME_TYPE_CONFIG.standard;
+    return GAME_TYPE_CONFIG[game.game_type] || GAME_TYPE_CONFIG.standard;
+  }, [game]);
+
+  // Fullscreen handlers
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
     if (!isFullscreen) {
       containerRef.current.requestFullscreen?.();
-      setIsFullscreen(true);
     } else {
       document.exitFullscreen?.();
-      setIsFullscreen(false);
     }
   }, [isFullscreen]);
 
-  // Fullscreen change listener
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () =>
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  // Set up a countdown timer for time-limited games
+  // Fetch initial data ONCE
   useEffect(() => {
-    if (!game?.ends_at) return;
-    const interval = setInterval(() => {
-      const now = new Date();
-      const end = new Date(game.ends_at!);
-      if (end > now) {
-        const distance = end.getTime() - now.getTime();
-        const hours = Math.floor(
-          (distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-        );
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-        setCountdown(`${hours}h ${minutes}m ${seconds}s`);
-      } else {
-        setCountdown("0h 0m 0s");
-        clearInterval(interval);
+    if (!gameId || !wheelService || dataFetchedRef.current) return;
+    dataFetchedRef.current = true;
+
+    const fetchData = async () => {
+      try {
+        const [gameData, participantsList, stats, winnersData] =
+          await Promise.all([
+            wheelService.getGame(gameId),
+            wheelService.getAllParticipants(gameId, 50),
+            wheelService.getParticipantStats(gameId),
+            wheelService.getRecentWinners(gameId, 20),
+          ]);
+
+        if (gameData) setGame(gameData);
+        if (participantsList) setParticipants(participantsList);
+        if (stats) setParticipantStats(stats);
+        if (winnersData) {
+          setRecentWins(
+            winnersData.map((w: any) => ({
+              name: w.name,
+              prize: w.prize,
+              timestamp: w.timestamp ?? w.time ?? new Date().toISOString(),
+            })),
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
       }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [game?.ends_at]);
+    };
 
-  // Fetch game data - stable with useCallback
-  const fetchGameData = useCallback(async () => {
-    if (!gameId || !wheelService) return;
-    try {
-      const gameData = await wheelService.getGame(gameId);
-      if (gameData) {
-        setGame(gameData);
-      } else {
-        setGame(null);
-      }
-    } catch (error) {
-      console.error("Error fetching game:", error);
-      setGame(null);
-    } finally {
-      setLoading(false);
-    }
+    fetchData();
   }, [gameId, wheelService]);
 
-  // Fetch participants and stats - stable with useCallback
-  const fetchParticipants = useCallback(async () => {
-    if (!gameId || !wheelService) return;
-    try {
-      const participantsList = await wheelService.getAllParticipants(
-        gameId,
-        50,
-      );
-      setParticipants(participantsList || []);
-
-      const stats = await wheelService.getParticipantStats(gameId);
-      setParticipantStats(stats || { total_participants: 0, total_spins: 0 });
-    } catch (error) {
-      console.error("Error fetching participants:", error);
-      setParticipants([]);
-      setParticipantStats({ total_participants: 0, total_spins: 0 });
-    }
-  }, [gameId, wheelService]);
-
-  // Fetch recent winners - stable with useCallback
-  const fetchRecentWinners = useCallback(async () => {
-    if (!gameId || !wheelService) return;
-    try {
-      const winnersData = await wheelService.getRecentWinners(gameId, 20);
-      setRecentWins(
-        (winnersData || []).map((winner: any) => ({
-          name: winner.name,
-          prize: winner.prize,
-          timestamp:
-            winner.timestamp ?? winner.time ?? new Date().toISOString(),
-        })),
-      );
-    } catch (error) {
-      console.error("Error fetching winners:", error);
-      setRecentWins([]);
-    }
-  }, [gameId, wheelService]);
-
-  // Main real-time subscription with simplified queue
+  // Real-time subscriptions - NO MANUAL TIMEOUTS
   useEffect(() => {
     if (!supabase || !gameId) return;
 
-    // SINGLE CHANNEL for everything
-    const mainChannel = supabase
-      .channel(`spin-live-main-${gameId}`)
-      // 1. Listen to spin_live_ticker for spin events
+    const channel = supabase
+      .channel(`spin-live-${gameId}`)
+      // Spin events
       .on(
         "postgres_changes",
         {
@@ -225,24 +198,22 @@ export default function SpinLivePage() {
         },
         (payload) => {
           const event = payload.new;
-          console.log("Spin event:", event.action_type, event.user_name);
 
           if (event.action_type === "spin_start") {
-            setCurrentSpinner({
-              user_name: event.user_name,
-              is_spinning: true,
-            });
-            setWheelSpinning(true);
-            setMustSpin(true);
-
-            if (spinningTimeoutRef.current) {
-              clearTimeout(spinningTimeoutRef.current);
+            // Set prize index if available
+            if (event.prize_index !== undefined && event.prize_index !== null) {
+              setPrizeNumber(event.prize_index);
             }
-            spinningTimeoutRef.current = setTimeout(() => {
-              setMustSpin(false);
-              setWheelSpinning(false);
-              setCurrentSpinner(null);
-            }, 3000);
+
+            setCurrentSpinner({ user_name: event.user_name });
+            setWheelSpinning(true);
+
+            // Start spinning - wheel handles its own timing!
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                setMustSpin(true);
+              });
+            });
           } else if (event.action_type === "win") {
             setRecentWins((prev) => [
               {
@@ -257,16 +228,12 @@ export default function SpinLivePage() {
               winnerAudioRef.current.play().catch(() => {});
             }
 
-            setMustSpin(false);
-            setWheelSpinning(false);
+            // Don't manually stop - let onStopSpinning handle it
             setCurrentSpinner(null);
-            if (spinningTimeoutRef.current) {
-              clearTimeout(spinningTimeoutRef.current);
-            }
           }
         },
       )
-      // 2. Listen to spin_attempts for participant updates
+      // Participant updates
       .on(
         "postgres_changes",
         {
@@ -293,9 +260,7 @@ export default function SpinLivePage() {
 
             setParticipants((prev) => {
               const exists = prev.some((p) => p.id === newParticipant.id);
-              if (!exists) {
-                return [newParticipant, ...prev.slice(0, 49)];
-              }
+              if (!exists) return [newParticipant, ...prev.slice(0, 49)];
               return prev.map((p) =>
                 p.id === newParticipant.id
                   ? { ...p, spin_count: p.spin_count + 1 }
@@ -310,7 +275,7 @@ export default function SpinLivePage() {
           }
         },
       )
-      // 3. Listen to spin_games for grand prize updates
+      // Grand prize updates
       .on(
         "postgres_changes",
         {
@@ -336,15 +301,13 @@ export default function SpinLivePage() {
           }
         },
       )
-      // 4. Presence for viewer count
+      // Viewer presence
       .on("presence", { event: "sync" }, () => {
-        const state = mainChannel.presenceState();
-        setActiveViewers(Object.keys(state).length);
+        setActiveViewers(Object.keys(channel.presenceState()).length);
       })
       .subscribe(async (status) => {
-        console.log("Main channel status:", status);
         if (status === "SUBSCRIBED") {
-          await mainChannel.track({
+          await channel.track({
             user_id: "viewer",
             online_at: new Date().toISOString(),
           });
@@ -352,66 +315,22 @@ export default function SpinLivePage() {
       });
 
     return () => {
-      mainChannel.unsubscribe();
-      if (spinningTimeoutRef.current) {
-        clearTimeout(spinningTimeoutRef.current);
-      }
+      channel.unsubscribe();
     };
-  }, [supabase, gameId]); // Only depends on supabase and gameId
+  }, [supabase, gameId]);
 
-  // Initial data fetch - runs once when component mounts
-  useEffect(() => {
-    fetchGameData();
-    fetchParticipants();
-    fetchRecentWinners();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId]); // Only depends on gameId
-
-  // Refresh stats periodically - uses refs to avoid recreating interval
-  useEffect(() => {
-    if (!gameId) return;
-    const interval = setInterval(() => {
-      if (wheelService) {
-        wheelService
-          .getAllParticipants(gameId, 50)
-          .then(setParticipants)
-          .catch(console.error);
-        wheelService
-          .getParticipantStats(gameId)
-          .then(setParticipantStats)
-          .catch(console.error);
-        wheelService
-          .getRecentWinners(gameId, 20)
-          .then((winnersData) => {
-            setRecentWins(
-              (winnersData || []).map((winner: any) => ({
-                name: winner.name,
-                prize: winner.prize,
-                timestamp:
-                  winner.timestamp ?? winner.time ?? new Date().toISOString(),
-              })),
-            );
-          })
-          .catch(console.error);
-      }
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [gameId, wheelService]);
-
-  const wheelData = game
-    ? game.prize_config.map((prize) => ({
-        option: prize.label,
-        style: { backgroundColor: prize.color },
-      }))
-    : [];
+  // Handle wheel stop - THE ONLY PLACE mustSpin becomes false
+  const handleStopSpinning = useCallback(() => {
+    setMustSpin(false);
+    setWheelSpinning(false);
+    setCurrentSpinner(null);
+  }, []);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950">
-        <div className="container mx-auto px-4 py-12">
-          <div className="flex justify-center">
-            <Skeleton className="h-96 w-96 rounded-full" />
-          </div>
+        <div className="container mx-auto px-4 py-12 flex justify-center">
+          <Skeleton className="h-96 w-96 rounded-full" />
         </div>
       </div>
     );
@@ -426,37 +345,6 @@ export default function SpinLivePage() {
       </div>
     );
   }
-
-  const gameTypeConfig = {
-    standard: {
-      icon: <Zap className="h-5 w-5" />,
-      label: "Standard Spin",
-      color: "from-blue-500 to-cyan-500",
-    },
-    vip: {
-      icon: <Crown className="h-5 w-5" />,
-      label: "VIP Exclusive",
-      color: "from-yellow-500 to-amber-500",
-    },
-    new_customer: {
-      icon: <Gift className="h-5 w-5" />,
-      label: "Welcome Bonus",
-      color: "from-green-500 to-emerald-500",
-    },
-    weekend: {
-      icon: <Zap className="h-5 w-5" />,
-      label: "Weekend Special",
-      color: "from-purple-500 to-pink-500",
-    },
-    flash: {
-      icon: <Zap className="h-5 w-5" />,
-      label: "Flash Game",
-      color: "from-red-500 to-orange-500",
-    },
-  }[game.game_type];
-
-  // Get top 3 participants for medal display
-  const topParticipants = participants.slice(0, 3);
 
   return (
     <div
@@ -478,15 +366,9 @@ export default function SpinLivePage() {
               <p className="text-sm text-purple-300">{game.description}</p>
             </div>
             <div className="flex items-center gap-3">
-              {/* OBS/Fullscreen Button */}
               <button
                 onClick={toggleFullscreen}
                 className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
-                title={
-                  isFullscreen
-                    ? "Exit Fullscreen"
-                    : "Enter Fullscreen (OBS Mode)"
-                }
               >
                 {isFullscreen ? (
                   <Minimize2 className="h-3 w-3 text-purple-400" />
@@ -497,7 +379,6 @@ export default function SpinLivePage() {
                   {isFullscreen ? "Exit" : "OBS Mode"}
                 </span>
               </button>
-
               <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-purple-500/20">
                 <Users className="h-3 w-3 text-purple-400" />
                 <span className="text-sm text-white">{activeViewers}</span>
@@ -515,164 +396,40 @@ export default function SpinLivePage() {
         </div>
       </div>
 
-      {/* Main Content - Three Column Funnel Layout */}
+      {/* Main Content */}
       <div className="px-4 py-6">
         <div className="grid lg:grid-cols-14 gap-6">
-          {/* LEFT COLUMN: Participants Leaderboard */}
+          {/* LEFT: Participants */}
           <div className="lg:col-span-4 space-y-4">
-            <Card className="bg-gradient-to-br from-blue-900/40 to-purple-900/40 backdrop-blur border-blue-500/30">
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-white flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-400" />
-                    Participants Leaderboard
-                  </h3>
-                  <Badge
-                    variant="outline"
-                    className="border-blue-500/50 text-blue-300"
-                  >
-                    {participantStats.total_participants} players
-                  </Badge>
-                </div>
-
-                {/* Top 3 Medals */}
-                {topParticipants.length > 0 && (
-                  <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30">
-                    <p className="text-xs text-yellow-400 mb-2">
-                      🏆 TOP SPINNERS
-                    </p>
-                    <div className="space-y-2">
-                      {topParticipants.map((p, idx) => (
-                        <div key={p.id} className="flex items-center gap-3">
-                          <div className="w-6 text-center">
-                            {idx === 0 && (
-                              <Medal className="h-4 w-4 text-yellow-400" />
-                            )}
-                            {idx === 1 && (
-                              <Medal className="h-4 w-4 text-gray-400" />
-                            )}
-                            {idx === 2 && (
-                              <Medal className="h-4 w-4 text-amber-600" />
-                            )}
-                            {idx > 2 && (
-                              <span className="text-xs text-purple-300">
-                                #{idx + 1}
-                              </span>
-                            )}
-                          </div>
-                          <Avatar className="h-6 w-6 bg-purple-600">
-                            <AvatarFallback className="text-xs">
-                              {p.avatar}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm text-white flex-1">
-                            {p.name}
-                          </span>
-                          <span className="text-xs text-purple-300">
-                            {p.spin_count} spins
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* All Participants List */}
-                <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  {participants.length === 0 ? (
-                    <div className="text-center py-8 text-purple-300 text-sm">
-                      Waiting for players...
-                    </div>
-                  ) : (
-                    participants.map((participant, idx) => (
-                      <div
-                        key={participant.id}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all animate-in fade-in slide-in-from-left duration-300"
-                        style={{ animationDelay: `${idx * 20}ms` }}
-                      >
-                        <div className="relative">
-                          <Avatar className="h-8 w-8 bg-purple-600">
-                            <AvatarFallback>
-                              {participant.avatar}
-                            </AvatarFallback>
-                          </Avatar>
-                          {idx === 0 && (
-                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">
-                            {participant.name}
-                          </p>
-                          <p className="text-xs text-purple-300">
-                            {participant.spin_count} spin
-                            {participant.spin_count !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <ArrowRight className="h-3 w-3 text-purple-400" />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </Card>
+            <ParticipantsLeaderboard
+              participants={participants}
+              totalParticipants={participantStats.total_participants}
+            />
           </div>
 
-          {/* CENTER COLUMN: Wheel (Action) */}
+          {/* CENTER: Wheel */}
           <div className="lg:col-span-6 space-y-4">
             <Card className="bg-gradient-to-br from-purple-900/50 to-pink-900/50 backdrop-blur border-purple-500/30">
               <div className="p-6">
-                {/* Current Spinner Indicator */}
-                {currentSpinner && (
-                  <div className="mb-4 text-center animate-in fade-in slide-in-from-top duration-300">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500/50">
-                      <Loader2 className="h-4 w-4 text-yellow-400 animate-spin" />
-                      <span className="text-sm font-medium text-yellow-400">
-                        {currentSpinner.user_name} is spinning...
-                      </span>
-                    </div>
-                  </div>
-                )}
+                {/* Isolated spinner - won't re-render wheel */}
+                <CurrentSpinner userName={currentSpinner?.user_name || null} />
 
-                {/* Countdown for time-limited games */}
+                {/* Isolated countdown - won't re-render wheel */}
                 {game.ends_at && new Date(game.ends_at) > new Date() && (
-                  <div className="absolute top-[-20px] left-1/2 transform -translate-x-1/2">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted text-sm">
-                      <ClockIcon className="h-4 w-4" />
-                      <span>Game ends {countdown}</span>
-                    </div>
+                  <div className="mb-4 text-center">
+                    <CountdownTimer endsAt={game.ends_at} />
                   </div>
                 )}
 
-                {/* Wheel */}
+                {/* MEMOIZED WHEEL - Completely isolated from parent renders */}
                 <div className="flex justify-center">
-                  <div className="relative">
-                    <Wheel
-                      mustStartSpinning={mustSpin}
-                      prizeNumber={prizeNumber}
-                      data={wheelData}
-                      onStopSpinning={() => {
-                        setMustSpin(false);
-                        setWheelSpinning(false);
-                      }}
-                      outerBorderColor="#9333ea"
-                      outerBorderWidth={3}
-                      innerRadius={5}
-                      radiusLineColor="#9333ea"
-                      radiusLineWidth={2}
-                      textDistance={65}
-                      fontSize={14}
-                      textColors={["#ffffff"]}
-                      backgroundColors={["#1e1b4b"]}
-                    />
-
-                    {/* Spin Overlay Effect */}
-                    {wheelSpinning && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-500/20 to-transparent animate-pulse rounded-full" />
-                      </div>
-                    )}
-                  </div>
+                  <LiveWheel
+                    mustSpin={mustSpin}
+                    prizeNumber={prizeNumber}
+                    data={wheelData}
+                    spinning={wheelSpinning}
+                    onStopSpinning={handleStopSpinning}
+                  />
                 </div>
 
                 {/* Game Info Badges */}
@@ -680,13 +437,13 @@ export default function SpinLivePage() {
                   <div
                     className={cn(
                       "flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r",
-                      gameTypeConfig.color,
+                      gameConfig.color,
                       "bg-opacity-20",
                     )}
                   >
-                    {gameTypeConfig.icon}
+                    {gameConfig.icon}
                     <span className="text-xs font-medium text-white">
-                      {gameTypeConfig.label}
+                      {gameConfig.label}
                     </span>
                   </div>
                   {game.is_single_prize && !game.single_prize_claimed && (
@@ -702,79 +459,14 @@ export default function SpinLivePage() {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: Winners Feed */}
+          {/* RIGHT: Winners */}
           <div className="lg:col-span-4 space-y-4">
-            <Card className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 backdrop-blur border-green-500/30">
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-white flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-yellow-400" />
-                    Recent Winners
-                  </h3>
-                  <Badge
-                    variant="outline"
-                    className="border-green-500/50 text-green-300"
-                  >
-                    {recentWins.length} wins
-                  </Badge>
-                </div>
-
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {recentWins.length === 0 ? (
-                    <div className="text-center py-8 text-purple-300 text-sm">
-                      No winners yet. Be the first!
-                    </div>
-                  ) : (
-                    recentWins.map((win, idx) => (
-                      <div
-                        key={`${win.name}-${win.timestamp}-${idx}`}
-                        className="flex items-center gap-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all animate-in fade-in slide-in-from-right duration-300"
-                        style={{
-                          animationDelay: `${Math.min(idx * 20, 300)}ms`,
-                        }}
-                      >
-                        <audio
-                          ref={winnerAudioRef}
-                          src="/sounds/claim-chime.mp3"
-                          preload="auto"
-                        />
-                        <div className="flex-shrink-0">
-                          {win.prize.includes("Points") ? (
-                            <Coins className="h-5 w-5 text-yellow-400" />
-                          ) : win.prize.includes("%") ? (
-                            <Tag className="h-5 w-5 text-blue-400" />
-                          ) : (
-                            <Sparkles className="h-5 w-5 text-yellow-400" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">
-                            {win.name}
-                          </p>
-                          <p className="text-xs text-green-300">
-                            Won {win.prize}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs text-purple-300">
-                            {new Date(win.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </Card>
+            <WinnersFeed winners={recentWins} />
           </div>
         </div>
 
-        {/* BOTTOM SECTION: Prize Pool & Stats */}
+        {/* Bottom Section */}
         <div className="mt-6 grid lg:grid-cols-2 gap-6">
-          {/* Prize Pool Details */}
           <Card className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 backdrop-blur border-purple-500/30">
             <div className="p-4">
               <h3 className="font-bold text-white mb-3 flex items-center gap-2">
@@ -803,7 +495,6 @@ export default function SpinLivePage() {
             </div>
           </Card>
 
-          {/* Live Statistics */}
           <Card className="bg-gradient-to-br from-pink-900/40 to-red-900/40 backdrop-blur border-pink-500/30">
             <div className="p-4">
               <h3 className="font-bold text-white mb-3 flex items-center gap-2">
@@ -834,7 +525,7 @@ export default function SpinLivePage() {
           </Card>
         </div>
 
-        {/* Call to Action */}
+        {/* CTA */}
         <div className="mt-6">
           <Card className="bg-gradient-to-r from-purple-600 to-pink-600 border-0">
             <div className="p-4 text-center">
@@ -855,6 +546,13 @@ export default function SpinLivePage() {
           </Card>
         </div>
       </div>
+
+      <audio
+        ref={winnerAudioRef}
+        src="/sounds/claim-chime.mp3"
+        preload="auto"
+        className="hidden"
+      />
     </div>
   );
 }

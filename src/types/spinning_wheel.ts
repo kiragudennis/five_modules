@@ -48,27 +48,6 @@ export interface PrizeSegment {
   icon?: string;
 }
 
-export interface SpinGame {
-  id: string;
-  name: string;
-  description: string | null;
-  game_type: "standard" | "vip" | "new_customer" | "weekend" | "flash";
-  is_active: boolean;
-  starts_at: string | null;
-  ends_at: string | null;
-  free_spins_per_day: number;
-  free_spins_per_week: number;
-  free_spins_total: number;
-  points_per_paid_spin: number;
-  eligible_tiers: string[];
-  is_single_prize: boolean;
-  single_prize_claimed: boolean;
-  single_prize_winner_id: string | null;
-  prize_config: PrizeSegment[];
-  show_confetti: boolean;
-  play_sounds: boolean;
-  live_theme: string;
-}
 export interface UserSpinState {
   spins_used_today: number;
   spins_used_week: number;

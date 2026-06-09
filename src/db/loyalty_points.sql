@@ -850,9 +850,7 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
--- Function to award loyalty points after order completion
--- Drop and recreate the function to handle both points and draw entries
--- Drop and recreate the function to handle points, draw entries, AND account activation
+-- Drop and recreate with detailed logging + referral processing
 DROP FUNCTION IF EXISTS award_loyalty_points() CASCADE;
 
 CREATE OR REPLACE FUNCTION award_loyalty_points()
@@ -865,38 +863,49 @@ DECLARE
     points_to_award integer;
     current_points integer;
     new_tier text;
-    -- Draw entry variables
     v_draw RECORD;
     v_entry_count INTEGER := 0;
     v_entries_awarded INTEGER := 0;
     v_entry_id UUID;
-    -- Activation variables
     v_current_status TEXT;
 BEGIN
+    -- ============================================
+    -- LOGGING: Always log that trigger fired
+    -- ============================================
+    RAISE WARNING '[TRIGGER FIRED] depth=%, op=%, order_id=%, old_status=%, old_payment=%, new_status=%, new_payment=%',
+        pg_trigger_depth(), TG_OP, NEW.id, OLD.status, OLD.payment_status, NEW.status, NEW.payment_status;
 
-    -- GUARD: Prevent infinite loop from our own UPDATE statements
+    -- GUARD: Prevent infinite loop
     IF pg_trigger_depth() > 1 THEN
+        RAISE WARNING '[GUARD] Skipping - depth > 1 (depth=%)', pg_trigger_depth();
         RETURN NEW;
     END IF;
 
-    -- Only process when order is marked as completed and paid/completed
+    -- ============================================
+    -- CONDITION CHECK
+    -- ============================================
+    RAISE WARNING '[CONDITION CHECK] Checking if should process: status=% → %, payment=% → %',
+        OLD.status, NEW.status, OLD.payment_status, NEW.payment_status;
+    
     IF NEW.status = 'processing' AND NEW.payment_status = 'completed' 
-       AND (OLD.status != 'completed' OR OLD.payment_status != 'refunded') THEN
-
-    -- IF NEW.status = 'completed' AND NEW.payment_status = 'paid' 
-    --    AND (OLD.status != 'completed' OR OLD.payment_status != 'completed') THEN
-
-        -- ============================================
-        -- PART 1: ACTIVATE USER ACCOUNT (30 days)
-        -- ============================================
-        -- Any successful paid order activates the account for 30 days
-        -- This is critical for streak challenges, team eligibility, and referral completion
+       AND (OLD.status != 'processing' OR OLD.payment_status != 'completed') THEN
         
-        SELECT status INTO v_current_status
-        FROM users
-        WHERE id = NEW.user_id;
+        RAISE WARNING '[CONDITION PASSED] Processing rewards for order %', NEW.id;
+        RAISE WARNING '[ORDER DETAILS] user_id=%, amount=%, order_number=%, referred_by=%',
+            NEW.user_id, NEW.total_amount, NEW.order_number, NEW.referred_by;
+    ELSE
+        RAISE WARNING '[CONDITION FAILED] Not processing. Required: status=processing, payment=completed. Got: status=%, payment=%',
+            NEW.status, NEW.payment_status;
+        RETURN NEW;
+    END IF;
+
+    -- ============================================
+    -- PART 1: ACTIVATE USER ACCOUNT (30 days)
+    -- ============================================
+    BEGIN
+        SELECT status INTO v_current_status FROM users WHERE id = NEW.user_id;
+        RAISE WARNING '[ACTIVATION] Current user status: %', v_current_status;
         
-        -- Set status to 'active' and record the activation expiry
         UPDATE users
         SET 
             status = 'active',
@@ -909,383 +918,395 @@ BEGIN
             updated_at = NOW()
         WHERE id = NEW.user_id;
         
-        -- Log the activation event
+        RAISE WARNING '[ACTIVATION] User % updated to active', NEW.user_id;
+        
         INSERT INTO loyalty_transactions (
-            user_id, 
-            order_id, 
-            points_change, 
-            current_points,
-            transaction_type, 
-            description
+            user_id, order_id, points_change, current_points,
+            transaction_type, description
         ) VALUES (
-            NEW.user_id,
-            NEW.id,
-            0,
+            NEW.user_id, NEW.id, 0,
             COALESCE((SELECT points FROM loyalty_points WHERE user_id = NEW.user_id), 0),
             'account_activation',
             'Account activated for 30 days via order #' || NEW.order_number
         );
         
-        RAISE NOTICE 'User % account activated for 30 days (was: %)', NEW.user_id, v_current_status;
-        
-        -- ============================================
--- PART 2: PROCESS SIGNUP REFERRALS (on first purchase)
--- ============================================
--- Complete pending signup referrals and award referrer
-IF EXISTS (
-    SELECT 1 FROM referrals
-    WHERE referred_user_id = NEW.user_id
-    AND status = 'joined'
-    AND conversion_type = 'signup'
-) THEN
-    -- Update pending signup referrals to completed
-    UPDATE referrals
-    SET 
-        status = 'completed',
-        completed_at = NOW(),
-        updated_at = NOW(),
-        reward_points = COALESCE(reward_points, 100)
-    WHERE referred_user_id = NEW.user_id
-    AND status = 'joined'
-    AND conversion_type = 'signup';
+        RAISE WARNING '[ACTIVATION] Activation transaction recorded';
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[ACTIVATION ERROR] %', SQLERRM;
+    END;
     
-    -- ✅ Award loyalty points to the referrer (always, regardless of challenges)
-    INSERT INTO loyalty_transactions (
-        user_id,
-        points_change,
-        current_points,
-        transaction_type,
-        description,
-        metadata
-    )
-    SELECT
-        r.referrer_id,
-        r.reward_points,
-        COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
-        'referral_bonus',
-        'Referral bonus: ' || COALESCE(
-            (SELECT full_name FROM users WHERE id = NEW.user_id), 
-            NEW.user_id::TEXT
-        ) || ' completed their first purchase',
-        jsonb_build_object(
-            'referral_id', r.id,
-            'referred_user_id', NEW.user_id,
-            'referred_email', r.referred_email,
-            'order_id', NEW.id,
-            'order_number', NEW.order_number,
-            'conversion_type', 'signup'
-        )
-    FROM referrals r
-    WHERE r.referred_user_id = NEW.user_id
-    AND r.status = 'completed'
-    AND r.conversion_type = 'signup'
-    AND r.completed_at >= NOW() - INTERVAL '1 minute';
-    
-    -- ✅ Update referrer's loyalty points balance
-    INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
-    SELECT
-        r.referrer_id,
-        r.reward_points,
-        r.reward_points,
-        NOW()
-    FROM referrals r
-    WHERE r.referred_user_id = NEW.user_id
-    AND r.status = 'completed'
-    ON CONFLICT (user_id) DO UPDATE
-    SET 
-        points = loyalty_points.points + EXCLUDED.points,
-        points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
-        last_updated = EXCLUDED.last_updated;
-    
-    -- ✅ Process referral challenges (if any exist)
-    -- This is separate - challenges are bonus on top of the base referral reward
-    PERFORM process_referral_challenge_completion(r.id)
-    FROM referrals r
-    WHERE r.referred_user_id = NEW.user_id
-    AND r.status = 'completed'
-    AND r.conversion_type = 'signup'
-    AND r.completed_at >= NOW() - INTERVAL '1 minute';
-    
-    RAISE NOTICE 'Signup referral completed: referrer awarded points + challenges processed for user %', NEW.user_id;
-END IF;
-
--- ============================================
--- PART 2b: PROCESS FIRST_PURCHASE REFERRALS
--- ============================================
-IF EXISTS (
-    SELECT 1 FROM referrals
-    WHERE referred_user_id = NEW.user_id
-    AND status = 'joined'
-    AND conversion_type = 'first_purchase'
-) THEN
-    -- Check if this is actually their first purchase
-    IF NOT EXISTS (
-        SELECT 1 FROM orders
-        WHERE user_id = NEW.user_id
-        AND status = 'completed'
-        AND payment_status = 'paid'
-        AND id != NEW.id
-    ) THEN
-        -- Complete the purchase referral
-        UPDATE referrals
-        SET 
-            status = 'completed',
-            completed_at = NOW(),
-            updated_at = NOW(),
-            reward_points = COALESCE(reward_points, 200),
-            conversion_value = NEW.total_amount
-        WHERE referred_user_id = NEW.user_id
-        AND status = 'joined'
-        AND conversion_type = 'first_purchase';
-        
-        -- ✅ Award loyalty points to the referrer
-        INSERT INTO loyalty_transactions (
-            user_id,
-            points_change,
-            current_points,
-            transaction_type,
-            description,
-            metadata
-        )
-        SELECT
-            r.referrer_id,
-            r.reward_points,
-            COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
-            'referral_bonus',
-            'Referral bonus: referred user made first purchase of KSH ' || NEW.total_amount::TEXT,
-            jsonb_build_object(
-                'referral_id', r.id,
-                'referred_user_id', NEW.user_id,
-                'referred_email', r.referred_email,
-                'order_id', NEW.id,
-                'order_number', NEW.order_number,
-                'purchase_amount', NEW.total_amount,
-                'conversion_type', 'first_purchase'
+    -- ============================================
+    -- PART 2: PROCESS SIGNUP REFERRALS
+    -- ============================================
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM referrals
+            WHERE referred_user_id = NEW.user_id
+            AND status = 'joined'
+            AND conversion_type = 'signup'
+        ) THEN
+            RAISE WARNING '[REFERRALS] Found pending signup referrals';
+            
+            -- Update pending signup referrals to completed
+            UPDATE referrals
+            SET 
+                status = 'completed',
+                completed_at = NOW(),
+                updated_at = NOW(),
+                reward_points = COALESCE(reward_points, 100)
+            WHERE referred_user_id = NEW.user_id
+            AND status = 'joined'
+            AND conversion_type = 'signup';
+            
+            -- Award loyalty points to the referrer (always, regardless of challenges)
+            INSERT INTO loyalty_transactions (
+                user_id, points_change, current_points,
+                transaction_type, description, metadata
             )
-        FROM referrals r
-        WHERE r.referred_user_id = NEW.user_id
-        AND r.status = 'completed'
-        AND r.conversion_type = 'first_purchase'
-        AND r.completed_at >= NOW() - INTERVAL '1 minute';
-        
-        -- ✅ Update referrer's loyalty points balance
-        INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
-        SELECT
-            r.referrer_id,
-            r.reward_points,
-            r.reward_points,
-            NOW()
-        FROM referrals r
-        WHERE r.referred_user_id = NEW.user_id
-        AND r.status = 'completed'
-        ON CONFLICT (user_id) DO UPDATE
-        SET 
-            points = loyalty_points.points + EXCLUDED.points,
-            points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
-            last_updated = EXCLUDED.last_updated;
-        
-        -- ✅ Process referral challenges
-        PERFORM process_referral_challenge_completion(r.id)
-        FROM referrals r
-        WHERE r.referred_user_id = NEW.user_id
-        AND r.status = 'completed'
-        AND r.conversion_type = 'first_purchase'
-        AND r.completed_at >= NOW() - INTERVAL '1 minute';
-        
-        RAISE NOTICE 'Purchase referral completed for user %', NEW.user_id;
-    END IF;
-END IF;
-        
-        -- ============================================
-        -- PART 3: AWARD LOYALTY POINTS
-        -- ============================================
-        
-        -- Award referral points if this is a referral order
-        -- This is same as sign up referral
+            SELECT
+                r.referrer_id,
+                r.reward_points,
+                COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
+                'referral_bonus',
+                'Referral bonus: ' || COALESCE(
+                    (SELECT full_name FROM users WHERE id = NEW.user_id), 
+                    NEW.user_id::TEXT
+                ) || ' completed their first purchase',
+                jsonb_build_object(
+                    'referral_id', r.id,
+                    'referred_user_id', NEW.user_id,
+                    'referred_email', r.referred_email,
+                    'order_id', NEW.id,
+                    'order_number', NEW.order_number,
+                    'conversion_type', 'signup'
+                )
+            FROM referrals r
+            WHERE r.referred_user_id = NEW.user_id
+            AND r.status = 'completed'
+            AND r.conversion_type = 'signup'
+            AND r.completed_at >= NOW() - INTERVAL '1 minute';
+            
+            RAISE WARNING '[REFERRALS] Referrer loyalty points awarded';
+            
+            -- Update referrer's loyalty points balance
+            INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
+            SELECT
+                r.referrer_id,
+                r.reward_points,
+                r.reward_points,
+                NOW()
+            FROM referrals r
+            WHERE r.referred_user_id = NEW.user_id
+            AND r.status = 'completed'
+            ON CONFLICT (user_id) DO UPDATE
+            SET 
+                points = loyalty_points.points + EXCLUDED.points,
+                points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
+                last_updated = EXCLUDED.last_updated;
+            
+            RAISE WARNING '[REFERRALS] Referrer points balance updated';
+            
+            -- Process referral challenges (bonus on top)
+            PERFORM process_referral_challenge_completion(r.id)
+            FROM referrals r
+            WHERE r.referred_user_id = NEW.user_id
+            AND r.status = 'completed'
+            AND r.conversion_type = 'signup'
+            AND r.completed_at >= NOW() - INTERVAL '1 minute';
+            
+            RAISE WARNING '[REFERRALS] Referral challenges processed';
+        ELSE
+            RAISE WARNING '[REFERRALS] No pending signup referrals';
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[REFERRALS ERROR] %', SQLERRM;
+    END;
+
+    -- ============================================
+    -- PART 2b: PROCESS FIRST_PURCHASE REFERRALS
+    -- ============================================
+    BEGIN
+        IF EXISTS (
+            SELECT 1 FROM referrals
+            WHERE referred_user_id = NEW.user_id
+            AND status = 'joined'
+            AND conversion_type = 'first_purchase'
+        ) THEN
+            -- Check if this is actually their first purchase
+            IF NOT EXISTS (
+                SELECT 1 FROM orders
+                WHERE user_id = NEW.user_id
+                AND status = 'completed'
+                AND payment_status = 'paid'
+                AND id != NEW.id
+            ) THEN
+                RAISE WARNING '[REFERRALS] Found pending first_purchase referral';
+                
+                UPDATE referrals
+                SET 
+                    status = 'completed',
+                    completed_at = NOW(),
+                    updated_at = NOW(),
+                    reward_points = COALESCE(reward_points, 200),
+                    conversion_value = NEW.total_amount
+                WHERE referred_user_id = NEW.user_id
+                AND status = 'joined'
+                AND conversion_type = 'first_purchase';
+                
+                -- Award loyalty points to referrer
+                INSERT INTO loyalty_transactions (
+                    user_id, points_change, current_points,
+                    transaction_type, description, metadata
+                )
+                SELECT
+                    r.referrer_id,
+                    r.reward_points,
+                    COALESCE((SELECT points FROM loyalty_points WHERE user_id = r.referrer_id), 0) + r.reward_points,
+                    'referral_bonus',
+                    'Referral bonus: referred user made first purchase of KSH ' || NEW.total_amount::TEXT,
+                    jsonb_build_object(
+                        'referral_id', r.id,
+                        'referred_user_id', NEW.user_id,
+                        'referred_email', r.referred_email,
+                        'order_id', NEW.id,
+                        'order_number', NEW.order_number,
+                        'purchase_amount', NEW.total_amount,
+                        'conversion_type', 'first_purchase'
+                    )
+                FROM referrals r
+                WHERE r.referred_user_id = NEW.user_id
+                AND r.status = 'completed'
+                AND r.conversion_type = 'first_purchase'
+                AND r.completed_at >= NOW() - INTERVAL '1 minute';
+                
+                -- Update referrer's loyalty points balance
+                INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
+                SELECT r.referrer_id, r.reward_points, r.reward_points, NOW()
+                FROM referrals r
+                WHERE r.referred_user_id = NEW.user_id
+                AND r.status = 'completed'
+                ON CONFLICT (user_id) DO UPDATE
+                SET 
+                    points = loyalty_points.points + EXCLUDED.points,
+                    points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
+                    last_updated = EXCLUDED.last_updated;
+                
+                -- Process referral challenges
+                PERFORM process_referral_challenge_completion(r.id)
+                FROM referrals r
+                WHERE r.referred_user_id = NEW.user_id
+                AND r.status = 'completed'
+                AND r.conversion_type = 'first_purchase'
+                AND r.completed_at >= NOW() - INTERVAL '1 minute';
+                
+                RAISE WARNING '[REFERRALS] Purchase referral completed';
+            ELSE
+                RAISE WARNING '[REFERRALS] Not first purchase, skipping purchase referral';
+            END IF;
+        ELSE
+            RAISE WARNING '[REFERRALS] No pending first_purchase referrals';
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[REFERRALS ERROR] %', SQLERRM;
+    END;
+    
+    -- ============================================
+    -- PART 3: AWARD LOYALTY POINTS
+    -- ============================================
+    BEGIN
         IF NEW.referred_by IS NOT NULL THEN
+            RAISE WARNING '[POINTS] Processing referral points for referrer %', NEW.referred_by;
             PERFORM award_referral_points_on_order_complete(NEW.id);
         END IF;
         
-        -- Get user's current tier
         SELECT lt.* INTO user_tier
         FROM loyalty_points lp
         JOIN loyalty_tiers lt ON lp.tier = lt.tier
         WHERE lp.user_id = NEW.user_id;
         
-        -- If user has no loyalty record, create one
         IF NOT FOUND THEN
-            INSERT INTO loyalty_points (user_id, tier)
-            VALUES (NEW.user_id, 'bronze')
+            RAISE WARNING '[POINTS] No loyalty record found, creating bronze tier';
+            INSERT INTO loyalty_points (user_id, tier) VALUES (NEW.user_id, 'bronze')
             ON CONFLICT (user_id) DO NOTHING;
-            
             SELECT * INTO user_tier FROM loyalty_tiers WHERE tier = 'bronze';
+        ELSE
+            RAISE WARNING '[POINTS] User tier: %, points_per_shilling: %', user_tier.tier, user_tier.points_per_shilling;
         END IF;
         
-        -- Calculate points (points per KES spent)
         points_to_award := FLOOR(NEW.total_amount * user_tier.points_per_shilling);
+        RAISE WARNING '[POINTS] Calculated points: % (amount=% * rate=%)', points_to_award, NEW.total_amount, user_tier.points_per_shilling;
         
-        -- Update loyalty points
         INSERT INTO loyalty_points (user_id, points, points_earned, last_updated)
         VALUES (NEW.user_id, points_to_award, points_to_award, NOW())
         ON CONFLICT (user_id) DO UPDATE
-        SET 
-            points = loyalty_points.points + EXCLUDED.points,
+        SET points = loyalty_points.points + EXCLUDED.points,
             points_earned = loyalty_points.points_earned + EXCLUDED.points_earned,
             last_updated = EXCLUDED.last_updated,
             updated_at = NOW()
         RETURNING points INTO current_points;
         
-        -- Record transaction
+        RAISE WARNING '[POINTS] Loyalty points updated. New balance: %', current_points;
+        
         INSERT INTO loyalty_transactions (
-            user_id, 
-            order_id, 
-            points_change, 
-            current_points,
-            transaction_type, 
-            description,
-            expires_at
+            user_id, order_id, points_change, current_points,
+            transaction_type, description, expires_at
         ) VALUES (
-            NEW.user_id,
-            NEW.id,
-            points_to_award,
-            current_points,
-            'earned',
-            'Points earned for order #' || NEW.order_number,
+            NEW.user_id, NEW.id, points_to_award, current_points,
+            'earned', 'Points earned for order #' || NEW.order_number,
             NOW() + INTERVAL '365 days'
         );
         
-        -- Update order with points earned
-        -- Done at the bottom of the draw entry section after awarding entries
+        RAISE WARNING '[POINTS] Transaction recorded: +% points', points_to_award;
         
-        -- Check and update tier
         SELECT tier INTO new_tier
-        FROM loyalty_tiers
-        WHERE min_points <= current_points
-        ORDER BY min_points DESC
-        LIMIT 1;
+        FROM loyalty_tiers WHERE min_points <= current_points
+        ORDER BY min_points DESC LIMIT 1;
         
-        UPDATE loyalty_points
-        SET tier = new_tier, updated_at = NOW()
+        UPDATE loyalty_points SET tier = new_tier, updated_at = NOW()
         WHERE user_id = NEW.user_id AND tier != new_tier;
         
-        -- ============================================
--- PART 4: AWARD DRAW ENTRIES
--- ============================================
-
--- Skip if draw entries already awarded
-IF NEW.draw_entries_awarded > 0 THEN
-    RAISE NOTICE 'Draw entries already awarded for order %', NEW.id;
-ELSE
-    -- Find the best draw for this user
-    SELECT d.* INTO v_draw
-    FROM draws d
-    WHERE d.status = 'open'
-      AND d.entry_starts_at <= NOW()
-      AND d.entry_ends_at >= NOW()
-      AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
-    ORDER BY 
-        CASE WHEN EXISTS (
-            SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = NEW.user_id
-        ) THEN 1 ELSE 2 END,
-        d.entry_ends_at ASC
-    LIMIT 1;
+        RAISE WARNING '[POINTS] Tier check: current=%, new=%', current_points, new_tier;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[POINTS ERROR] %', SQLERRM;
+        points_to_award := 0;
+    END;
     
-    IF FOUND THEN
-        -- Calculate entries based on order amount
-        v_entry_count := FLOOR(
-            NEW.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric
-        );
-        
-        -- Apply minimum purchase requirement
-        IF NEW.total_amount >= (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
-            -- Apply max entries per order
-            v_entry_count := LEAST(
-                v_entry_count,
-                (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
-            );
+    -- ============================================
+    -- PART 4: AWARD DRAW ENTRIES
+    -- ============================================
+    BEGIN
+        IF NEW.draw_entries_awarded IS NOT NULL AND NEW.draw_entries_awarded > 0 THEN
+            RAISE WARNING '[DRAW] Entries already awarded: %', NEW.draw_entries_awarded;
+        ELSE
+            RAISE WARNING '[DRAW] Looking for active draws...';
             
-            IF v_entry_count > 0 THEN
-                -- Add entries to draw
-                INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
-                VALUES (v_draw.id, NEW.user_id, v_entry_count, 'purchase', NEW.id::text, jsonb_build_object(
-                    'order_id', NEW.id,
-                    'order_amount', NEW.total_amount,
-                    'order_number', NEW.order_number,
-                    'awarded_at', NOW()
-                ))
-                RETURNING id INTO v_entry_id;
+            SELECT d.* INTO v_draw
+            FROM draws d
+            WHERE d.status = 'open'
+              AND d.entry_starts_at <= NOW()
+              AND d.entry_ends_at >= NOW()
+              AND (d.entry_calculation->'purchase'->>'enabled')::boolean = true
+            ORDER BY 
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM draw_entries de WHERE de.draw_id = d.id AND de.user_id = NEW.user_id
+                ) THEN 1 ELSE 2 END,
+                d.entry_ends_at ASC
+            LIMIT 1;
+            
+            IF FOUND THEN
+                RAISE WARNING '[DRAW] Found draw: % (id=%)', v_draw.name, v_draw.id;
                 
-                -- Create individual tickets
-                FOR i IN 1..v_entry_count LOOP
-                    INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
-                    VALUES (v_draw.id, NEW.user_id, v_entry_id, i);
-                END LOOP;
+                v_entry_count := FLOOR(NEW.total_amount * (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric);
+                RAISE WARNING '[DRAW] Raw entry count: % (amount=% * rate=%)', 
+                    v_entry_count, NEW.total_amount, (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric;
                 
-                -- Add to live ticker
-                INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
-                SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
-                FROM users u WHERE u.id = NEW.user_id;
-                
-                v_entries_awarded := v_entry_count;
-                
-                -- ============================================
--- SINGLE ORDER UPDATE AT THE END
--- ============================================
-UPDATE orders
-SET 
-    loyalty_points_earned = points_to_award,
-    draw_entries_awarded = CASE WHEN v_entries_awarded > 0 THEN v_entries_awarded ELSE 0 END,
-    draw_id = CASE WHEN v_entries_awarded > 0 THEN v_draw.id ELSE NULL END,
-    draw_entry_details = CASE WHEN v_entries_awarded > 0 THEN 
-        jsonb_build_object(
-            'draw_name', v_draw.name,
-            'draw_id', v_draw.id,
-            'draw_time', v_draw.draw_time,
-            'entries_awarded', v_entries_awarded,
-            'calculation', jsonb_build_object(
-                'order_amount', NEW.total_amount,
-                'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
-                'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
-                'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
-            ),
-            'awarded_at', NOW()
-        )
-    ELSE NULL
-    END,
-    updated_at = NOW()
-WHERE id = NEW.id;
-
-RAISE NOTICE 'Order % fully processed: % points, % draw entries', NEW.id, points_to_award, v_entries_awarded;
+                IF NEW.total_amount >= (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric THEN
+                    v_entry_count := LEAST(v_entry_count, (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer);
+                    RAISE WARNING '[DRAW] After max cap: % entries', v_entry_count;
+                    
+                    IF v_entry_count > 0 THEN
+                        INSERT INTO draw_entries (draw_id, user_id, entry_count, entry_method, source_id, metadata)
+                        VALUES (v_draw.id, NEW.user_id, v_entry_count, 'purchase', NEW.id::text, jsonb_build_object(
+                            'order_id', NEW.id, 'order_amount', NEW.total_amount,
+                            'order_number', NEW.order_number, 'awarded_at', NOW()
+                        ))
+                        RETURNING id INTO v_entry_id;
+                        
+                        RAISE WARNING '[DRAW] Draw entry created (id=%), creating % tickets...', v_entry_id, v_entry_count;
+                        
+                        FOR i IN 1..v_entry_count LOOP
+                            INSERT INTO draw_tickets (draw_id, user_id, entry_id, ticket_number)
+                            VALUES (v_draw.id, NEW.user_id, v_entry_id, i);
+                        END LOOP;
+                        
+                        RAISE WARNING '[DRAW] % tickets created', v_entry_count;
+                        
+                        INSERT INTO draw_live_ticker (draw_id, user_name, entry_count, entry_method)
+                        SELECT v_draw.id, COALESCE(u.full_name, 'Customer'), v_entry_count, 'purchase'
+                        FROM users u WHERE u.id = NEW.user_id;
+                        
+                        v_entries_awarded := v_entry_count;
+                    ELSE
+                        RAISE WARNING '[DRAW] Entry count is 0, skipping';
+                    END IF;
+                ELSE
+                    RAISE WARNING '[DRAW] Order amount % below minimum %', 
+                        NEW.total_amount, (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric;
+                END IF;
+            ELSE
+                RAISE WARNING '[DRAW] No active draw found';
             END IF;
         END IF;
-    ELSE
-        RAISE NOTICE 'No active draw found for order %', NEW.id;
-    END IF;
-END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[DRAW ERROR] %', SQLERRM;
+        v_entries_awarded := 0;
+    END;
+    
+    -- ============================================
+    -- SINGLE ORDER UPDATE
+    -- ============================================
+    BEGIN
+        RAISE WARNING '[UPDATE ORDER] Updating order % with % points and % entries', 
+            NEW.id, points_to_award, v_entries_awarded;
         
-        -- ============================================
-        -- PART 5: PROCESS PURCHASE CHALLENGES
-        -- ============================================
-        -- Check if this order qualifies for any purchase challenges
+        UPDATE orders
+        SET 
+            loyalty_points_earned = points_to_award,
+            draw_entries_awarded = CASE WHEN v_entries_awarded > 0 THEN v_entries_awarded ELSE 0 END,
+            draw_id = CASE WHEN v_entries_awarded > 0 THEN v_draw.id ELSE NULL END,
+            draw_entry_details = CASE WHEN v_entries_awarded > 0 THEN 
+                jsonb_build_object(
+                    'draw_name', v_draw.name,
+                    'draw_id', v_draw.id,
+                    'draw_time', v_draw.draw_time,
+                    'entries_awarded', v_entries_awarded,
+                    'calculation', jsonb_build_object(
+                        'order_amount', NEW.total_amount,
+                        'entries_per_ksh', (v_draw.entry_calculation->'purchase'->>'entries_per_ksh')::numeric,
+                        'min_purchase', (v_draw.entry_calculation->'purchase'->>'min_purchase')::numeric,
+                        'max_entries', (v_draw.entry_calculation->'purchase'->>'max_entries_per_order')::integer
+                    ),
+                    'awarded_at', NOW()
+                )
+            ELSE NULL
+            END,
+            updated_at = NOW()
+        WHERE id = NEW.id;
+        
+        GET DIAGNOSTICS v_entry_count = ROW_COUNT;
+        RAISE WARNING '[UPDATE ORDER] Rows updated: %', v_entry_count;
+        
+        IF v_entry_count = 0 THEN
+            RAISE WARNING '[UPDATE ORDER] WARNING: No rows updated! Check if order id=% exists', NEW.id;
+        END IF;
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[UPDATE ORDER ERROR] %', SQLERRM;
+    END;
+    
+    -- ============================================
+    -- PART 5 & 6: Challenges and Team Spending
+    -- ============================================
+    BEGIN
         PERFORM process_purchase_challenge(NEW.id);
-        
-        -- ============================================
-        -- PART 6: PROCESS TEAM SPENDING
-        -- ============================================
-        -- If user is in a team, add spending to team total
-        PERFORM process_team_spending(
-            NEW.id,
-            NEW.user_id,
-            NEW.total_amount
-        );
-        
-    END IF;
+        RAISE WARNING '[CHALLENGES] Purchase challenges processed';
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[CHALLENGES ERROR] %', SQLERRM;
+    END;
+    
+    BEGIN
+        PERFORM process_team_spending(NEW.id, NEW.user_id, NEW.total_amount);
+        RAISE WARNING '[TEAM] Team spending processed';
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '[TEAM ERROR] %', SQLERRM;
+    END;
+    
+    RAISE WARNING '[COMPLETE] Order % fully processed', NEW.id;
     
     RETURN NEW;
 END;
 $$;
 
--- Recreate the trigger
+-- Recreate trigger
 DROP TRIGGER IF EXISTS orders_award_points ON orders;
 CREATE TRIGGER orders_award_points
     AFTER UPDATE ON orders
